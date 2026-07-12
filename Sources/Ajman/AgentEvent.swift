@@ -15,6 +15,23 @@ enum JSONValue: Equatable {
     }
 }
 
+struct PetNotification: Identifiable, Equatable {
+    enum Kind: Equatable { case waiting, done, failed, running }
+
+    let id: String
+    let provider: AgentEvent.Provider
+    let sessionId: String
+    let kind: Kind
+    let title: String
+    let preview: String
+    let timestamp: Date
+}
+
+enum PetNotificationChange: Equatable {
+    case upsert(PetNotification)
+    case dismiss(id: String)
+}
+
 struct AgentEvent {
     enum Provider: String { case claude, codex }
 

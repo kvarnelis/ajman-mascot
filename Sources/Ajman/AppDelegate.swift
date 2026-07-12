@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var registry: SessionRegistry?
     private var server: UDSServer?
     private var codexMonitor: CodexMonitor?
+    private var bubbleController: BubbleController?
     private var catalog: PetCatalog?
     private var activePetID = PetCatalog.defaultPetID
 
@@ -27,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let panel = OverlayPanel(contentView: view, scale: scale, relativeScale: relativeScale)
             let animator = Animator(sheet: sheet, view: view)
             let registry = SessionRegistry()
+            let bubbleController = BubbleController(petPanel: panel)
             let server = UDSServer()
             let codexMonitor = CodexMonitor()
             var statusMenu: StatusMenu!
@@ -54,6 +56,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     animator?.play(state)
                 }
             }
+            registry.notificationDidChange = { [weak bubbleController] change in
+                bubbleController?.apply(change)
+            }
+            bubbleController.dismissHandler = { [weak registry] id in
+                registry?.dismissNotification(id: id)
+            }
             server.eventHandler = { event in
                 Task { @MainActor in registry.apply(event) }
             }
@@ -70,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.registry = registry
             self.server = server
             self.codexMonitor = codexMonitor
+            self.bubbleController = bubbleController
             self.catalog = catalog
             activePetID = loadedPet.descriptor.id
             catalog.saveSelection(activePetID)

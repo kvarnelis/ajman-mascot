@@ -12,6 +12,7 @@ final class SessionRegistry {
     private(set) var sessions: [String: Session] = [:]
     private(set) var currentState: AnimationState = .idle
     var didChange: ((AnimationState, Int) -> Void)?
+    var notificationDidChange: ((PetNotificationChange) -> Void)?
     private var timer: Timer?
 
     init(startTimer: Bool = true) {
@@ -25,6 +26,7 @@ final class SessionRegistry {
     func apply(_ event: AgentEvent) {
         let identifier = event.sessionId ?? "unknown"
         let key = "\(event.provider.rawValue):\(identifier)"
+        updateNotification(for: event, id: key, sessionId: identifier)
         if event.event == "SessionEnd" {
             sessions.removeValue(forKey: key)
         } else {
@@ -33,6 +35,89 @@ final class SessionRegistry {
             sessions[key] = Session(key: key, lastEvent: event.event, lastActivity: event.timestamp, derivedState: next)
         }
         reduce(now: event.timestamp)
+    }
+
+    func dismissNotification(id: String) {
+        notificationDidChange?(.dismiss(id: id))
+    }
+
+    private func updateNotification(for event: AgentEvent, id: String, sessionId: String) {
+        let kind: PetNotification.Kind?
+        switch event.event {
+        case "Notification": kind = .waiting
+        case "Stop": kind = .done
+        default: kind = event.event.hasSuffix("Failure") ? .failed : nil
+        }
+
+        guard let kind else {
+            // Any subsequent progress/user-presence/end signal supersedes a card.
+            if ["UserPromptSubmit", "PreToolUse", "PostToolUse", "SessionEnd"].contains(event.event) {
+                notificationDidChange?(.dismiss(id: id))
+            }
+            return
+        }
+
+        notificationDidChange?(.upsert(PetNotification(
+            id: id,
+            provider: event.provider,
+            sessionId: sessionId,
+            kind: kind,
+            title: Self.title(for: event, kind: kind),
+            preview: Self.preview(for: event, kind: kind),
+            timestamp: event.timestamp
+        )))
+    }
+
+    private static func title(for event: AgentEvent, kind: PetNotification.Kind) -> String {
+        let provider = event.provider == .claude ? "Claude" : "Codex"
+        switch kind {
+        case .waiting: return "\(provider) needs you"
+        case .done: return "\(provider) finished"
+        case .failed: return "\(provider) hit an error"
+        case .running: return event.toolName.map { "\(provider): \($0)" } ?? "\(provider) is working"
+        }
+    }
+
+    private static func preview(for event: AgentEvent, kind: PetNotification.Kind) -> String {
+        let preferredKeys = ["message", "last_assistant_message", "lastAssistantMessage", "summary", "reason", "error", "content", "text"]
+        if let message = firstString(in: .object(event.raw), preferredKeys: preferredKeys) {
+            return clean(message)
+        }
+        if let tool = event.toolName, !tool.isEmpty {
+            return kind == .waiting ? "Approval needed for \(tool)." : tool
+        }
+        switch kind {
+        case .waiting: return "This session is waiting for your input."
+        case .done: return "The turn is ready for review."
+        case .failed: return "The session reported an error."
+        case .running: return "Work is in progress."
+        }
+    }
+
+    private static func firstString(in value: JSONValue, preferredKeys: [String]) -> String? {
+        switch value {
+        case .object(let dictionary):
+            for key in preferredKeys {
+                if let candidate = dictionary[key], let string = firstString(in: candidate, preferredKeys: preferredKeys), !string.isEmpty {
+                    return string
+                }
+            }
+            for candidate in dictionary.values {
+                if case .object = candidate, let string = firstString(in: candidate, preferredKeys: preferredKeys), !string.isEmpty { return string }
+                if case .array = candidate, let string = firstString(in: candidate, preferredKeys: preferredKeys), !string.isEmpty { return string }
+            }
+        case .array(let values):
+            for candidate in values {
+                if let string = firstString(in: candidate, preferredKeys: preferredKeys), !string.isEmpty { return string }
+            }
+        case .string(let string): return string
+        default: break
+        }
+        return nil
+    }
+
+    private static func clean(_ value: String) -> String {
+        value.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
     }
 
     func reduce(now: Date = Date()) {

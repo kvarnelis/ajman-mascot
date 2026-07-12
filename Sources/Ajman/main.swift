@@ -4,6 +4,8 @@ import AppKit
 private func runSelfTest() -> Int32 {
     let fileManager = FileManager.default
     let registry = SessionRegistry(startTimer: false)
+    var notificationChanges: [PetNotificationChange] = []
+    registry.notificationDidChange = { notificationChanges.append($0) }
     let selfTestSocket = URL(fileURLWithPath: "/tmp/ajman-selftest-\(UUID().uuidString.prefix(8)).sock")
     let server = UDSServer(socketURL: selfTestSocket)
     server.eventHandler = { event in Task { @MainActor in registry.apply(event) } }
@@ -61,6 +63,17 @@ private func runSelfTest() -> Int32 {
         try invokeHook(event: "Notification")
         guard pump(until: { registry.currentState == .waiting }) else { throw SelfTestError("Notification did not produce waiting") }
         print("UDS transport: Notification -> waiting")
+        guard case .upsert(let waiting)? = notificationChanges.last, waiting.kind == .waiting else {
+            throw SelfTestError("Notification did not raise a waiting card")
+        }
+        try invokeHook(event: "PostToolUse", tool: "Bash")
+        guard pump(until: {
+            notificationChanges.contains { change in
+                if case .dismiss(let id) = change { return id == waiting.id }
+                return false
+            }
+        }) else { throw SelfTestError("follow-up event did not dismiss waiting card") }
+        print("Bubble lifecycle: waiting card raised; PostToolUse dismissed it")
 
         let temp = fileManager.temporaryDirectory.appendingPathComponent("ajman-selftest-\(UUID().uuidString)")
         defer { try? fileManager.removeItem(at: temp) }
