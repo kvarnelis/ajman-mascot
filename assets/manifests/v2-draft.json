@@ -1,0 +1,62 @@
+{
+  "cellWidth": 192,
+  "cellHeight": 208,
+  "columns": 8,
+  "rows": 9,
+  "v1Sheet": "assets/live-pet-backup-2026-07-11/spritesheet.webp",
+  "cells": [
+    {"row":0,"col":0,"from":"work/segmented/exec-22f826c0-d919-4ddd-85ba-8721342ae271/frame-00.png"},
+    {"row":0,"col":1,"from":"work/segmented/exec-22f826c0-d919-4ddd-85ba-8721342ae271/frame-01.png"},
+    {"row":0,"col":2,"from":"work/segmented/exec-22f826c0-d919-4ddd-85ba-8721342ae271/frame-02.png"},
+    {"row":0,"col":3,"from":"work/segmented/exec-22f826c0-d919-4ddd-85ba-8721342ae271/frame-01.png"},
+    {"row":0,"col":4,"from":"work/segmented/exec-22f826c0-d919-4ddd-85ba-8721342ae271/frame-00.png"},
+    {"row":0,"col":5,"from":"work/segmented/exec-22f826c0-d919-4ddd-85ba-8721342ae271/frame-07.png"},
+
+    {"row":1,"col":0,"v1":{"row":1,"col":0}}, {"row":1,"col":1,"v1":{"row":1,"col":1}},
+    {"row":1,"col":2,"v1":{"row":1,"col":2}}, {"row":1,"col":3,"v1":{"row":1,"col":3}},
+    {"row":1,"col":4,"v1":{"row":1,"col":4}}, {"row":1,"col":5,"v1":{"row":1,"col":5}},
+    {"row":1,"col":6,"v1":{"row":1,"col":6}}, {"row":1,"col":7,"v1":{"row":1,"col":7}},
+
+    {"row":2,"col":0,"v1":{"row":2,"col":0}}, {"row":2,"col":1,"v1":{"row":2,"col":1}},
+    {"row":2,"col":2,"v1":{"row":2,"col":2}}, {"row":2,"col":3,"v1":{"row":2,"col":3}},
+    {"row":2,"col":4,"v1":{"row":2,"col":4}}, {"row":2,"col":5,"v1":{"row":2,"col":5}},
+    {"row":2,"col":6,"v1":{"row":2,"col":6}}, {"row":2,"col":7,"v1":{"row":2,"col":7}},
+
+    {"row":3,"col":0,"v1":{"row":3,"col":0}}, {"row":3,"col":1,"v1":{"row":3,"col":1}},
+    {"row":3,"col":2,"v1":{"row":3,"col":2}}, {"row":3,"col":3,"v1":{"row":3,"col":3}},
+
+    {"row":4,"col":0,"v1":{"row":4,"col":0}}, {"row":4,"col":1,"v1":{"row":4,"col":1}},
+    {"row":4,"col":2,"v1":{"row":4,"col":2}}, {"row":4,"col":3,"v1":{"row":4,"col":3}},
+    {"row":4,"col":4,"v1":{"row":4,"col":4}},
+
+    {"row":5,"col":0,"from":"work/segmented/exec-9fb0abb3-0356-4762-b527-33185c76ca06/frame-00.png"},
+    {"row":5,"col":1,"from":"work/segmented/exec-9fb0abb3-0356-4762-b527-33185c76ca06/frame-01.png"},
+    {"row":5,"col":2,"from":"work/segmented/exec-9fb0abb3-0356-4762-b527-33185c76ca06/frame-02.png"},
+    {"row":5,"col":3,"from":"work/segmented/exec-9fb0abb3-0356-4762-b527-33185c76ca06/frame-03.png"},
+    {"row":5,"col":4,"from":"work/segmented/exec-9fb0abb3-0356-4762-b527-33185c76ca06/frame-03.png"},
+    {"row":5,"col":5,"from":"work/segmented/exec-9fb0abb3-0356-4762-b527-33185c76ca06/frame-02.png"},
+    {"row":5,"col":6,"from":"work/segmented/exec-9fb0abb3-0356-4762-b527-33185c76ca06/frame-01.png"},
+    {"row":5,"col":7,"from":"work/segmented/exec-9fb0abb3-0356-4762-b527-33185c76ca06/frame-00.png"},
+
+    {"row":6,"col":0,"from":"work/segmented/exec-a05cf3f3-ba26-4c68-b7a6-bcfe76a0172d/frame-02.png"},
+    {"row":6,"col":1,"from":"work/segmented/exec-a05cf3f3-ba26-4c68-b7a6-bcfe76a0172d/frame-03.png"},
+    {"row":6,"col":2,"from":"work/segmented/exec-a05cf3f3-ba26-4c68-b7a6-bcfe76a0172d/frame-04.png"},
+    {"row":6,"col":3,"from":"work/segmented/exec-a05cf3f3-ba26-4c68-b7a6-bcfe76a0172d/frame-05.png"},
+    {"row":6,"col":4,"from":"work/segmented/exec-a05cf3f3-ba26-4c68-b7a6-bcfe76a0172d/frame-06.png"},
+    {"row":6,"col":5,"from":"work/segmented/exec-a05cf3f3-ba26-4c68-b7a6-bcfe76a0172d/frame-07.png"},
+
+    {"row":7,"col":0,"from":"work/segmented/exec-99dd981c-7d33-45b4-9620-0557d0529a90/frame-00.png"},
+    {"row":7,"col":1,"from":"work/segmented/exec-99dd981c-7d33-45b4-9620-0557d0529a90/frame-01.png"},
+    {"row":7,"col":2,"from":"work/segmented/exec-99dd981c-7d33-45b4-9620-0557d0529a90/frame-02.png"},
+    {"row":7,"col":3,"from":"work/segmented/exec-99dd981c-7d33-45b4-9620-0557d0529a90/frame-03.png"},
+    {"row":7,"col":4,"from":"work/segmented/exec-99dd981c-7d33-45b4-9620-0557d0529a90/frame-04.png"},
+    {"row":7,"col":5,"from":"work/segmented/exec-99dd981c-7d33-45b4-9620-0557d0529a90/frame-05.png"},
+
+    {"row":8,"col":0,"from":"work/segmented/exec-2ed2cf57-8e8f-4c2b-b25f-b2c9a47bf40a/frame-00.png"},
+    {"row":8,"col":1,"from":"work/segmented/exec-2ed2cf57-8e8f-4c2b-b25f-b2c9a47bf40a/frame-01.png"},
+    {"row":8,"col":2,"from":"work/segmented/exec-2ed2cf57-8e8f-4c2b-b25f-b2c9a47bf40a/frame-02.png"},
+    {"row":8,"col":3,"from":"work/segmented/exec-2ed2cf57-8e8f-4c2b-b25f-b2c9a47bf40a/frame-03.png"},
+    {"row":8,"col":4,"from":"work/segmented/exec-2ed2cf57-8e8f-4c2b-b25f-b2c9a47bf40a/frame-02.png"},
+    {"row":8,"col":5,"from":"work/segmented/exec-2ed2cf57-8e8f-4c2b-b25f-b2c9a47bf40a/frame-01.png"}
+  ]
+}
