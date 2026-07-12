@@ -50,7 +50,9 @@
     {
       "id": "idle",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57de-2aa8-7521-ae49-76518a856c30/exec-6f2ff77b-cd21-41a9-b848-6898a6a70a6c.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/idle.md",
       "retry_prompt_file": "prompts/row-retries/idle.md",
       "input_images": [
@@ -113,7 +115,9 @@
     {
       "id": "running-right",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57e4-50ea-7822-986d-5b9efd682db9/exec-38e9ebf2-1540-4fa6-a210-bb1672a1ebc4.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/running-right.md",
       "retry_prompt_file": "prompts/row-retries/running-right.md",
       "input_images": [
@@ -176,7 +180,7 @@
     {
       "id": "running-left",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
       "prompt_file": "prompts/rows/running-left.md",
       "retry_prompt_file": "prompts/row-retries/running-left.md",
       "input_images": [
@@ -249,12 +253,29 @@
         "derivation": "framewise-horizontal-mirror-preserving-order",
         "requires_explicit_approval": true,
         "fallback_generation_skill": "$imagegen"
+      },
+      "source_path": "decoded/running-right.png",
+      "derived_from": "running-right",
+      "completed_at": "2026-07-12T19:55:22.457556+00:00",
+      "metadata": {
+        "width": 1731,
+        "height": 909,
+        "mode": "RGBA",
+        "format": "PNG"
+      },
+      "mirror_decision": {
+        "approved": true,
+        "approved_at": "2026-07-12T19:55:22.457556+00:00",
+        "note": "Winnie has no side-specific prop or asymmetric identity feature; her collar and round tag are centered, so framewise mirroring preserves identity and direction semantics.",
+        "transform": "framewise-horizontal-mirror-preserving-order"
       }
     },
     {
       "id": "waving",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57e4-6ce4-72a2-9161-fbe71b8c65d1/exec-10e350eb-6b4d-4410-9302-3f818c7887b5.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/waving.md",
       "retry_prompt_file": "prompts/row-retries/waving.md",
       "input_images": [
@@ -317,7 +338,9 @@
     {
       "id": "jumping",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57de-2aa8-7521-ae49-76518a856c30/exec-36781963-9244-46b5-9a3a-10223dd516f4.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/jumping.md",
       "retry_prompt_file": "prompts/row-retries/jumping.md",
       "input_images": [
@@ -380,7 +403,9 @@
     {
       "id": "failed",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57e4-50ea-7822-986d-5b9efd682db9/exec-cf210e4e-996f-4db0-9f0c-88ef40fb7e1e.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/failed.md",
       "retry_prompt_file": "prompts/row-retries/failed.md",
       "input_images": [
@@ -443,7 +468,9 @@
     {
       "id": "waiting",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57de-2aa8-7521-ae49-76518a856c30/exec-f55ec4e2-4d6d-4da6-b56e-c5e8e988ed0a.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/waiting.md",
       "retry_prompt_file": "prompts/row-retries/waiting.md",
       "input_images": [
@@ -506,7 +533,9 @@
     {
       "id": "running",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57e4-50ea-7822-986d-5b9efd682db9/exec-e5621cb2-7b5e-4113-8a84-6ab3ce191af2.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/running.md",
       "retry_prompt_file": "prompts/row-retries/running.md",
       "input_images": [
@@ -569,7 +598,9 @@
     {
       "id": "review",
       "kind": "row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57e4-6ce4-72a2-9161-fbe71b8c65d1/exec-02b42b41-75bc-4d1b-86bb-d364bd125cd0.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/review.md",
       "retry_prompt_file": "prompts/row-retries/review.md",
       "input_images": [
@@ -632,7 +663,9 @@
     {
       "id": "look-cardinals",
       "kind": "look-cardinal-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57e4-6ce4-72a2-9161-fbe71b8c65d1/exec-19961900-0530-4de4-8b13-1709625b0516.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/look-cardinals.md",
       "repair_prompt_files": {
         "000": "prompts/look-anchor-repairs/000.md",
@@ -734,7 +767,9 @@
     {
       "id": "look-row-9",
       "kind": "look-row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57e4-6ce4-72a2-9161-fbe71b8c65d1/exec-8790a79d-bff8-4b38-b029-3cd43f83ffd7.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/look-row-9.md",
       "retry_prompt_file": "prompts/row-retries/look-row-9.md",
       "input_images": [
