@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "chroma_key": {
+    "hex": "#00FF00",
+    "rgb": [
+      0,
+      255,
+      0
+    ]
+  },
+  "rows": [
+    {
+      "state": "idle",
+      "frames": 6,
+      "method": "components",
+      "source": "deterministic animation from cleaned Ajman base sprite and raised-paw pose"
+    },
+    {
+      "state": "running-right",
+      "frames": 8,
+      "method": "components",
+      "source": "deterministic animation from cleaned Ajman base sprite and raised-paw pose"
+    },
+    {
+      "state": "running-left",
+      "frames": 8,
+      "method": "components",
+      "source": "deterministic animation from cleaned Ajman base sprite and raised-paw pose"
+    },
+    {
+      "state": "waving",
+      "frames": 4,
+      "method": "components",
+      "source": "deterministic animation from cleaned Ajman base sprite and raised-paw pose"
+    },
+    {
+      "state": "jumping",
+      "frames": 5,
+      "method": "components",
+      "source": "deterministic animation from cleaned Ajman base sprite and raised-paw pose"
+    },
+    {
+      "state": "failed",
+      "frames": 8,
+      "method": "components",
+      "source": "deterministic animation from cleaned Ajman base sprite and raised-paw pose"
+    },
+    {
+      "state": "waiting",
+      "frames": 6,
+      "method": "components",
+      "source": "deterministic animation from cleaned Ajman base sprite and raised-paw pose"
+    },
+    {
+      "state": "running",
+      "frames": 6,
+      "method": "components",
+      "source": "deterministic animation from cleaned Ajman base sprite and raised-paw pose"
+    },
+    {
+      "state": "review",
+      "frames": 6,
+      "method": "components",
+      "source": "deterministic animation from cleaned Ajman base sprite and raised-paw pose"
+    }
+  ]
+}

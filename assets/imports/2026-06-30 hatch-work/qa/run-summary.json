@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "package_dir": "/Users/kazys/Documents/Codex/2026-06-30/hi/work/hatch-pet/ajman/package/ajman",
+  "spritesheet": "/Users/kazys/Documents/Codex/2026-06-30/hi/work/hatch-pet/ajman/final/spritesheet.webp",
+  "pet_json": "/Users/kazys/Documents/Codex/2026-06-30/hi/work/hatch-pet/ajman/package/ajman/pet.json",
+  "contact_sheet": "/Users/kazys/Documents/Codex/2026-06-30/hi/work/hatch-pet/ajman/qa/contact-sheet.png",
+  "validation": "/Users/kazys/Documents/Codex/2026-06-30/hi/work/hatch-pet/ajman/final/validation.json",
+  "review": "/Users/kazys/Documents/Codex/2026-06-30/hi/work/hatch-pet/ajman/qa/review.json",
+  "previews": "/Users/kazys/Documents/Codex/2026-06-30/hi/work/hatch-pet/ajman/qa/previews",
+  "outputs": {
+    "spritesheet": "/Users/kazys/Documents/Codex/2026-06-30/hi/outputs/ajman-spritesheet.webp",
+    "pet_json": "/Users/kazys/Documents/Codex/2026-06-30/hi/outputs/ajman-pet.json",
+    "contact_sheet": "/Users/kazys/Documents/Codex/2026-06-30/hi/outputs/ajman-contact-sheet.png",
+    "zip": "/Users/kazys/Documents/Codex/2026-06-30/hi/outputs/ajman-codex-pet.zip"
+  }
+}
