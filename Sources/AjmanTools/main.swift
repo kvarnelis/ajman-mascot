@@ -199,6 +199,14 @@ private func alphaBounds(_ raster: Raster, within box: Box) -> Box? {
     return maxX < minX ? nil : Box(x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1)
 }
 
+private func alphaBounds(_ raster: Raster, within box: Box, threshold: UInt8) -> Box? {
+    var minX = box.x + box.w, maxX = box.x - 1, minY = box.y + box.h, maxY = box.y - 1
+    for y in box.y..<(box.y + box.h) { for x in box.x..<(box.x + box.w) where raster[x, y, 3] > threshold {
+        minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+    }}
+    return maxX < minX ? nil : Box(x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1)
+}
+
 private func median(_ values: [Int]) -> Double? {
     guard !values.isEmpty else { return nil }
     let sorted = values.sorted()
@@ -226,6 +234,40 @@ private func blit(_ source: Raster, sourceBox: Box, into target: inout Raster,
             for c in 0..<4 { target[tx, ty, c] = source[sx, sy, c] }
         }
     }
+}
+
+private func scaled(_ source: Raster, sourceBox: Box, width: Int, height: Int) throws -> Raster {
+    guard let cropped = try makeImage(source).cropping(to: CGRect(
+        x: sourceBox.x, y: sourceBox.y, width: sourceBox.w, height: sourceBox.h
+    )) else {
+        throw ToolError.message("Could not crop cell content for scaling")
+    }
+    var result = Raster(width: width, height: height)
+    let ok = result.pixels.withUnsafeMutableBytes { bytes -> Bool in
+        guard let base = bytes.baseAddress,
+              let context = CGContext(data: base, width: width, height: height,
+                                      bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+        context.interpolationQuality = .high
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return true
+    }
+    guard ok else { throw ToolError.message("Could not create scaled RGBA bitmap") }
+    return result
+}
+
+private func despillMagenta(in raster: inout Raster, box: Box) {
+    for y in box.y..<(box.y + box.h) { for x in box.x..<(box.x + box.w) {
+        let r = raster[x, y, 0], g = raster[x, y, 1], b = raster[x, y, 2]
+        if r > 180, b > 170, g < 120 {
+            raster[x, y, 0] = 0; raster[x, y, 1] = 0
+            raster[x, y, 2] = 0; raster[x, y, 3] = 0
+        } else if raster[x, y, 3] > 0, r > g, b > g {
+            raster[x, y, 0] = g
+            raster[x, y, 2] = g
+        }
+    }}
 }
 
 private let glyphs: [Character: [UInt8]] = [
@@ -431,9 +473,97 @@ private func compose(manifestURL: URL, outURL: URL) throws {
     print("compose: wrote spritesheet.png \(atlas.width)x\(atlas.height) and preview.png")
 }
 
+private func rescaleCells(inputURL: URL, factor: Double, outputURL: URL,
+                          requestedRows: Int?, shouldDespillMagenta: Bool) throws {
+    let cellWidth = 192, cellHeight = 208, columns = 8
+    guard factor > 0, factor <= 1 else {
+        throw ToolError.message("rescale-cells factor must be greater than 0 and at most 1")
+    }
+
+    var source = try decode(inputURL)
+    let inferredRows = Int((Double(source.height) / Double(cellHeight)).rounded())
+    let rows = requestedRows ?? inferredRows
+    guard rows > 0 else { throw ToolError.message("rescale-cells rows must be greater than 0") }
+    guard source.width == cellWidth * columns, source.height == rows * cellHeight else {
+        throw ToolError.message(
+            "rescale-cells expected a 1536x\(rows * cellHeight) sheet (8 columns x \(rows) rows of 192x208); got \(source.width)x\(source.height)"
+        )
+    }
+
+    if shouldDespillMagenta {
+        for row in 0..<rows { for column in 0..<columns {
+            despillMagenta(in: &source, box: Box(x: column * cellWidth, y: row * cellHeight,
+                                                 w: cellWidth, h: cellHeight))
+        }}
+    }
+
+    var output = Raster(width: source.width, height: source.height)
+    var filledCells = 0
+    for row in 0..<rows { for column in 0..<columns {
+        let cell = Box(x: column * cellWidth, y: row * cellHeight, w: cellWidth, h: cellHeight)
+        guard let bounds = alphaBounds(source, within: cell, threshold: 10) else { continue }
+        let scaledWidth = max(1, Int((Double(bounds.w) * factor).rounded()))
+        let scaledHeight = max(1, Int((Double(bounds.h) * factor).rounded()))
+        guard scaledWidth <= cellWidth, scaledHeight <= cellHeight - 4 else {
+            throw ToolError.message(
+                "rescale-cells content in row \(row), column \(column) does not fit with the 4px bottom margin after scaling (\(scaledWidth)x\(scaledHeight))"
+            )
+        }
+        let scaledContent = try scaled(source, sourceBox: bounds, width: scaledWidth, height: scaledHeight)
+        copyCell(scaledContent, sourceBox: Box(x: 0, y: 0, w: scaledWidth, h: scaledHeight),
+                 into: &output,
+                 destX: column * cellWidth + (cellWidth - scaledWidth) / 2,
+                 destY: row * cellHeight + cellHeight - 4 - scaledHeight,
+                 mirror: false)
+        filledCells += 1
+    }}
+
+    try write(output, to: outputURL, type: "public.png" as CFString)
+    let previewURL = URL(fileURLWithPath: outputURL.path + ".preview.png")
+    try write(makePreview(atlas: output, cellW: cellWidth, cellH: cellHeight,
+                          columns: columns, rows: rows),
+              to: previewURL, type: "public.png" as CFString)
+    print("rescale-cells: wrote \(outputURL.path) \(output.width)x\(output.height)")
+    print("rescale-cells: wrote \(previewURL.path) (2x preview with gridlines)")
+    print("rescale-cells: \(filledCells) non-empty cells; \(rows * columns - filledCells) empty cells")
+}
+
+private let usage = """
+Usage: ajman-tools segment <strip.png> <outdir>
+       ajman-tools compose <manifest.json> <outdir>
+       ajman-tools rescale-cells <input.png|webp> <factor> <output.png> [--rows N] [--despill-magenta]
+"""
+
 private func main() throws {
     let args = Array(CommandLine.arguments.dropFirst())
-    guard args.count == 3 else { throw ToolError.message("Usage: ajman-tools segment <strip.png> <outdir>\n       ajman-tools compose <manifest.json> <outdir>") }
+    guard let command = args.first else { throw ToolError.message(usage) }
+    if command == "rescale-cells" {
+        guard args.count >= 4, let factor = Double(args[2]) else { throw ToolError.message(usage) }
+        var rows: Int?
+        var despillMagenta = false
+        var index = 4
+        while index < args.count {
+            switch args[index] {
+            case "--rows":
+                guard rows == nil, index + 1 < args.count, let value = Int(args[index + 1]) else {
+                    throw ToolError.message("--rows requires one integer value and may only be supplied once")
+                }
+                rows = value
+                index += 2
+            case "--despill-magenta":
+                guard !despillMagenta else { throw ToolError.message("--despill-magenta may only be supplied once") }
+                despillMagenta = true
+                index += 1
+            default:
+                throw ToolError.message("Unknown rescale-cells option: \(args[index])\n\(usage)")
+            }
+        }
+        try rescaleCells(inputURL: URL(fileURLWithPath: args[1]), factor: factor,
+                         outputURL: URL(fileURLWithPath: args[3]), requestedRows: rows,
+                         shouldDespillMagenta: despillMagenta)
+        return
+    }
+    guard args.count == 3 else { throw ToolError.message(usage) }
     switch args[0] {
     case "segment": try segment(stripURL: URL(fileURLWithPath: args[1]), outURL: URL(fileURLWithPath: args[2]))
     case "compose": try compose(manifestURL: URL(fileURLWithPath: args[1]), outURL: URL(fileURLWithPath: args[2]))
