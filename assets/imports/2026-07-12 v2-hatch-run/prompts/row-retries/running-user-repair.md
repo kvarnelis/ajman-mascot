@@ -1,0 +1,7 @@
+Create one horizontal six-frame animation strip for Codex pet Ajman in the `running` state, meaning a task is actively running.
+
+The existing row fails because Ajman appears essentially still. Make the six-frame loop unmistakably active at normal pet size. Keep him seated and planted, but animate a clear repeating work cycle: lean forward with focused eyes, rapidly alternate his two white front paws in low purposeful kneading/tapping gestures near the ground, compress slightly with effort, then return through a different intermediate pose. Both paws must visibly change position across the loop and the head/shoulders must bob subtly. No two neighboring frames may be near-identical. Keep paw pads facing down or inward; never raise an open paw beside the face, because that reads as waving.
+
+Do not show waving, a raised greeting paw, literal locomotion, jogging, raised knees, directional travel, speed lines, dust, shadows, detached effects, or new props. The motion comes from Ajman's own low busy paws, focused face, and body posture.
+
+Preserve the exact existing Ajman identity from the attached base and atlas: calm black tuxedo cat, white muzzle/chest/paws, yellow-green eyes, same realistic sprite style and proportions. Output exactly six complete, separated full-body poses left-to-right on perfectly flat pure #00FF00 green, one pose per invisible equal slot, stable scale and baseline, generous padding, no labels, guides, scenery, or clipping.

@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "chroma_key": {
+    "hex": "#00FF00",
+    "rgb": [
+      0,
+      255,
+      0
+    ],
+    "threshold": 96.0
+  },
+  "rows": [
+    {
+      "state": "running",
+      "frames": [
+        "/private/tmp/ajman-v2-run/qa/rows/running/frames/running/00.png",
+        "/private/tmp/ajman-v2-run/qa/rows/running/frames/running/01.png",
+        "/private/tmp/ajman-v2-run/qa/rows/running/frames/running/02.png",
+        "/private/tmp/ajman-v2-run/qa/rows/running/frames/running/03.png",
+        "/private/tmp/ajman-v2-run/qa/rows/running/frames/running/04.png",
+        "/private/tmp/ajman-v2-run/qa/rows/running/frames/running/05.png"
+      ],
+      "method": "components"
+    }
+  ]
+}
