@@ -128,6 +128,7 @@ Masko public commits: MIT (© 2026 Masko) — valid regardless of later private 
 2. **EventCore + UDS + Claude hooks (observe-only)** — Ajman reacts to real Claude sessions.
 3. **Codex hooks + rollout tailer + session registry** — multi-agent priority; Desktop vs CLI badges.
 4. **Bubbles + click-to-focus + menu-bar controls** (pause, launch-at-login, uninstall hooks). ← *v1 ships here*
+   - **Bubble design (locked 2026-07-12, modeled on Codex's native pet cards):** each card = **bold title** (short turn summary) · **truncated preview** of the message (~first sentence / ~120 chars, ellipsis-cut wherever it lands — a length cap, NOT first-line-only) · **⌄ expand** to read the full text · **status dot** (green ✓ done / spinner running / attention for waiting). **Stack one card per active session, newest on top.** Cross-agent by construction — Claude cards and Codex cards share the same stack (EventCore already keys per `provider+sessionId` with priority `waiting>failed>review>running>idle`, so the stack ordering falls out of the reducer). Click a card → focus that session's app/terminal. Title source: reuse the agent's own turn summary where exposed (Codex `notify`/rollout), else derive from the first line of the last assistant message.
 5. **v2** — answer permissions from the bubble (Claude rich, Codex allow/deny), exact terminal-tab focus, more agents.
 
 ## Backlog (unscheduled)
