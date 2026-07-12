@@ -853,7 +853,9 @@
     {
       "id": "look-row-10",
       "kind": "look-row-strip",
-      "status": "pending",
+      "status": "complete",
+      "source_path": "/Users/kazys/.codex/generated_images/019f57e4-50ea-7822-986d-5b9efd682db9/exec-d54656ff-3c9a-4b3a-93b4-685c35b4f312.png",
+      "completed_at": "2026-07-12T00:00:00Z",
       "prompt_file": "prompts/rows/look-row-10.md",
       "retry_prompt_file": "prompts/row-retries/look-row-10.md",
       "input_images": [
