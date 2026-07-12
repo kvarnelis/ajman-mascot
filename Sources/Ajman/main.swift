@@ -40,6 +40,21 @@ private func runSelfTest() -> Int32 {
         }
         print("Pet scale: default 0.5; all 6 options round-trip")
 
+        let selectionSuiteName = "AjmanSelfTest.PetSelection.\(UUID().uuidString)"
+        guard let selectionDefaults = UserDefaults(suiteName: selectionSuiteName) else { throw SelfTestError("could not create selection defaults") }
+        defer { selectionDefaults.removePersistentDomain(forName: selectionSuiteName) }
+        let catalog = PetCatalog(defaults: selectionDefaults)
+        guard !catalog.discover().isEmpty else { throw SelfTestError("pet discovery found no readable packages") }
+        guard catalog.selectedPetID == "ajman" else { throw SelfTestError("selected pet default was not ajman") }
+        catalog.saveSelection("winnie")
+        guard catalog.selectedPetID == "winnie" else { throw SelfTestError("selected pet did not round-trip") }
+        guard catalog.relativeScale(for: "ajman") == 1.0, catalog.relativeScale(for: "winnie") == 0.8 else {
+            throw SelfTestError("built-in relative pet scales were incorrect")
+        }
+        selectionDefaults.set(0.7, forKey: "AjmanPetScale.winnie")
+        guard catalog.relativeScale(for: "winnie") == 0.7 else { throw SelfTestError("relative pet scale override did not persist") }
+        print("Pet catalog: discovered \(catalog.discover().count); selection and relative scale override round-trip")
+
         try invokeHook(event: "PreToolUse", tool: "Bash")
         guard pump(until: { registry.currentState == .running }) else { throw SelfTestError("PreToolUse did not produce running") }
         print("UDS transport: PreToolUse(Bash) -> running")
@@ -94,8 +109,10 @@ if CommandLine.arguments.contains("--selftest") { exit(MainActor.assumeIsolated 
 
 if CommandLine.arguments.contains("--validate") {
     do {
-        let sheet = try SpriteSheet.load()
+        let loadedPet = try PetCatalog().loadSelected()
+        let sheet = loadedPet.sheet
         let table = sheet.animationTable
+        print("pet=\(loadedPet.descriptor.id)")
         print("source=\(sheet.sourceURL.path)")
         print("spriteVersionNumber=\(table.spriteVersionNumber)")
         print("usedFrames=\(table.usedFrameCount)")
@@ -138,7 +155,7 @@ if CommandLine.arguments.contains("--disconnect") {
 }
 
 let application = NSApplication.shared
-let delegate = AppDelegate()
+let delegate = MainActor.assumeIsolated { AppDelegate() }
 application.delegate = delegate
 application.setActivationPolicy(.accessory)
 application.run()

@@ -1,7 +1,7 @@
 import AppKit
 
 final class Animator {
-    private let sheet: SpriteSheet
+    private var sheet: SpriteSheet
     private weak var view: PetView?
     private var timer: DispatchSourceTimer?
     private var frames: [CGImage] = []
@@ -16,8 +16,22 @@ final class Animator {
         self.view = view
     }
 
+    func replaceSheet(_ sheet: SpriteSheet, playing state: AnimationState) {
+        timer?.cancel()
+        timer = nil
+        frames = []
+        frameIndex = 0
+        self.sheet = sheet
+        currentState = state
+        play(sheet.animationTable.definition(for: state) == nil ? .idle : state, force: true)
+    }
+
     func play(_ state: AnimationState) {
-        guard state != currentState || timer == nil else { return }
+        play(state, force: false)
+    }
+
+    private func play(_ state: AnimationState, force: Bool) {
+        guard force || state != currentState || timer == nil else { return }
         guard let definition = sheet.animationTable.definition(for: state) else { return }
         timer?.cancel()
         timer = nil

@@ -4,15 +4,18 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
     private static let positionKey = "AjmanPanelOrigin"
     private var saveWorkItem: DispatchWorkItem?
     private(set) var petScale: PetScale
+    private(set) var relativeScale: Double
     var petWasClicked: (() -> Void)?
     private var mouseDownScreenLocation: NSPoint?
     private var mouseDownTimestamp: TimeInterval?
-    var displaySize: NSSize { petScale.displaySize }
+    var displaySize: NSSize { Self.displaySize(global: petScale, relative: relativeScale) }
 
-    init(contentView: NSView, scale: PetScale) {
+    init(contentView: NSView, scale: PetScale, relativeScale: Double = 1.0) {
         petScale = scale
+        self.relativeScale = relativeScale
+        let size = Self.displaySize(global: scale, relative: relativeScale)
         super.init(
-            contentRect: NSRect(origin: .zero, size: scale.displaySize),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -71,12 +74,14 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
         savePosition()
     }
 
-    func apply(scale: PetScale) {
-        guard scale != petScale else { return }
+    func apply(scale: PetScale? = nil, relativeScale: Double? = nil) {
+        let nextScale = scale ?? petScale
+        let nextRelativeScale = relativeScale ?? self.relativeScale
+        guard nextScale != petScale || nextRelativeScale != self.relativeScale else { return }
 
         let oldFrame = frame
         let bottomCenter = NSPoint(x: oldFrame.midX, y: oldFrame.minY)
-        let newSize = scale.displaySize
+        let newSize = Self.displaySize(global: nextScale, relative: nextRelativeScale)
         var newFrame = NSRect(
             x: bottomCenter.x - newSize.width / 2,
             y: bottomCenter.y,
@@ -92,11 +97,19 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
             newFrame.origin.y = min(max(newFrame.minY, visibleFrame.minY), visibleFrame.maxY - newFrame.height)
         }
 
-        petScale = scale
+        petScale = nextScale
+        self.relativeScale = nextRelativeScale
         contentView?.frame = NSRect(origin: .zero, size: newSize)
         setFrame(newFrame, display: true)
-        scale.save()
+        if scale != nil { nextScale.save() }
         savePosition()
+    }
+
+    private static func displaySize(global: PetScale, relative: Double) -> NSSize {
+        NSSize(
+            width: (CGFloat(SpriteSheet.cellWidth) * CGFloat(global.rawValue) * CGFloat(relative)).rounded(),
+            height: (CGFloat(SpriteSheet.cellHeight) * CGFloat(global.rawValue) * CGFloat(relative)).rounded()
+        )
     }
 
     func windowDidMove(_ notification: Notification) {

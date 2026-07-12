@@ -15,8 +15,12 @@ final class StatusMenu: NSObject {
     private var scaleItems: [PetScale: NSMenuItem] = [:]
     private var cycleTimer: Timer?
     private let playfulIdleItem = NSMenuItem(title: "Playful Idle", action: #selector(togglePlayfulIdle(_:)), keyEquivalent: "")
+    private let petMenu = NSMenu(title: "Pet")
+    private let debugMenu = NSMenu(title: "Debug")
+    private var petItems: [String: NSMenuItem] = [:]
+    var petSelectionHandler: ((String) -> Void)?
 
-    init(animator: Animator, panel: OverlayPanel, registry: SessionRegistry, petMode: PetMode) {
+    init(animator: Animator, panel: OverlayPanel, registry: SessionRegistry, petMode: PetMode, pets: [PetDescriptor], activePetID: String) {
         self.animator = animator
         self.panel = panel
         self.registry = registry
@@ -27,6 +31,10 @@ final class StatusMenu: NSObject {
         let menu = NSMenu()
         activityItem.isEnabled = false
         menu.addItem(activityItem)
+        rebuildPetMenu(pets: pets, activePetID: activePetID)
+        let petItem = NSMenuItem(title: "Pet", action: nil, keyEquivalent: "")
+        petItem.submenu = petMenu
+        menu.addItem(petItem)
         playfulIdleItem.target = self
         playfulIdleItem.state = petMode.isEnabled ? .on : .off
         menu.addItem(playfulIdleItem)
@@ -49,15 +57,7 @@ final class StatusMenu: NSObject {
         sizeItem.submenu = sizeMenu
         menu.addItem(sizeItem)
 
-        let debugMenu = NSMenu(title: "Debug")
-        for state in animator.availableStates {
-            let item = NSMenuItem(title: state.title, action: #selector(selectState(_:)), keyEquivalent: "")
-            item.target = self; item.representedObject = state.rawValue
-            debugMenu.addItem(item); stateItems[state] = item
-        }
-        debugMenu.addItem(.separator()); cycleItem.target = self; debugMenu.addItem(cycleItem)
-        let resumeLive = NSMenuItem(title: "Resume Live Reactions", action: #selector(resumeLiveReactions), keyEquivalent: "")
-        resumeLive.target = self; debugMenu.addItem(resumeLive)
+        rebuildDebugMenu()
         let debugItem = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
         debugItem.submenu = debugMenu; menu.addItem(debugItem)
 
@@ -69,6 +69,49 @@ final class StatusMenu: NSObject {
         updateChecks(for: animator.currentState)
         updateScaleChecks(for: panel.petScale)
         panel.petWasClicked = { [weak petMode] in petMode?.wake() }
+    }
+
+    func refreshForPet(pets: [PetDescriptor], activePetID: String) {
+        rebuildPetMenu(pets: pets, activePetID: activePetID)
+        rebuildDebugMenu()
+        updateChecks(for: animator.currentState)
+        refreshManualIndicator()
+    }
+
+    private func rebuildPetMenu(pets: [PetDescriptor], activePetID: String) {
+        petMenu.removeAllItems()
+        petItems.removeAll()
+        for pet in pets {
+            let item = NSMenuItem(title: pet.displayName, action: #selector(selectPet(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = pet.id
+            item.state = pet.id == activePetID ? .on : .off
+            petMenu.addItem(item)
+            petItems[pet.id] = item
+        }
+    }
+
+    private func rebuildDebugMenu() {
+        debugMenu.removeAllItems()
+        stateItems.removeAll()
+        for state in animator.availableStates {
+            let item = NSMenuItem(title: state.title, action: #selector(selectState(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = state.rawValue
+            debugMenu.addItem(item)
+            stateItems[state] = item
+        }
+        debugMenu.addItem(.separator())
+        cycleItem.target = self
+        debugMenu.addItem(cycleItem)
+        let resumeLive = NSMenuItem(title: "Resume Live Reactions", action: #selector(resumeLiveReactions), keyEquivalent: "")
+        resumeLive.target = self
+        debugMenu.addItem(resumeLive)
+    }
+
+    @objc private func selectPet(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        petSelectionHandler?(id)
     }
 
     func updateActivity(state: AnimationState, sessionCount: Int) {

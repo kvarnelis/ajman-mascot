@@ -34,6 +34,8 @@ enum SpriteSheetError: LocalizedError {
 }
 
 private struct PetManifest: Decodable {
+    let id: String?
+    let displayName: String?
     let spriteVersionNumber: Int?
     let spritesheetPath: String?
 }
@@ -48,41 +50,19 @@ struct SpriteSheet {
     private let cells: [[CGImage]]
 
     static func load() throws -> SpriteSheet {
-        let liveDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".codex/pets/ajman", isDirectory: true)
-        do {
-            return try load(directory: liveDirectory, isBundle: false)
-        } catch {
-            FileHandle.standardError.write(Data("Ajman: live pet load failed: \(error.localizedDescription)\n".utf8))
-        }
-
-        do {
-            return try loadBundlePackage()
-        } catch {
-            FileHandle.standardError.write(Data("Ajman: bundled pet load failed: \(error.localizedDescription)\n".utf8))
-            throw error
-        }
+        try PetCatalog().loadSelected().sheet
     }
 
-    private static func loadBundlePackage() throws -> SpriteSheet {
-        guard let manifestURL = Bundle.main.url(forResource: "pet", withExtension: "json"),
-              let sheetURL = Bundle.main.url(forResource: "spritesheet", withExtension: "webp") else {
-            throw SpriteSheetError.missingBundlePackage
-        }
-        return try load(manifestURL: manifestURL, defaultSheetURL: sheetURL, isBundle: true)
-    }
-
-    private static func load(directory: URL, isBundle: Bool) throws -> SpriteSheet {
+    static func load(directory: URL) throws -> SpriteSheet {
         let manifestURL = directory.appendingPathComponent("pet.json")
         let sheetURL = directory.appendingPathComponent("spritesheet.webp")
-        guard FileManager.default.fileExists(atPath: manifestURL.path),
-              FileManager.default.fileExists(atPath: sheetURL.path) else {
+        guard FileManager.default.isReadableFile(atPath: manifestURL.path) else {
             throw SpriteSheetError.missingPackage(directory)
         }
-        return try load(manifestURL: manifestURL, defaultSheetURL: sheetURL, isBundle: isBundle)
+        return try load(manifestURL: manifestURL, defaultSheetURL: sheetURL)
     }
 
-    private static func load(manifestURL: URL, defaultSheetURL: URL, isBundle: Bool) throws -> SpriteSheet {
+    private static func load(manifestURL: URL, defaultSheetURL: URL) throws -> SpriteSheet {
         let manifest: PetManifest
         do {
             manifest = try JSONDecoder().decode(PetManifest.self, from: Data(contentsOf: manifestURL))
@@ -95,18 +75,8 @@ struct SpriteSheet {
         let rows = version == 2 ? 11 : 9
         let expectedWidth = columns * cellWidth
         let expectedHeight = rows * cellHeight
-        let sheetURL: URL
-        if isBundle {
-            // Bundle resources are flattened by build-app.sh; honor only the file name.
-            let name = URL(fileURLWithPath: manifest.spritesheetPath ?? defaultSheetURL.lastPathComponent).lastPathComponent
-            sheetURL = Bundle.main.url(
-                forResource: URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent,
-                withExtension: URL(fileURLWithPath: name).pathExtension
-            ) ?? defaultSheetURL
-        } else {
-            sheetURL = manifestURL.deletingLastPathComponent()
-                .appendingPathComponent(manifest.spritesheetPath ?? defaultSheetURL.lastPathComponent)
-        }
+        let sheetURL = manifestURL.deletingLastPathComponent()
+            .appendingPathComponent(manifest.spritesheetPath ?? defaultSheetURL.lastPathComponent)
 
         guard let source = CGImageSourceCreateWithURL(sheetURL as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {

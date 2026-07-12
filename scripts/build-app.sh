@@ -30,10 +30,16 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-ASSET_DIR="$HOME/.codex/pets/ajman"
-for asset in spritesheet.webp pet.json; do
-  if [[ -f "$ASSET_DIR/$asset" ]]; then
-    cp "$ASSET_DIR/$asset" "$CONTENTS/Resources/$asset"
+mkdir -p "$CONTENTS/Resources/Pets"
+for pet_id in ajman winnie; do
+  ASSET_DIR="$HOME/.codex/pets/$pet_id"
+  if [[ -f "$ASSET_DIR/pet.json" && -f "$ASSET_DIR/spritesheet.webp" ]]; then
+    mkdir -p "$CONTENTS/Resources/Pets/$pet_id"
+    cp "$ASSET_DIR/pet.json" "$CONTENTS/Resources/Pets/$pet_id/pet.json"
+    cp "$ASSET_DIR/spritesheet.webp" "$CONTENTS/Resources/Pets/$pet_id/spritesheet.webp"
+  elif [[ "$pet_id" == "ajman" ]]; then
+    echo "Required bundled fallback is missing: $ASSET_DIR" >&2
+    exit 1
   fi
 done
 

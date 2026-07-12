@@ -78,9 +78,17 @@ private func write(_ raster: Raster, to url: URL, type: CFString) throws {
     }
 }
 
-// Deliberately conservative: pure and noisy greens key out, while yellow-green eyes remain.
-private func isBackground(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> Bool {
-    Int(g) > 90 && Int(g) > Int(r) + 60 && Int(g) > Int(b) + 60
+private enum ChromaKey { case green, magenta }
+
+// Deliberately conservative: pure and noisy greens key out while yellow-green
+// eyes remain; the magenta path targets the near-pure #FF00FF generation matte.
+private func isBackground(_ r: UInt8, _ g: UInt8, _ b: UInt8, key: ChromaKey) -> Bool {
+    switch key {
+    case .green:
+        return Int(g) > 90 && Int(g) > Int(r) + 60 && Int(g) > Int(b) + 60
+    case .magenta:
+        return r > 180 && b > 170 && g < 120
+    }
 }
 
 private struct Box: Codable { let x: Int; let y: Int; let w: Int; let h: Int }
@@ -89,10 +97,18 @@ private struct SegmentIndex: Codable { let source: String; let frames: [SegmentF
 
 private func segment(stripURL: URL, outURL: URL) throws {
     let source = try decode(stripURL)
+    var greenPixels = 0, magentaPixels = 0
+    for y in 0..<source.height { for x in 0..<source.width {
+        let r = source[x, y, 0], g = source[x, y, 1], b = source[x, y, 2]
+        if isBackground(r, g, b, key: .green) { greenPixels += 1 }
+        if isBackground(r, g, b, key: .magenta) { magentaPixels += 1 }
+    }}
+    let key: ChromaKey = magentaPixels > greenPixels ? .magenta : .green
     var background = [Bool](repeating: false, count: source.width * source.height)
     for y in 0..<source.height {
         for x in 0..<source.width {
-            background[y * source.width + x] = isBackground(source[x, y, 0], source[x, y, 1], source[x, y, 2])
+            background[y * source.width + x] = isBackground(
+                source[x, y, 0], source[x, y, 1], source[x, y, 2], key: key)
         }
     }
     var runs: [Range<Int>] = []
@@ -134,9 +150,15 @@ private func segment(stripURL: URL, outURL: URL) throws {
                 if background[sy * source.width + sx] {
                     frame[x, y, 0] = 0; frame[x, y, 1] = 0; frame[x, y, 2] = 0; frame[x, y, 3] = 0
                 } else {
-                    frame[x, y, 0] = r
-                    frame[x, y, 1] = g > max(r, b) ? max(r, b) : g
-                    frame[x, y, 2] = b
+                    if key == .magenta, r > g, b > g {
+                        frame[x, y, 0] = g
+                        frame[x, y, 1] = g
+                        frame[x, y, 2] = g
+                    } else {
+                        frame[x, y, 0] = r
+                        frame[x, y, 1] = g > max(r, b) ? max(r, b) : g
+                        frame[x, y, 2] = b
+                    }
                     frame[x, y, 3] = 255
                 }
             }
@@ -148,7 +170,7 @@ private func segment(stripURL: URL, outURL: URL) throws {
     let record = SegmentIndex(source: stripURL.path, frames: records)
     let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
     try encoder.encode(record).write(to: outURL.appendingPathComponent("index.json"))
-    print("segment: \(stripURL.lastPathComponent): \(records.count) frames")
+    print("segment: \(stripURL.lastPathComponent): \(records.count) frames (\(key == .magenta ? "magenta" : "green") key)")
 }
 
 private struct V1Cell: Codable { let row: Int; let col: Int }
