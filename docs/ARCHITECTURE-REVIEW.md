@@ -136,6 +136,7 @@ Masko public commits: MIT (© 2026 Masko) — valid regardless of later private 
 ## Backlog (unscheduled)
 
 - **Multiple pets — Winnie is next** (owner-confirmed 2026-07-12). The renderer already handles any hatch pet (v1 8×9 / v2 8×11), so the lift is small: (a) stop hardcoding `~/.codex/pets/ajman/` — load any `~/.codex/pets/<id>/`; (b) a menu picker to switch the active pet, persisted in UserDefaults; (c) optionally follow Codex's own `[desktop] selected-avatar-id` from config.toml, or keep an independent selection. Bundle Winnie's package (own pet.json + spritesheet) and back up her source imagery under `assets/imports/` on arrival, exactly as Ajman's. Not yet scheduled.
+  - **Direction (owner 2026-07-12):** Ajman *stays* the Codex/ChatGPT pet, untouched — the app only *adds* the picker (additive, nothing undone). Winnie is pet #2 and is a **smaller animal** — preserve that: do NOT apply the compose height-normalization to her (it would blow her up to Ajman's size). Each pet keeps its own scale; Winnie fills less of the 192×208 cell so she renders smaller than Ajman on-screen at the same half-cell treatment (our app draws Ajman at 96×104 pt; the Codex pet draws him larger — relative pet-to-pet size is what we protect). Canonical Ajman handed to Gemini as the style example: `assets/imports/2026-07-12 canonical-v2-hatch/references/canonical-base.png` (1078×1460).
 
 ## Open questions (tracked, non-blocking)
 
