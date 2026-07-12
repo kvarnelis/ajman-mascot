@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let server = UDSServer()
             let statusMenu = StatusMenu(animator: animator, panel: panel, registry: registry)
             registry.didChange = { [weak animator, weak statusMenu] state, count in
+                if statusMenu?.manualMode == true { return }   // Debug menu holds the reins; don't fight it
                 animator?.play(state)
                 statusMenu?.updateActivity(state: state, sessionCount: count)
             }
