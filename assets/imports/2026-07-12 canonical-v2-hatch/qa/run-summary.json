@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "spriteVersionNumber": 2,
+  "canonicalEarNotch": true,
+  "run_dir": "/private/tmp/ajman-canonical-v2",
+  "spritesheet": "/private/tmp/ajman-canonical-v2/final/spritesheet-extended.webp",
+  "validation": "/private/tmp/ajman-canonical-v2/final/validation-extended.json",
+  "chroma_despill": "/private/tmp/ajman-canonical-v2/qa/chroma-despill-extended.json",
+  "contact_sheet": "/private/tmp/ajman-canonical-v2/qa/contact-sheet-extended.png",
+  "direction_sheet": "/private/tmp/ajman-canonical-v2/qa/look-directions.png",
+  "direction_semantics": "/private/tmp/ajman-canonical-v2/qa/direction-semantics.json",
+  "blind_direction_validation": "/private/tmp/ajman-canonical-v2/qa/direction-blind-validation.json",
+  "continuity": "/private/tmp/ajman-canonical-v2/qa/look-continuity.json",
+  "review": "/private/tmp/ajman-canonical-v2/qa/review.json",
+  "package": "/Users/kazys/.codex/pets/ajman"
+}
