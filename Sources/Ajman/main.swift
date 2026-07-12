@@ -98,6 +98,33 @@ if CommandLine.arguments.contains("--validate") {
     }
 }
 
+if CommandLine.arguments.contains("--connect") {
+    do {
+        let hook = try ClaudeHookInstaller.installHookBinary()
+        let settings = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
+        let summary = try ClaudeHookInstaller.install(settingsPath: settings, hookBinaryPath: hook.path)
+        print("connected: hook=\(hook.path)")
+        print("events added: \(summary.eventsAdded.isEmpty ? "(none — already present)" : summary.eventsAdded.joined(separator: ", "))")
+        print("backup: \(summary.backupPath ?? "(none)")")
+        exit(EXIT_SUCCESS)
+    } catch {
+        FileHandle.standardError.write(Data("connect failed: \(error.localizedDescription)\n".utf8))
+        exit(EXIT_FAILURE)
+    }
+}
+
+if CommandLine.arguments.contains("--disconnect") {
+    do {
+        let settings = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
+        let summary = try ClaudeHookInstaller.uninstall(settingsPath: settings)
+        print("disconnected: removed \(summary.commandsRemoved) Ajman command(s); backup: \(summary.backupPath)")
+        exit(EXIT_SUCCESS)
+    } catch {
+        FileHandle.standardError.write(Data("disconnect failed: \(error.localizedDescription)\n".utf8))
+        exit(EXIT_FAILURE)
+    }
+}
+
 let application = NSApplication.shared
 let delegate = AppDelegate()
 application.delegate = delegate
