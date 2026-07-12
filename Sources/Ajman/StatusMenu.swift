@@ -7,6 +7,7 @@ final class StatusMenu: NSObject {
     private let registry: SessionRegistry
     private let petMode: PetMode
     private let statusItem: NSStatusItem
+    private let launchAtLogin = LaunchAtLogin()
     /// When true, the live Claude/Codex driver is paused so the Debug menu selection sticks.
     private(set) var manualMode = false
     private let activityItem = NSMenuItem(title: "Claude: Idle — 0 sessions", action: nil, keyEquivalent: "")
@@ -15,6 +16,7 @@ final class StatusMenu: NSObject {
     private var scaleItems: [PetScale: NSMenuItem] = [:]
     private var cycleTimer: Timer?
     private let playfulIdleItem = NSMenuItem(title: "Playful Idle", action: #selector(togglePlayfulIdle(_:)), keyEquivalent: "")
+    private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
     private let petMenu = NSMenu(title: "Pet")
     private let debugMenu = NSMenu(title: "Debug")
     private var petItems: [String: NSMenuItem] = [:]
@@ -62,7 +64,11 @@ final class StatusMenu: NSObject {
         debugItem.submenu = debugMenu; menu.addItem(debugItem)
 
         let reset = NSMenuItem(title: "Reset Position", action: #selector(resetPosition), keyEquivalent: "")
-        reset.target = self; menu.addItem(reset); menu.addItem(.separator())
+        reset.target = self; menu.addItem(reset)
+        launchAtLoginItem.target = self
+        launchAtLoginItem.state = launchAtLogin.isEnabled ? .on : .off
+        menu.addItem(launchAtLoginItem)
+        menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Ajman", action: #selector(quit), keyEquivalent: "q")
         quit.target = self; menu.addItem(quit); statusItem.menu = menu
         animator.stateDidChange = { [weak self] state in self?.updateChecks(for: state) }
@@ -142,6 +148,16 @@ final class StatusMenu: NSObject {
     @objc private func togglePlayfulIdle(_ sender: NSMenuItem) {
         petMode.setEnabled(!petMode.isEnabled)
         sender.state = petMode.isEnabled ? .on : .off
+    }
+
+    @objc private func toggleLaunchAtLogin(_ sender: NSMenuItem) {
+        let current = launchAtLogin.isEnabled
+        do {
+            try launchAtLogin.setEnabled(!current)
+        } catch {
+            showAlert(title: "Could not update Launch at Login", text: error.localizedDescription)
+        }
+        sender.state = launchAtLogin.isEnabled ? .on : .off
     }
 
     @objc private func connectToClaude() {
