@@ -5,7 +5,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-swift build -c release
+# --disable-sandbox avoids SwiftPM's inner sandbox conflicting with an outer
+# agent sandbox (sandbox_apply: Operation not permitted). No build plugins here,
+# so this is safe and keeps agent builds deterministic.
+swift build -c release --disable-sandbox
 
 APP="$REPO_ROOT/build/Ajman.app"
 CONTENTS="$APP/Contents"
