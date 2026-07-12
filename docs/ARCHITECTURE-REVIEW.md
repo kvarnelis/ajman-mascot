@@ -130,6 +130,10 @@ Masko public commits: MIT (© 2026 Masko) — valid regardless of later private 
 4. **Bubbles + click-to-focus + menu-bar controls** (pause, launch-at-login, uninstall hooks). ← *v1 ships here*
 5. **v2** — answer permissions from the bubble (Claude rich, Codex allow/deny), exact terminal-tab focus, more agents.
 
+## Backlog (unscheduled)
+
+- **Multiple pets — Winnie is next** (owner-confirmed 2026-07-12). The renderer already handles any hatch pet (v1 8×9 / v2 8×11), so the lift is small: (a) stop hardcoding `~/.codex/pets/ajman/` — load any `~/.codex/pets/<id>/`; (b) a menu picker to switch the active pet, persisted in UserDefaults; (c) optionally follow Codex's own `[desktop] selected-avatar-id` from config.toml, or keep an independent selection. Bundle Winnie's package (own pet.json + spritesheet) and back up her source imagery under `assets/imports/` on arrival, exactly as Ajman's. Not yet scheduled.
+
 ## Open questions (tracked, non-blocking)
 
 - Do Codex **Desktop** sessions fire user-configured hooks, or only CLI/TUI? (Unverified — rollout tailing covers Desktop either way; test empirically in stage 3.)
