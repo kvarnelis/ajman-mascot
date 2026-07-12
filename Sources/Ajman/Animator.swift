@@ -17,6 +17,7 @@ final class Animator {
     }
 
     func play(_ state: AnimationState) {
+        guard state != currentState || timer == nil else { return }
         guard let definition = sheet.animationTable.definition(for: state) else { return }
         timer?.cancel()
         timer = nil

@@ -4,6 +4,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: OverlayPanel?
     private var animator: Animator?
     private var statusMenu: StatusMenu?
+    private var registry: SessionRegistry?
+    private var server: UDSServer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
@@ -11,11 +13,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let view = PetView(frame: NSRect(origin: .zero, size: OverlayPanel.displaySize))
             let panel = OverlayPanel(contentView: view)
             let animator = Animator(sheet: sheet, view: view)
-            let statusMenu = StatusMenu(animator: animator, panel: panel)
+            let registry = SessionRegistry()
+            let server = UDSServer()
+            let statusMenu = StatusMenu(animator: animator, panel: panel, registry: registry)
+            registry.didChange = { [weak animator, weak statusMenu] state, count in
+                animator?.play(state)
+                statusMenu?.updateActivity(state: state, sessionCount: count)
+            }
+            server.eventHandler = { event in
+                Task { @MainActor in registry.apply(event) }
+            }
+            try server.start()
 
             self.panel = panel
             self.animator = animator
             self.statusMenu = statusMenu
+            self.registry = registry
+            self.server = server
 
             panel.restorePositionOrUseDefault()
             panel.orderFrontRegardless()
@@ -29,4 +43,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApplication.shared.terminate(nil)
         }
     }
+
+    func applicationWillTerminate(_ notification: Notification) { server?.stop() }
 }
