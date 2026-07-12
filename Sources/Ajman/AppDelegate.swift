@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var petMode: PetMode?
     private var registry: SessionRegistry?
     private var server: UDSServer?
+    private var codexMonitor: CodexMonitor?
     private var catalog: PetCatalog?
     private var activePetID = PetCatalog.defaultPetID
 
@@ -27,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let animator = Animator(sheet: sheet, view: view)
             let registry = SessionRegistry()
             let server = UDSServer()
+            let codexMonitor = CodexMonitor()
             var statusMenu: StatusMenu!
             let petMode = PetMode(
                 animator: animator,
@@ -56,6 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task { @MainActor in registry.apply(event) }
             }
             try server.start()
+            codexMonitor.eventHandler = { event in
+                Task { @MainActor in registry.apply(event) }
+            }
+            codexMonitor.start()
 
             self.panel = panel
             self.animator = animator
@@ -63,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.petMode = petMode
             self.registry = registry
             self.server = server
+            self.codexMonitor = codexMonitor
             self.catalog = catalog
             activePetID = loadedPet.descriptor.id
             catalog.saveSelection(activePetID)
@@ -80,7 +87,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func applicationWillTerminate(_ notification: Notification) { server?.stop() }
+    func applicationWillTerminate(_ notification: Notification) {
+        codexMonitor?.stop()
+        server?.stop()
+    }
 
     private func switchPet(to id: String) {
         guard id != activePetID, let catalog, let animator, let panel, let statusMenu, let petMode, let registry else { return }
