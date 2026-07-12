@@ -5,30 +5,49 @@ final class StatusMenu: NSObject {
     private let animator: Animator
     private weak var panel: OverlayPanel?
     private let registry: SessionRegistry
+    private let petMode: PetMode
     private let statusItem: NSStatusItem
     /// When true, the live Claude/Codex driver is paused so the Debug menu selection sticks.
     private(set) var manualMode = false
     private let activityItem = NSMenuItem(title: "Claude: Idle — 0 sessions", action: nil, keyEquivalent: "")
     private let cycleItem = NSMenuItem(title: "Cycle All States", action: #selector(toggleCycle(_:)), keyEquivalent: "")
     private var stateItems: [AnimationState: NSMenuItem] = [:]
+    private var scaleItems: [PetScale: NSMenuItem] = [:]
     private var cycleTimer: Timer?
+    private let playfulIdleItem = NSMenuItem(title: "Playful Idle", action: #selector(togglePlayfulIdle(_:)), keyEquivalent: "")
 
-    init(animator: Animator, panel: OverlayPanel, registry: SessionRegistry) {
+    init(animator: Animator, panel: OverlayPanel, registry: SessionRegistry, petMode: PetMode) {
         self.animator = animator
         self.panel = panel
         self.registry = registry
+        self.petMode = petMode
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         statusItem.button?.title = "🐈‍⬛"
         let menu = NSMenu()
         activityItem.isEnabled = false
         menu.addItem(activityItem)
+        playfulIdleItem.target = self
+        playfulIdleItem.state = petMode.isEnabled ? .on : .off
+        menu.addItem(playfulIdleItem)
         menu.addItem(.separator())
         let connect = NSMenuItem(title: "Connect to Claude Code", action: #selector(connectToClaude), keyEquivalent: "")
         connect.target = self; menu.addItem(connect)
         let disconnect = NSMenuItem(title: "Disconnect from Claude Code", action: #selector(disconnectFromClaude), keyEquivalent: "")
         disconnect.target = self; menu.addItem(disconnect)
         menu.addItem(.separator())
+
+        let sizeMenu = NSMenu(title: "Size")
+        for scale in PetScale.allCases {
+            let item = NSMenuItem(title: scale.menuTitle, action: #selector(selectScale(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = scale.rawValue
+            sizeMenu.addItem(item)
+            scaleItems[scale] = item
+        }
+        let sizeItem = NSMenuItem(title: "Size", action: nil, keyEquivalent: "")
+        sizeItem.submenu = sizeMenu
+        menu.addItem(sizeItem)
 
         let debugMenu = NSMenu(title: "Debug")
         for state in animator.availableStates {
@@ -48,6 +67,8 @@ final class StatusMenu: NSObject {
         quit.target = self; menu.addItem(quit); statusItem.menu = menu
         animator.stateDidChange = { [weak self] state in self?.updateChecks(for: state) }
         updateChecks(for: animator.currentState)
+        updateScaleChecks(for: panel.petScale)
+        panel.petWasClicked = { [weak petMode] in petMode?.wake() }
     }
 
     func updateActivity(state: AnimationState, sessionCount: Int) {
@@ -66,8 +87,18 @@ final class StatusMenu: NSObject {
     @objc private func resumeLiveReactions() {
         stopCycling()
         manualMode = false
-        animator.play(registry.currentState)
+        if registry.currentState == .idle {
+            petMode.resumeAtRest()
+        } else {
+            petMode.yieldToHigherPriorityDriver()
+            animator.play(registry.currentState)
+        }
         refreshManualIndicator()
+    }
+
+    @objc private func togglePlayfulIdle(_ sender: NSMenuItem) {
+        petMode.setEnabled(!petMode.isEnabled)
+        sender.state = petMode.isEnabled ? .on : .off
     }
 
     @objc private func connectToClaude() {
@@ -90,11 +121,18 @@ final class StatusMenu: NSObject {
     }
 
     private func showAlert(title: String, text: String) { let alert = NSAlert(); alert.messageText = title; alert.informativeText = text; alert.runModal() }
-    @objc private func selectState(_ sender: NSMenuItem) { stopCycling(); guard let raw = sender.representedObject as? String, let state = AnimationState(rawValue: raw) else { return }; manualMode = true; animator.play(state); refreshManualIndicator() }
+    @objc private func selectState(_ sender: NSMenuItem) { stopCycling(); guard let raw = sender.representedObject as? String, let state = AnimationState(rawValue: raw) else { return }; manualMode = true; petMode.yieldToHigherPriorityDriver(); animator.play(state); refreshManualIndicator() }
     @objc private func toggleCycle(_ sender: NSMenuItem) { cycleTimer == nil ? startCycling() : stopCycling() }
-    private func startCycling() { manualMode = true; cycleItem.state = .on; refreshManualIndicator(); cycleTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in Task { @MainActor in guard let self, let index = self.animator.availableStates.firstIndex(of: self.animator.currentState) else { return }; let states = self.animator.availableStates; self.animator.play(states[(index + 1) % states.count]); self.refreshManualIndicator() } } }
+    private func startCycling() { manualMode = true; petMode.yieldToHigherPriorityDriver(); cycleItem.state = .on; refreshManualIndicator(); cycleTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in Task { @MainActor in guard let self, let index = self.animator.availableStates.firstIndex(of: self.animator.currentState) else { return }; let states = self.animator.availableStates; self.animator.play(states[(index + 1) % states.count]); self.refreshManualIndicator() } } }
     private func stopCycling() { cycleTimer?.invalidate(); cycleTimer = nil; cycleItem.state = .off }
     private func updateChecks(for state: AnimationState) { for (candidate, item) in stateItems { item.state = candidate == state ? .on : .off } }
+    @objc private func selectScale(_ sender: NSMenuItem) {
+        guard let factor = sender.representedObject as? Double,
+              let scale = PetScale(rawValue: factor) else { return }
+        panel?.apply(scale: scale)
+        updateScaleChecks(for: scale)
+    }
+    private func updateScaleChecks(for scale: PetScale) { for (candidate, item) in scaleItems { item.state = candidate == scale ? .on : .off } }
     @objc private func resetPosition() { panel?.resetPosition() }
     @objc private func quit() { NSApplication.shared.terminate(nil) }
 }

@@ -25,8 +25,9 @@ if let eventIndex = CommandLine.arguments.firstIndex(of: "--event"),
 }
 
 input.append(0x0a)
-let socketPath = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent(".ajman/run/ajman.sock").path
+let socketPath = ProcessInfo.processInfo.environment["AJMAN_SOCKET_PATH"]
+    ?? FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".ajman/run/ajman.sock").path
 guard socketPath.utf8.count < MemoryLayout<sockaddr_un>.size - 2 else { finish() }
 
 let fd = socket(AF_UNIX, SOCK_STREAM, 0)

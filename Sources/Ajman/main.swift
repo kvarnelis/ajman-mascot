@@ -4,7 +4,8 @@ import AppKit
 private func runSelfTest() -> Int32 {
     let fileManager = FileManager.default
     let registry = SessionRegistry(startTimer: false)
-    let server = UDSServer()
+    let selfTestSocket = URL(fileURLWithPath: "/tmp/ajman-selftest-\(UUID().uuidString.prefix(8)).sock")
+    let server = UDSServer(socketURL: selfTestSocket)
     server.eventHandler = { event in Task { @MainActor in registry.apply(event) } }
     do { try server.start() } catch {
         print("SELFTEST FAIL: UDS start: \(error.localizedDescription)")
@@ -20,6 +21,7 @@ private func runSelfTest() -> Int32 {
     func invokeHook(event: String, tool: String? = nil) throws {
         let binary = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("ajman-hook")
         let process = Process(); process.executableURL = binary
+        process.environment = ProcessInfo.processInfo.environment.merging(["AJMAN_SOCKET_PATH": selfTestSocket.path]) { _, testValue in testValue }
         let pipe = Pipe(); process.standardInput = pipe; process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
         var json: [String: Any] = ["hook_event_name": event, "session_id": "selftest", "cwd": "/tmp"]
         if let tool { json["tool_name"] = tool }
@@ -28,6 +30,16 @@ private func runSelfTest() -> Int32 {
     }
 
     do {
+        let suiteName = "AjmanSelfTest.PetScale.\(UUID().uuidString)"
+        guard let scaleDefaults = UserDefaults(suiteName: suiteName) else { throw SelfTestError("could not create scale defaults") }
+        defer { scaleDefaults.removePersistentDomain(forName: suiteName) }
+        guard PetScale.load(from: scaleDefaults) == .small else { throw SelfTestError("scale default was not 0.5") }
+        for scale in PetScale.allCases {
+            scale.save(to: scaleDefaults)
+            guard PetScale.load(from: scaleDefaults) == scale else { throw SelfTestError("scale did not round-trip: \(scale.rawValue)") }
+        }
+        print("Pet scale: default 0.5; all 6 options round-trip")
+
         try invokeHook(event: "PreToolUse", tool: "Bash")
         guard pump(until: { registry.currentState == .running }) else { throw SelfTestError("PreToolUse did not produce running") }
         print("UDS transport: PreToolUse(Bash) -> running")

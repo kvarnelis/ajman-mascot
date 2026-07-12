@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "spriteVersionNumber": 2,
+  "run_dir": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch",
+  "spritesheet": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch/final/spritesheet-extended.webp",
+  "validation": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch/final/validation-extended.json",
+  "chroma_despill": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch/qa/chroma-despill-extended.json",
+  "contact_sheet": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch/qa/contact-sheet-extended.png",
+  "direction_sheet": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch/qa/look-directions.png",
+  "direction_semantics": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch/qa/direction-semantics.json",
+  "blind_direction_validation": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch/qa/direction-blind-validation.json",
+  "blind_review_resolution": null,
+  "continuity": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch/qa/look-continuity.json",
+  "review": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-v2-hatch/qa/review.json",
+  "package": "/Users/kazys/.codex/pets/winnie"
+}

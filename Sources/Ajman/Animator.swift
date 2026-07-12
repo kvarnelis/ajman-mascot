@@ -28,6 +28,10 @@ final class Animator {
         showCurrentFrameAndScheduleNext(definition: definition)
     }
 
+    func duration(of state: AnimationState) -> TimeInterval? {
+        sheet.animationTable.definition(for: state)?.durations.reduce(0, +)
+    }
+
     private func showCurrentFrameAndScheduleNext(definition: AnimationDefinition) {
         guard !frames.isEmpty else { return }
         view?.image = frames[frameIndex]
