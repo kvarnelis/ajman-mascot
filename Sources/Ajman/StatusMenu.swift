@@ -16,7 +16,7 @@ final class StatusMenu: NSObject {
 
         statusItem.button?.title = "🐈‍⬛"
         let menu = NSMenu()
-        for state in AnimationState.allCases {
+        for state in animator.availableStates {
             let item = NSMenuItem(title: state.title, action: #selector(selectState(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = state.rawValue
@@ -56,8 +56,9 @@ final class StatusMenu: NSObject {
         cycleItem.state = .on
         cycleTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
             guard let self,
-                  let index = AnimationState.allCases.firstIndex(of: self.animator.currentState) else { return }
-            self.animator.play(AnimationState.allCases[(index + 1) % AnimationState.allCases.count])
+                  let index = self.animator.availableStates.firstIndex(of: self.animator.currentState) else { return }
+            let states = self.animator.availableStates
+            self.animator.play(states[(index + 1) % states.count])
         }
     }
 

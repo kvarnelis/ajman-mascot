@@ -9,27 +9,28 @@ final class Animator {
 
     private(set) var currentState: AnimationState = .idle
     var stateDidChange: ((AnimationState) -> Void)?
+    var availableStates: [AnimationState] { sheet.animationTable.states }
 
     init(sheet: SpriteSheet, view: PetView) {
-        precondition(AnimationState.usedFrameCount == 57, "Animation table must use 57 frames")
         self.sheet = sheet
         self.view = view
     }
 
     func play(_ state: AnimationState) {
+        guard let definition = sheet.animationTable.definition(for: state) else { return }
         timer?.cancel()
         timer = nil
         currentState = state
-        frames = sheet.frames(for: state)
+        frames = sheet.frames(for: definition)
         frameIndex = 0
         stateDidChange?(state)
-        showCurrentFrameAndScheduleNext()
+        showCurrentFrameAndScheduleNext(definition: definition)
     }
 
-    private func showCurrentFrameAndScheduleNext() {
+    private func showCurrentFrameAndScheduleNext(definition: AnimationDefinition) {
         guard !frames.isEmpty else { return }
         view?.image = frames[frameIndex]
-        let delay = currentState.durations[frameIndex]
+        let delay = definition.durations[frameIndex]
         let nextIndex = (frameIndex + 1) % frames.count
 
         let timer = DispatchSource.makeTimerSource(queue: .main)
@@ -39,7 +40,7 @@ final class Animator {
             self.timer?.cancel()
             self.timer = nil
             self.frameIndex = nextIndex
-            self.showCurrentFrameAndScheduleNext()
+            self.showCurrentFrameAndScheduleNext(definition: definition)
         }
         self.timer = timer
         timer.resume()

@@ -152,12 +152,35 @@ private func segment(stripURL: URL, outURL: URL) throws {
 }
 
 private struct V1Cell: Codable { let row: Int; let col: Int }
+private struct SheetCell: Codable { let path: String; let row: Int; let col: Int }
 private struct Cell: Codable {
-    let row: Int; let col: Int; let from: String?; let v1: V1Cell?; let empty: Bool?
+    let row: Int; let col: Int; let from: String?; let v1: V1Cell?; let sheet: SheetCell?; let empty: Bool?
+    let mirror: Bool?; let despill: Bool?
 }
 private struct Manifest: Codable {
-    let cellWidth: Int; let cellHeight: Int; let columns: Int; let rows: Int
-    let v1Sheet: String; let cells: [Cell]
+    let cellWidth: Int; let cellHeight: Int; let columns: Int; let rows: Int?
+    let v1Sheet: String?; let cells: [Cell]
+
+    var rowCount: Int { rows ?? 9 }
+}
+
+private func copyCell(_ source: Raster, sourceBox: Box, into target: inout Raster,
+                      destX: Int, destY: Int, mirror: Bool) {
+    for y in 0..<sourceBox.h { for x in 0..<sourceBox.w {
+        let sourceX = sourceBox.x + (mirror ? sourceBox.w - 1 - x : x)
+        for channel in 0..<4 {
+            target[destX + x, destY + y, channel] = source[sourceX, sourceBox.y + y, channel]
+        }
+    }}
+}
+
+// This is the same conservative foreground cleanup used by `segment`: preserve
+// alpha and red/blue, but clamp excess green to the stronger neighbouring channel.
+private func despillCell(_ raster: inout Raster, box: Box) {
+    for y in box.y..<(box.y + box.h) { for x in box.x..<(box.x + box.w) where raster[x, y, 3] > 0 {
+        let r = raster[x, y, 0], g = raster[x, y, 1], b = raster[x, y, 2]
+        if g > max(r, b) { raster[x, y, 1] = max(r, b) }
+    }}
 }
 
 private func alphaBounds(_ raster: Raster) -> Box? {
@@ -237,10 +260,10 @@ private func makePreview(atlas: Raster, cellW: Int, cellH: Int, columns: Int, ro
     let full = Box(x: 0, y: 0, w: atlas.width, h: atlas.height)
     blit(atlas, sourceBox: full, into: &result, destX: labelWidth, destY: 0,
          destW: atlas.width * scale, destH: atlas.height * scale)
-    let labels = ["IDLE", "RUN-R", "RUN-L", "WAVE", "JUMP", "FAILED", "WAITING", "WORKING", "REVIEW"]
+    let labels = ["IDLE", "RUN-R", "RUN-L", "WAVE", "JUMP", "FAILED", "WAITING", "WORKING", "REVIEW", "LOOK-U-R", "LOOK-D-L"]
     for row in 0..<rows {
         let yy = row * cellH * scale
-        drawText(labels[row], x: 8, y: yy + cellH * scale / 2 - 14, scale: 3, into: &result)
+        drawText(row < labels.count ? labels[row] : "ROW", x: 8, y: yy + cellH * scale / 2 - 14, scale: 3, into: &result)
         for x in labelWidth..<result.width { for t in 0..<2 { result[x, min(result.height - 1, yy + t), 0] = 255; result[x, min(result.height - 1, yy + t), 1] = 255; result[x, min(result.height - 1, yy + t), 2] = 255; result[x, min(result.height - 1, yy + t), 3] = 180 } }
     }
     for col in 0...columns {
@@ -254,13 +277,19 @@ private func makePreview(atlas: Raster, cellW: Int, cellH: Int, columns: Int, ro
 
 private func compose(manifestURL: URL, outURL: URL) throws {
     let manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: manifestURL))
-    guard manifest.cellWidth == 192, manifest.cellHeight == 208, manifest.columns == 8, manifest.rows == 9 else {
-        throw ToolError.message("Manifest must describe the standard 8x9 atlas with 192x208 cells")
+    let rows = manifest.rowCount
+    guard manifest.cellWidth == 192, manifest.cellHeight == 208, manifest.columns == 8, rows > 0 else {
+        throw ToolError.message("Manifest must describe an 8-column atlas with 192x208 cells and at least one row")
     }
     let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-    let v1URL = URL(fileURLWithPath: manifest.v1Sheet, relativeTo: cwd).standardizedFileURL
-    let v1 = try decode(v1URL)
-    guard v1.width == 1536, v1.height == 1872 else { throw ToolError.message("v1 sheet has unexpected dimensions") }
+    var v1: Raster?
+    if manifest.cells.contains(where: { $0.v1 != nil }) {
+        guard let path = manifest.v1Sheet else { throw ToolError.message("Manifest uses v1 cells but has no v1Sheet") }
+        let v1URL = URL(fileURLWithPath: path, relativeTo: cwd).standardizedFileURL
+        let decoded = try decode(v1URL)
+        guard decoded.width == 1536, decoded.height == 1872 else { throw ToolError.message("v1 sheet has unexpected dimensions") }
+        v1 = decoded
+    }
     var v1Heights: [Int] = []
     for cell in manifest.cells { if let sourceCell = cell.v1 {
         guard sourceCell.row >= 0, sourceCell.row < 9, sourceCell.col >= 0, sourceCell.col < 8 else {
@@ -268,7 +297,7 @@ private func compose(manifestURL: URL, outURL: URL) throws {
         }
         let cellBox = Box(x: sourceCell.col * manifest.cellWidth, y: sourceCell.row * manifest.cellHeight,
                           w: manifest.cellWidth, h: manifest.cellHeight)
-        guard let bounds = alphaBounds(v1, within: cellBox) else {
+        guard let v1, let bounds = alphaBounds(v1, within: cellBox) else {
             throw ToolError.message("v1 source cell is empty: row \(sourceCell.row), col \(sourceCell.col)")
         }
         v1Heights.append(bounds.h)
@@ -276,11 +305,19 @@ private func compose(manifestURL: URL, outURL: URL) throws {
     let targetHeight = median(v1Heights) ?? 196
 
     var loaded: [String: (Raster, Box)] = [:]
+    var loadedSheets: [String: Raster] = [:]
     var pathsByStrip: [String: [String]] = [:]
     for cell in manifest.cells { if let path = cell.from, loaded[path] == nil {
         let raster = try decode(URL(fileURLWithPath: path, relativeTo: cwd).standardizedFileURL)
         guard let bounds = alphaBounds(raster) else { throw ToolError.message("Source frame is empty: \(path)") }
         loaded[path] = (raster, bounds)
+    }}
+    for cell in manifest.cells { if let source = cell.sheet, loadedSheets[source.path] == nil {
+        let raster = try decode(URL(fileURLWithPath: source.path, relativeTo: cwd).standardizedFileURL)
+        guard raster.width % manifest.cellWidth == 0, raster.height % manifest.cellHeight == 0 else {
+            throw ToolError.message("Sheet dimensions are not multiples of 192x208: \(source.path)")
+        }
+        loadedSheets[source.path] = raster
     }}
     for cell in manifest.cells { if let path = cell.from {
         let strip = (path as NSString).deletingLastPathComponent
@@ -301,14 +338,14 @@ private func compose(manifestURL: URL, outURL: URL) throws {
             medianHeight: medianHeight, desiredFactor: desiredFactor, factor: factor,
             capDescription: capParts.isEmpty ? nil : capParts.joined(separator: "+"))
     }
-    var atlas = Raster(width: manifest.cellWidth * manifest.columns, height: manifest.cellHeight * manifest.rows)
+    var atlas = Raster(width: manifest.cellWidth * manifest.columns, height: manifest.cellHeight * rows)
     var explicitlyFilled = Set<Int>()
     for cell in manifest.cells {
-        guard cell.row >= 0, cell.row < manifest.rows, cell.col >= 0, cell.col < manifest.columns else {
+        guard cell.row >= 0, cell.row < rows, cell.col >= 0, cell.col < manifest.columns else {
             throw ToolError.message("Cell outside atlas: row \(cell.row), col \(cell.col)")
         }
-        let choices = (cell.from == nil ? 0 : 1) + (cell.v1 == nil ? 0 : 1) + (cell.empty == true ? 1 : 0)
-        guard choices == 1 else { throw ToolError.message("Each cell needs exactly one of from, v1, or empty") }
+        let choices = (cell.from == nil ? 0 : 1) + (cell.v1 == nil ? 0 : 1) + (cell.sheet == nil ? 0 : 1) + (cell.empty == true ? 1 : 0)
+        guard choices == 1 else { throw ToolError.message("Each cell needs exactly one of from, v1, sheet, or empty") }
         let key = cell.row * manifest.columns + cell.col
         guard !explicitlyFilled.contains(key) else { throw ToolError.message("Duplicate cell row \(cell.row), col \(cell.col)") }
         explicitlyFilled.insert(key)
@@ -330,13 +367,35 @@ private func compose(manifestURL: URL, outURL: URL) throws {
             guard sourceCell.row >= 0, sourceCell.row < 9, sourceCell.col >= 0, sourceCell.col < 8 else {
                 throw ToolError.message("v1 source cell outside atlas")
             }
-            blit(v1, sourceBox: Box(x: sourceCell.col * 192, y: sourceCell.row * 208, w: 192, h: 208),
-                 into: &atlas, destX: originX, destY: originY, destW: 192, destH: 208)
+            guard let v1 else { throw ToolError.message("v1 sheet was not loaded") }
+            copyCell(v1, sourceBox: Box(x: sourceCell.col * 192, y: sourceCell.row * 208, w: 192, h: 208),
+                     into: &atlas, destX: originX, destY: originY, mirror: cell.mirror == true)
+        } else if let sourceCell = cell.sheet, let source = loadedSheets[sourceCell.path] {
+            let sourceRows = source.height / manifest.cellHeight
+            let sourceColumns = source.width / manifest.cellWidth
+            guard sourceCell.row >= 0, sourceCell.row < sourceRows,
+                  sourceCell.col >= 0, sourceCell.col < sourceColumns else {
+                throw ToolError.message("Sheet source cell outside atlas: \(sourceCell.path), row \(sourceCell.row), col \(sourceCell.col)")
+            }
+            copyCell(source,
+                     sourceBox: Box(x: sourceCell.col * manifest.cellWidth, y: sourceCell.row * manifest.cellHeight,
+                                    w: manifest.cellWidth, h: manifest.cellHeight),
+                     into: &atlas, destX: originX, destY: originY, mirror: cell.mirror == true)
+        }
+        if cell.mirror == true, cell.from != nil {
+            var mirrored = Raster(width: manifest.cellWidth, height: manifest.cellHeight)
+            copyCell(atlas, sourceBox: Box(x: originX, y: originY, w: manifest.cellWidth, h: manifest.cellHeight),
+                     into: &mirrored, destX: 0, destY: 0, mirror: true)
+            copyCell(mirrored, sourceBox: Box(x: 0, y: 0, w: manifest.cellWidth, h: manifest.cellHeight),
+                     into: &atlas, destX: originX, destY: originY, mirror: false)
+        }
+        if cell.despill == true {
+            despillCell(&atlas, box: Box(x: originX, y: originY, w: manifest.cellWidth, h: manifest.cellHeight))
         }
     }
     let required = [6, 8, 8, 4, 5, 8, 6, 6, 6]
     var violations: [String] = []
-    for row in 0..<required.count { for col in 0..<required[row] {
+    for row in 0..<min(rows, required.count) { for col in 0..<required[row] {
         var nonempty = false
         for y in row * manifest.cellHeight..<(row + 1) * manifest.cellHeight {
             for x in col * manifest.cellWidth..<(col + 1) * manifest.cellWidth where atlas[x, y, 3] > 0 { nonempty = true; break }
@@ -357,7 +416,7 @@ private func compose(manifestURL: URL, outURL: URL) throws {
         print("compose: WebP encoding available; wrote spritesheet.webp")
     } else { print("compose: WebP encoding unavailable; skipped spritesheet.webp") }
     try write(makePreview(atlas: atlas, cellW: manifest.cellWidth, cellH: manifest.cellHeight,
-                          columns: manifest.columns, rows: manifest.rows),
+                          columns: manifest.columns, rows: rows),
               to: outURL.appendingPathComponent("preview.png"), type: "public.png" as CFString)
     print(String(format: "compose: v1 target content height %.2f px%@", targetHeight,
                  v1Heights.isEmpty ? " (default; no v1 cells)" : ""))
@@ -368,7 +427,7 @@ private func compose(manifestURL: URL, outURL: URL) throws {
         print(String(format: "compose: strip %@ median %.2f px; factor %.6f%@",
                      strip, normalization.medianHeight, normalization.factor, cap))
     }}
-    print("compose: validation passed; 57 required cells filled")
+    print("compose: validation passed; required standard cells filled")
     print("compose: wrote spritesheet.png \(atlas.width)x\(atlas.height) and preview.png")
 }
 
