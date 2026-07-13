@@ -18,11 +18,26 @@ final class PetInstance {
     var availableStates: [AnimationState] { animator.availableStates }
     var hasSleepAnimation: Bool { loadedPet.sleepAnimation != nil }
     var positionPersistenceKey: String { panel.positionPersistenceKey }
+    var screenCenter: NSPoint { NSPoint(x: panel.frame.midX, y: panel.frame.midY) }
+    var glanceEligibility: InterCatGlanceEligibility {
+        let available = Set(animator.availableStates)
+        return InterCatGlanceEligibility(
+            isShown: panel.isVisible,
+            supportsLookDirections: available.contains(.lookDirectionsA) && available.contains(.lookDirectionsB),
+            liveState: liveState.value,
+            displayedState: animator.currentState,
+            isManual: isManualMode(),
+            isSleeping: petMode.isSleeping || animator.isPlayingSleep,
+            isAlreadyGlancing: isGlancing
+        )
+    }
 
     private let catalog: PetCatalog
     private let defaults: UserDefaults
     private let isManualMode: () -> Bool
     private let liveState = LiveStateBox()
+    private var glanceTimer: Timer?
+    private(set) var isGlancing = false
     private var tornDown = false
 
     init(
@@ -34,7 +49,8 @@ final class PetInstance {
         defaults: UserDefaults = .standard,
         isManualMode: @escaping () -> Bool,
         petWasClicked: @escaping () -> Void,
-        dismissNotification: @escaping (String) -> Void
+        dismissNotification: @escaping (String) -> Void,
+        livelyAnimationBegan: @escaping (String, NSPoint) -> Void
     ) throws {
         self.petID = petID
         self.binding = binding
@@ -68,6 +84,10 @@ final class PetInstance {
         bubbleController = BubbleController(petPanel: panel)
         bubbleController.dismissHandler = dismissNotification
         panel.petWasClicked = petWasClicked
+        animator.stateDidChange = { [weak self] state in
+            guard state.isLively, let self, self.panel.isVisible else { return }
+            livelyAnimationBegan(self.petID, self.screenCenter)
+        }
     }
 
     func show(useLegacyPositionFallback: Bool) {
@@ -77,9 +97,11 @@ final class PetInstance {
     }
 
     func applyState(_ state: AnimationState) {
+        if state != .idle { cancelGlance(returnToRest: false) }
         liveState.value = state
         guard !isManualMode() else { return }
         if state == .idle {
+            guard !isGlancing else { return }
             petMode.resumeAtRest()
         } else {
             petMode.yieldToHigherPriorityDriver()
@@ -90,23 +112,28 @@ final class PetInstance {
     func resumeAtRest() {
         liveState.value = .idle
         guard !isManualMode() else { return }
+        guard !isGlancing else { return }
         petMode.resumeAtRest()
     }
 
     func resumeLiveReactions() {
+        cancelGlance(returnToRest: false)
         petMode.stir()
         applyState(liveState.value)
     }
 
     func wake() {
+        cancelGlance(returnToRest: true)
         petMode.wake()
     }
 
     func handleAgentActivity() {
+        cancelGlance(returnToRest: true)
         petMode.stir()
     }
 
     func handlePetSwitch() {
+        cancelGlance(returnToRest: true)
         petMode.stir()
     }
 
@@ -117,6 +144,7 @@ final class PetInstance {
 
     func setBinding(_ binding: AgentEvent.Provider?) {
         guard self.binding != binding else { return }
+        cancelGlance(returnToRest: true)
         self.binding = binding
         bubbleController.removeAll()
         petMode.stir()
@@ -131,6 +159,7 @@ final class PetInstance {
     }
 
     func setSteadySize(_ enabled: Bool) throws {
+        cancelGlance(returnToRest: true)
         let state = animator.currentState
         loadedPet = try catalog.load(id: petID, steadySize: enabled)
         petMode.replaceSleepAnimation(loadedPet.sleepAnimation)
@@ -138,17 +167,42 @@ final class PetInstance {
     }
 
     func setPlayfulIdle(_ enabled: Bool) {
+        cancelGlance(returnToRest: true)
         petMode.setEnabled(enabled, defaults: defaults)
     }
 
     func setDebugState(_ state: AnimationState) {
         guard animator.availableStates.contains(state) else { return }
+        cancelGlance(returnToRest: false)
         petMode.yieldToHigherPriorityDriver()
         animator.play(state)
     }
 
     func setDebugSleep() {
+        cancelGlance(returnToRest: false)
         _ = petMode.forceSleep()
+    }
+
+    @discardableResult
+    func glanceToward(screenPoint: NSPoint) -> Bool {
+        guard glanceEligibility.canReact,
+              let direction = LookDirection.toward(source: screenCenter, target: screenPoint) else {
+            return false
+        }
+
+        petMode.yieldToHigherPriorityDriver()
+        isGlancing = true
+        guard animator.playSingleFrame(direction.state, frameIndex: direction.frameIndex) else {
+            isGlancing = false
+            petMode.resumeAtRest()
+            return false
+        }
+
+        let hold = TimeInterval.random(in: 1.2...1.8)
+        glanceTimer = Timer.scheduledTimer(withTimeInterval: hold, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.finishGlance() }
+        }
+        return true
     }
 
     func resetPosition() {
@@ -162,7 +216,9 @@ final class PetInstance {
     func teardown() {
         guard !tornDown else { return }
         tornDown = true
+        cancelGlance(returnToRest: false)
         panel.petWasClicked = nil
+        animator.stateDidChange = nil
         bubbleController.dismissHandler = nil
         petMode.teardown()
         animator.stop()
@@ -171,6 +227,26 @@ final class PetInstance {
     }
 
     deinit {
+        glanceTimer?.invalidate()
         animator.stop()
+    }
+
+    private func finishGlance() {
+        guard isGlancing else { return }
+        glanceTimer?.invalidate()
+        glanceTimer = nil
+        isGlancing = false
+        guard liveState.value == .idle, !isManualMode() else { return }
+        petMode.resumeAtRest()
+    }
+
+    private func cancelGlance(returnToRest: Bool) {
+        guard isGlancing else { return }
+        glanceTimer?.invalidate()
+        glanceTimer = nil
+        isGlancing = false
+        if returnToRest, liveState.value == .idle, !isManualMode() {
+            petMode.resumeAtRest()
+        }
     }
 }

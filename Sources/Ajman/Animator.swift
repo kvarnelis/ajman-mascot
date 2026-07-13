@@ -59,6 +59,24 @@ final class Animator {
         showCurrentFrameAndScheduleNext()
     }
 
+    @discardableResult
+    func playSingleFrame(_ state: AnimationState, frameIndex: Int) -> Bool {
+        guard let definition = sheet.animationTable.definition(for: state) else { return false }
+        let stateFrames = sheet.frames(for: definition)
+        guard stateFrames.indices.contains(frameIndex) else { return false }
+
+        timer?.cancel()
+        timer = nil
+        isPlayingSleep = false
+        currentState = state
+        frames = [stateFrames[frameIndex]]
+        frameDurations = []
+        self.frameIndex = 0
+        stateDidChange?(state)
+        view?.image = frames[0]
+        return true
+    }
+
     func duration(of state: AnimationState) -> TimeInterval? {
         sheet.animationTable.definition(for: state)?.durations.reduce(0, +)
     }

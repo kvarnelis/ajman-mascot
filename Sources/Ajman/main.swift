@@ -139,6 +139,131 @@ private func runSelfTest() -> Int32 {
         }
         print("Pet instances: both packages load; distinct per-pet position keys (headless)")
 
+        let expectedLivelyStates: Set<AnimationState> = [
+            .jumping, .waving, .runningRight, .runningLeft, .running,
+        ]
+        guard Set(AnimationState.allCases.filter(\.isLively)) == expectedLivelyStates else {
+            throw SelfTestError("inter-cat lively trigger set was incorrect")
+        }
+
+        func glanceEligibility(
+            liveState: AnimationState = .idle,
+            displayedState: AnimationState = .idle,
+            isManual: Bool = false,
+            isSleeping: Bool = false,
+            isAlreadyGlancing: Bool = false,
+            supportsLookDirections: Bool = true
+        ) -> InterCatGlanceEligibility {
+            InterCatGlanceEligibility(
+                isShown: true,
+                supportsLookDirections: supportsLookDirections,
+                liveState: liveState,
+                displayedState: displayedState,
+                isManual: isManual,
+                isSleeping: isSleeping,
+                isAlreadyGlancing: isAlreadyGlancing
+            )
+        }
+
+        let calmStatus = glanceEligibility()
+        let agentBusyStatus = glanceEligibility(liveState: .running)
+        let sleepingStatus = glanceEligibility(isSleeping: true)
+        let manualStatus = glanceEligibility(isManual: true)
+        guard calmStatus.canReact,
+              !agentBusyStatus.canReact,
+              !sleepingStatus.canReact,
+              !manualStatus.canReact,
+              !glanceEligibility(displayedState: .jumping).canReact,
+              !glanceEligibility(isAlreadyGlancing: true).canReact,
+              !glanceEligibility(supportsLookDirections: false).canReact else {
+            throw SelfTestError("inter-cat rest/manual/sleep/look-row eligibility guards were incorrect")
+        }
+
+        let calmCenter = NSPoint(x: 0, y: 0)
+        var glanceClock = Date(timeIntervalSince1970: 1_000)
+        var randomDraw = 0.0
+        var requestedDirections: [LookDirection] = []
+        var unexpectedReactors: [String] = []
+        let glanceCoordinator = InterCatGlanceCoordinator(
+            probability: 0.6,
+            cooldown: 8,
+            now: { glanceClock },
+            randomUnit: { randomDraw }
+        )
+        let glanceCandidates = [
+            InterCatGlanceCandidate(
+                petID: "active",
+                isEligible: { true },
+                requestGlance: { _ in unexpectedReactors.append("source"); return true }
+            ),
+            InterCatGlanceCandidate(
+                petID: "calm",
+                isEligible: { calmStatus.canReact },
+                requestGlance: { target in
+                    guard let direction = LookDirection.toward(source: calmCenter, target: target) else { return false }
+                    requestedDirections.append(direction)
+                    return true
+                }
+            ),
+            InterCatGlanceCandidate(
+                petID: "agent-busy",
+                isEligible: { agentBusyStatus.canReact },
+                requestGlance: { _ in unexpectedReactors.append("agent-busy"); return true }
+            ),
+            InterCatGlanceCandidate(
+                petID: "sleeping",
+                isEligible: { sleepingStatus.canReact },
+                requestGlance: { _ in unexpectedReactors.append("sleeping"); return true }
+            ),
+            InterCatGlanceCandidate(
+                petID: "manual",
+                isEligible: { manualStatus.canReact },
+                requestGlance: { _ in unexpectedReactors.append("manual"); return true }
+            ),
+        ]
+
+        glanceCoordinator.livelyAnimationBegan(
+            sourcePetID: "active",
+            sourceCenter: NSPoint(x: 100, y: 0),
+            candidates: glanceCandidates
+        )
+        guard requestedDirections == [LookDirection(headingIndex: 4)], unexpectedReactors.isEmpty else {
+            throw SelfTestError("calm sibling did not glance right toward lively sibling, or an ineligible pet reacted")
+        }
+
+        glanceCoordinator.livelyAnimationBegan(
+            sourcePetID: "active",
+            sourceCenter: NSPoint(x: -100, y: 0),
+            candidates: glanceCandidates
+        )
+        guard requestedDirections.count == 1 else {
+            throw SelfTestError("per-pet inter-cat cooldown did not suppress an immediate second glance")
+        }
+
+        glanceClock = glanceClock.addingTimeInterval(9)
+        randomDraw = 0.9
+        glanceCoordinator.livelyAnimationBegan(
+            sourcePetID: "active",
+            sourceCenter: NSPoint(x: -100, y: 0),
+            candidates: glanceCandidates
+        )
+        guard requestedDirections.count == 1 else {
+            throw SelfTestError("forced inter-cat probability rejection still requested a glance")
+        }
+
+        randomDraw = 0
+        glanceCoordinator.livelyAnimationBegan(
+            sourcePetID: "active",
+            sourceCenter: NSPoint(x: -100, y: 0),
+            candidates: glanceCandidates
+        )
+        guard requestedDirections == [LookDirection(headingIndex: 4), LookDirection(headingIndex: 12)],
+              LookDirection.toward(source: calmCenter, target: NSPoint(x: 0, y: 100)) == LookDirection(headingIndex: 0),
+              LookDirection.toward(source: calmCenter, target: NSPoint(x: 0, y: -100)) == LookDirection(headingIndex: 8) else {
+            throw SelfTestError("inter-cat look direction mapping did not select right/left/up/down frames")
+        }
+        print("Inter-cat glances: lively set exact; calm faces right/left; busy/sleep/manual excluded; forced 60% gate and 8s cooldown pass")
+
         guard let bundledPets = Bundle.main.resourceURL?.appendingPathComponent("pets", isDirectory: true) else {
             throw SelfTestError("bundle resource root was unavailable for sleep tests")
         }

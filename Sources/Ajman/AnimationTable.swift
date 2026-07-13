@@ -28,6 +28,15 @@ enum AnimationState: String, CaseIterable {
         case .lookDirectionsB: "Look Directions B"
         }
     }
+
+    var isLively: Bool {
+        switch self {
+        case .jumping, .waving, .runningRight, .runningLeft, .running:
+            true
+        default:
+            false
+        }
+    }
 }
 
 struct AnimationDefinition {

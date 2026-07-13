@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var catalog: PetCatalog?
     private var configuration: MenagerieConfiguration?
     private var discoveredPets: [PetDescriptor] = []
+    private let glanceCoordinator = InterCatGlanceCoordinator()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
@@ -179,7 +180,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             defaultPositionIndex: simultaneousCount == 1 ? 0 : defaultPositionIndex(for: id),
             isManualMode: { [weak self] in self?.statusMenu?.manualMode ?? false },
             petWasClicked: { [weak self] in self?.handlePetClick(id: id) },
-            dismissNotification: { [weak registry] id in registry?.dismissNotification(id: id) }
+            dismissNotification: { [weak registry] id in registry?.dismissNotification(id: id) },
+            livelyAnimationBegan: { [weak self] sourcePetID, sourceCenter in
+                self?.coordinateGlances(from: sourcePetID, at: sourceCenter)
+            }
+        )
+    }
+
+    private func coordinateGlances(from sourcePetID: String, at sourceCenter: NSPoint) {
+        let candidates = pets.map { pet in
+            InterCatGlanceCandidate(
+                petID: pet.petID,
+                isEligible: { [weak pet] in pet?.glanceEligibility.canReact ?? false },
+                requestGlance: { [weak pet] point in pet?.glanceToward(screenPoint: point) ?? false }
+            )
+        }
+        glanceCoordinator.livelyAnimationBegan(
+            sourcePetID: sourcePetID,
+            sourceCenter: sourceCenter,
+            candidates: candidates
         )
     }
 
