@@ -104,6 +104,24 @@ Ajman.app  (Swift/AppKit, LSUIElement menu-bar accessory)
 └── Bubble/Focus   speech bubble w/ session + message; click → activate owning app
 ```
 
+### Menagerie runtime (implemented 2026-07-12)
+
+`AppDelegate` owns the shared observation layer (`SessionRegistry`, Claude UDS server, and
+Codex monitor) plus zero or more `PetInstance` objects. Each `PetInstance` owns one loaded
+pet, `OverlayPanel`, `PetView`, `Animator`, `PetMode`, and `BubbleController`; it has no
+shared animation timer with another pet. Its provider binding is Claude, Codex, or `nil`
+(`Both`). Registry reduction filters its provider-keyed sessions for each instance, while a
+Both-bound instance retains the original global priority reduction.
+
+Shown pet ids persist in `AjmanShownPets`; bindings persist in
+`AjmanPetBinding.<petID>`. An absent shown-pets key is the versioned first-run signal: show
+Ajman bound to Claude and Winnie bound to Codex. Panel origins persist independently under
+`AjmanPanelOrigin.<petID>` and use stable stagger slots; a lone pet may migrate the legacy
+`AjmanPanelOrigin`. Global size, steady-size, playful-idle, and debug controls fan out from
+the status menu to every live instance. Removing an instance explicitly invalidates its
+PetMode timers, cancels its Animator timer, removes bubble observers/expiry timers, and
+closes both panels before releasing it.
+
 **Explicitly out of v1:** answering permissions (v2 — both agents support it now), exact terminal-tab focus (v2, Claude first), global hotkeys, Accessibility permission, auto-update, any network egress, Claude Desktop/ChatGPT adapters.
 
 ## Parts to lift (with MIT attribution headers)
@@ -128,7 +146,7 @@ Masko public commits: MIT (© 2026 Masko) — valid regardless of later private 
 2. **EventCore + UDS + Claude hooks (observe-only)** — Ajman reacts to real Claude sessions.
 3. **Codex hooks + rollout tailer + session registry** — multi-agent priority; Desktop vs CLI badges.
 4. **Bubbles + click-to-focus + menu-bar controls** (pause, launch-at-login, uninstall hooks). ← *v1 ships here*
-   - **Bubble design (locked 2026-07-12, modeled on Codex's native pet cards):** each card = **bold title** (short turn summary) · **truncated preview** of the message (~first sentence / ~120 chars, ellipsis-cut wherever it lands — a length cap, NOT first-line-only) · **⌄ expand** to read the full text · **status dot** (green ✓ done / spinner running / attention for waiting). **Stack one card per active session, newest on top.** Cross-agent by construction — Claude cards and Codex cards share the same stack (EventCore already keys per `provider+sessionId` with priority `waiting>failed>review>running>idle`, so the stack ordering falls out of the reducer). Click a card → focus that session's app/terminal. Title source: reuse the agent's own turn summary where exposed (Codex `notify`/rollout), else derive from the first line of the last assistant message.
+   - **Bubble design (locked 2026-07-12, modeled on Codex's native pet cards):** each card = **bold title** (short turn summary) · **truncated preview** of the message (~first sentence / ~120 chars, ellipsis-cut wherever it lands — a length cap, NOT first-line-only) · **⌄ expand** to read the full text · **status dot** (green ✓ done / spinner running / attention for waiting). **Stack one card per active session, newest on top.** A provider-bound pet shows only that provider's cards; a Both-bound pet retains the original cross-agent stack. Click a card → focus that session's app/terminal. Title source: reuse the agent's own turn summary where exposed (Codex `notify`/rollout), else derive from the first line of the last assistant message.
    - **Dismissal (Codex parity, locked 2026-07-12):** a card clears three ways — (1) explicit **✕** on the card; (2) **click the card** → focus that session (counts as seen); (3) **implicit — the user visits the thread by any route**, including opening it directly in the underlying app *without touching the card*. Path (3) is the hard one: Codex dismisses for free because it owns the thread view; we're external and get no "thread opened" signal. So we **approximate presence from our own event stream** — a fresh `UserPromptSubmit` on that session (user is typing there now), or the session leaving its attention state (e.g. `waiting`→`running` because a permission was answered elsewhere) — and clear the card then. Belt-and-suspenders: auto-expire a stale card after a timeout so a missed signal never leaves it stuck.
    - **Reuse Masko's proven, permission-free clearing (verified in `MaTriXy/masko-code` `AppStore`/`PendingPermissionStore`):** cache the `tool_use_id` from `PreToolUse` (the `PermissionRequest`/attention event lacks it); then clear the card when **any later event carries that same `tool_use_id`** (the tool ran → the user answered elsewhere), OR on `Stop`/`UserPromptSubmit` for that session, OR when the hook connection goes silent (a ~1 s liveness timer), OR on a timeout. Finished-toasts auto-dismiss on an ~8 s timer and are suppressed while a permission is pending. Our Stage 2 EventCore already receives all these signals. **Accessibility is now owner-approved (2026-07-12)** as an *optional* refinement for the pure silent-glance case (user eyeballs the thread without typing) and — more valuably — to power precise click-to-focus targeting; the event-inference path stays primary and works with no permission.
 5. **v2** — answer permissions from the bubble (Claude rich, Codex allow/deny), exact terminal-tab focus, more agents.
@@ -143,7 +161,7 @@ Masko public commits: MIT (© 2026 Masko) — valid regardless of later private 
 - **Winnie's default posture → sitting, like Ajman (owner 2026-07-12).** Her hatch drew idle/stationary rows *standing*; owner wants her to mostly **sit** (Ajman's convention). Regenerate her stationary rows (idle, waiting, review, failed, working) as sitting poses; keep the charming standing pose as an occasional Pet-Mode "fun" beat, not the default. Bonus: sitting-vs-sitting makes the "Winnie smaller than Ajman" size comparison apples-to-apples. Art-regen task (Codex hatch / Gemini) — set the sitting posture in her row prompts when regenerating.
 - **Sleep state for both pets (owner 2026-07-12).** A sleep/deep-rest animation (curled up, eyes closed). NOT in the standard 8×9 / 8×11 hatch format → design decision needed: an extra row beyond the format vs a separate small sheet/frames. Needs new art for **both** Ajman and Winnie. Ties into Pet Mode: doze off after a long calm stretch, wake on click or any agent activity.
 
-- **Simultaneous pets, one per agent (owner idea 2026-07-12).** Beyond the switch-between picker: optionally show MULTIPLE pets at once — a little menagerie — each **bound to one agent**. Default binding: **Ajman ↔ Claude Code, Winnie ↔ Codex** (configurable per pet, in the menu). Each pet is driven only by its bound provider's activity, and shows Pet-Mode idle when that agent is quiet. Natural fit: EventCore already keys state per `provider+session`, so filter the reducer by provider and render one pet per provider. Implementation: multiple `OverlayPanel`s (per-pet position + size persistence), a pet↔provider binding map, route each provider's reduced state to its matching pet's Animator. The read-at-a-glance payoff: "Ajman's working" = Claude working; "Winnie's ears up" = Codex wants you.
+- **Simultaneous pets, one per agent — implemented 2026-07-12.** See “Menagerie runtime” above. The status menu can show zero or more discovered pets and bind each to Claude, Codex, or Both; first-run defaults are Ajman ↔ Claude and Winnie ↔ Codex.
 
 - **Keep the old (pre-tip, standing) Winnie — as an easter egg (owner 2026-07-12).** The original hatched Winnie (un-tipped, standing idle) is preserved byte-for-byte at `assets/winnie/GOLDEN-winnie-pet-2026-07-12/` (tracked in git; = the pre-install live pet). Do NOT discard her. Optionally expose her as a selectable bonus/easter-egg pet — e.g. install to `~/.codex/pets/winnie-classic/` so the multi-pet picker lists "Winnie (classic)" beside the tipped Winnie, or gate her behind a fun trigger. She is her own preserved snapshot regardless of what the live `winnie` pet becomes.
 
