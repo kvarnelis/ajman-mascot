@@ -29,7 +29,14 @@ struct PetNotification: Identifiable, Equatable {
 
 enum PetNotificationChange: Equatable {
     case upsert(PetNotification)
-    case dismiss(id: String)
+    case dismiss(id: String, provider: AgentEvent.Provider)
+
+    var provider: AgentEvent.Provider {
+        switch self {
+        case .upsert(let notification): notification.provider
+        case .dismiss(_, let provider): provider
+        }
+    }
 }
 
 struct AgentEvent {

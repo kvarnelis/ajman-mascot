@@ -145,6 +145,12 @@ final class PetMode {
         beatTimer = nil
     }
 
+    func teardown() {
+        ownsRestingAnimation = false
+        wakeUntil = nil
+        cancelTimers()
+    }
+
     deinit {
         idleTimer?.invalidate()
         beatTimer?.invalidate()

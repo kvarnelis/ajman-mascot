@@ -46,6 +46,13 @@ final class Animator {
         sheet.animationTable.definition(for: state)?.durations.reduce(0, +)
     }
 
+    func stop() {
+        timer?.cancel()
+        timer = nil
+        frames = []
+        view?.image = nil
+    }
+
     private func showCurrentFrameAndScheduleNext(definition: AnimationDefinition) {
         guard !frames.isEmpty else { return }
         view?.image = frames[frameIndex]
@@ -63,5 +70,9 @@ final class Animator {
         }
         self.timer = timer
         timer.resume()
+    }
+
+    deinit {
+        timer?.cancel()
     }
 }

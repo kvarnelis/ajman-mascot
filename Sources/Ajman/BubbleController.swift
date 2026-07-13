@@ -59,12 +59,27 @@ final class BubbleController {
         expiryTimers.values.forEach { $0.invalidate() }
     }
 
+    func removeAll() {
+        notifications.removeAll()
+        expiryTimers.values.forEach { $0.invalidate() }
+        expiryTimers.removeAll()
+        render()
+    }
+
+    func teardown() {
+        removeAll()
+        observerTokens.forEach(NotificationCenter.default.removeObserver)
+        observerTokens.removeAll()
+        panel.orderOut(nil)
+        panel.close()
+    }
+
     func apply(_ change: PetNotificationChange) {
         switch change {
         case .upsert(let notification):
             notifications[notification.id] = notification
             scheduleExpiry(for: notification)
-        case .dismiss(let id):
+        case .dismiss(let id, _):
             notifications.removeValue(forKey: id)
             expiryTimers.removeValue(forKey: id)?.invalidate()
         }

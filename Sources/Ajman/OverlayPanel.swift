@@ -1,8 +1,11 @@
 import AppKit
 
 final class OverlayPanel: NSPanel, NSWindowDelegate {
-    private static let positionKey = "AjmanPanelOrigin"
+    private static let legacyPositionKey = "AjmanPanelOrigin"
     private var saveWorkItem: DispatchWorkItem?
+    private let defaults: UserDefaults
+    private var defaultPositionIndex: Int
+    let positionPersistenceKey: String
     private(set) var petScale: PetScale
     private(set) var relativeScale: Double
     var petWasClicked: (() -> Void)?
@@ -10,9 +13,19 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
     private var mouseDownTimestamp: TimeInterval?
     var displaySize: NSSize { Self.displaySize(global: petScale, relative: relativeScale) }
 
-    init(contentView: NSView, scale: PetScale, relativeScale: Double = 1.0) {
+    init(
+        contentView: NSView,
+        scale: PetScale,
+        relativeScale: Double = 1.0,
+        petID: String,
+        defaultPositionIndex: Int,
+        defaults: UserDefaults = .standard
+    ) {
         petScale = scale
         self.relativeScale = relativeScale
+        self.defaultPositionIndex = defaultPositionIndex
+        self.defaults = defaults
+        positionPersistenceKey = "AjmanPanelOrigin.\(petID)"
         let size = Self.displaySize(global: scale, relative: relativeScale)
         super.init(
             contentRect: NSRect(origin: .zero, size: size),
@@ -54,8 +67,10 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
         super.sendEvent(event)
     }
 
-    func restorePositionOrUseDefault() {
-        if let value = UserDefaults.standard.string(forKey: Self.positionKey) {
+    func restorePositionOrUseDefault(useLegacyFallback: Bool = false) {
+        let stored = defaults.string(forKey: positionPersistenceKey)
+            ?? (useLegacyFallback ? defaults.string(forKey: Self.legacyPositionKey) : nil)
+        if let value = stored {
             let origin = NSPointFromString(value)
             if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(NSRect(origin: origin, size: frame.size)) }) {
                 setFrameOrigin(origin)
@@ -68,10 +83,20 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
     func resetPosition() {
         guard let visibleFrame = NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame else { return }
         setFrameOrigin(NSPoint(
-            x: visibleFrame.maxX - frame.width - 24,
-            y: visibleFrame.minY + 24
+            x: max(
+                visibleFrame.minX,
+                visibleFrame.maxX - frame.width - 24 - CGFloat(defaultPositionIndex) * frame.width * 1.5
+            ),
+            y: min(
+                visibleFrame.maxY - frame.height,
+                visibleFrame.minY + 24 + CGFloat(defaultPositionIndex) * frame.height * 0.35
+            )
         ))
         savePosition()
+    }
+
+    func setDefaultPositionIndex(_ index: Int) {
+        defaultPositionIndex = index
     }
 
     func apply(scale: PetScale? = nil, relativeScale: Double? = nil) {
@@ -120,6 +145,13 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
     }
 
     private func savePosition() {
-        UserDefaults.standard.set(NSStringFromPoint(frame.origin), forKey: Self.positionKey)
+        defaults.set(NSStringFromPoint(frame.origin), forKey: positionPersistenceKey)
+    }
+
+    func teardown() {
+        saveWorkItem?.cancel()
+        saveWorkItem = nil
+        orderOut(nil)
+        close()
     }
 }

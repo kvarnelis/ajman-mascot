@@ -4,12 +4,14 @@ import Foundation
 final class SessionRegistry {
     struct Session {
         let key: String
+        let provider: AgentEvent.Provider
         var lastEvent: String
         var lastActivity: Date
         var derivedState: AnimationState
     }
 
     private(set) var sessions: [String: Session] = [:]
+    private(set) var notifications: [String: PetNotification] = [:]
     private(set) var currentState: AnimationState = .idle
     var didChange: ((AnimationState, Int) -> Void)?
     var notificationDidChange: ((PetNotificationChange) -> Void)?
@@ -32,13 +34,20 @@ final class SessionRegistry {
         } else {
             let old = sessions[key]?.derivedState ?? .idle
             let next = ActivityReducer.state(for: event, previous: old) ?? old
-            sessions[key] = Session(key: key, lastEvent: event.event, lastActivity: event.timestamp, derivedState: next)
+            sessions[key] = Session(
+                key: key,
+                provider: event.provider,
+                lastEvent: event.event,
+                lastActivity: event.timestamp,
+                derivedState: next
+            )
         }
         reduce(now: event.timestamp)
     }
 
     func dismissNotification(id: String) {
-        notificationDidChange?(.dismiss(id: id))
+        guard let notification = notifications.removeValue(forKey: id) else { return }
+        notificationDidChange?(.dismiss(id: id, provider: notification.provider))
     }
 
     private func updateNotification(for event: AgentEvent, id: String, sessionId: String) {
@@ -52,12 +61,13 @@ final class SessionRegistry {
         guard let kind else {
             // Any subsequent progress/user-presence/end signal supersedes a card.
             if ["UserPromptSubmit", "PreToolUse", "PostToolUse", "SessionEnd"].contains(event.event) {
-                notificationDidChange?(.dismiss(id: id))
+                notifications.removeValue(forKey: id)
+                notificationDidChange?(.dismiss(id: id, provider: event.provider))
             }
             return
         }
 
-        notificationDidChange?(.upsert(PetNotification(
+        let notification = PetNotification(
             id: id,
             provider: event.provider,
             sessionId: sessionId,
@@ -65,7 +75,9 @@ final class SessionRegistry {
             title: Self.title(for: event, kind: kind),
             preview: Self.preview(for: event, kind: kind),
             timestamp: event.timestamp
-        )))
+        )
+        notifications[id] = notification
+        notificationDidChange?(.upsert(notification))
     }
 
     private static func title(for event: AgentEvent, kind: PetNotification.Kind) -> String {
@@ -127,5 +139,22 @@ final class SessionRegistry {
         guard newState != currentState else { didChange?(newState, count); return }
         currentState = newState
         didChange?(newState, count)
+    }
+
+    func currentState(for provider: AgentEvent.Provider?) -> AnimationState {
+        ActivityReducer.currentState(in: filteredSessions(for: provider))
+    }
+
+    func sessionCount(for provider: AgentEvent.Provider?) -> Int {
+        filteredSessions(for: provider).count
+    }
+
+    func currentNotifications(for provider: AgentEvent.Provider?) -> [PetNotification] {
+        notifications.values.filter { provider == nil || $0.provider == provider }
+    }
+
+    private func filteredSessions(for provider: AgentEvent.Provider?) -> [Session] {
+        guard let provider else { return Array(sessions.values) }
+        return sessions.values.filter { $0.provider == provider }
     }
 }

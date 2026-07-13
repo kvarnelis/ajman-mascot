@@ -67,6 +67,84 @@ private func runSelfTest() -> Int32 {
         guard catalog.relativeScale(for: "winnie") == 0.7 else { throw SelfTestError("relative pet scale override did not persist") }
         print("Pet catalog: discovered \(catalog.discover().count); selection and relative scale override round-trip")
 
+        let menagerieSuiteName = "AjmanSelfTest.Menagerie.\(UUID().uuidString)"
+        guard let menagerieDefaults = UserDefaults(suiteName: menagerieSuiteName) else {
+            throw SelfTestError("could not create menagerie defaults")
+        }
+        defer { menagerieDefaults.removePersistentDomain(forName: menagerieSuiteName) }
+        var menagerie = MenagerieConfiguration(defaults: menagerieDefaults)
+        guard menagerie.shownPetIDs == ["ajman", "winnie"],
+              menagerie.binding(for: "ajman") == .claude,
+              menagerie.binding(for: "winnie") == .codex else {
+            throw SelfTestError("menagerie first-run defaults were incorrect")
+        }
+        menagerie.setShown(false, petID: "winnie")
+        menagerie.setShown(true, petID: "test-pet")
+        menagerie.setBinding(.codex, for: "ajman")
+        menagerie.setBinding(nil, for: "test-pet")
+        menagerie = MenagerieConfiguration(defaults: menagerieDefaults)
+        guard menagerie.shownPetIDs == ["ajman", "test-pet"],
+              menagerie.binding(for: "ajman") == .codex,
+              menagerie.binding(for: "test-pet") == nil else {
+            throw SelfTestError("shown pets and bindings did not round-trip")
+        }
+        print("Menagerie config: first-run pair and shown-pets/bindings round-trip")
+
+        let providerRegistry = SessionRegistry(startTimer: false)
+        let now = Date()
+        let claudeFrame = try JSONSerialization.data(withJSONObject: [
+            "hook_event_name": "Notification", "session_id": "claude-one",
+        ])
+        let codexFrame = try JSONSerialization.data(withJSONObject: [
+            "hook_event_name": "PreToolUse", "session_id": "codex-one", "tool_name": "Bash",
+        ])
+        guard let claudeEvent = AgentEvent.decode(frame: claudeFrame, provider: .claude, now: now),
+              let codexEvent = AgentEvent.decode(frame: codexFrame, provider: .codex, now: now) else {
+            throw SelfTestError("could not construct provider-isolation events")
+        }
+        providerRegistry.apply(claudeEvent)
+        providerRegistry.apply(codexEvent)
+        guard providerRegistry.currentState(for: .claude) == .waiting,
+              providerRegistry.currentState(for: .codex) == .running,
+              providerRegistry.currentState(for: nil) == .waiting,
+              providerRegistry.sessionCount(for: .claude) == 1,
+              providerRegistry.sessionCount(for: .codex) == 1 else {
+            throw SelfTestError("Claude and Codex provider states were not independent")
+        }
+        print("Provider reducer: Claude waiting; Codex running; global waiting")
+
+        let instanceSuiteName = "AjmanSelfTest.PetInstances.\(UUID().uuidString)"
+        guard let instanceDefaults = UserDefaults(suiteName: instanceSuiteName) else {
+            throw SelfTestError("could not create pet-instance defaults")
+        }
+        defer { instanceDefaults.removePersistentDomain(forName: instanceSuiteName) }
+        let instanceCatalog = PetCatalog(defaults: instanceDefaults)
+        guard instanceCatalog.discover().contains(where: { $0.id == "ajman" }),
+              instanceCatalog.discover().contains(where: { $0.id == "winnie" }) else {
+            throw SelfTestError("Ajman and Winnie packages are required for the two-instance test")
+        }
+        let ajmanInstance = try PetInstance(
+            petID: "ajman", binding: .claude, catalog: instanceCatalog,
+            scale: .small, defaultPositionIndex: 0, defaults: instanceDefaults,
+            isManualMode: { false }, dismissNotification: { _ in }
+        )
+        let winnieInstance = try PetInstance(
+            petID: "winnie", binding: .codex, catalog: instanceCatalog,
+            scale: .small, defaultPositionIndex: 1, defaults: instanceDefaults,
+            isManualMode: { false }, dismissNotification: { _ in }
+        )
+        defer {
+            ajmanInstance.teardown()
+            winnieInstance.teardown()
+        }
+        guard ajmanInstance.panel !== winnieInstance.panel,
+              ajmanInstance.positionPersistenceKey == "AjmanPanelOrigin.ajman",
+              winnieInstance.positionPersistenceKey == "AjmanPanelOrigin.winnie",
+              ajmanInstance.positionPersistenceKey != winnieInstance.positionPersistenceKey else {
+            throw SelfTestError("two PetInstances did not own distinct panels and position keys")
+        }
+        print("Pet instances: two panels; distinct per-pet position keys")
+
         let normalizationPetIDs = ["ajman", "winnie"].filter { id in
             catalog.discover().contains { $0.id == id }
         }
@@ -118,7 +196,7 @@ private func runSelfTest() -> Int32 {
         try invokeHook(event: "PostToolUse", tool: "Bash")
         guard pump(until: {
             notificationChanges.contains { change in
-                if case .dismiss(let id) = change { return id == waiting.id }
+                if case .dismiss(let id, _) = change { return id == waiting.id }
                 return false
             }
         }) else { throw SelfTestError("follow-up event did not dismiss waiting card") }
