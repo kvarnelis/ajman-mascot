@@ -1,0 +1,125 @@
+{
+  "ok": true,
+  "chroma_key": {
+    "hex": "#FF00FF",
+    "rgb": [
+      255,
+      0,
+      255
+    ],
+    "threshold": 96.0
+  },
+  "rows": [
+    {
+      "state": "idle",
+      "frames": [
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/idle/00.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/idle/01.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/idle/02.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/idle/03.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/idle/04.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/idle/05.png"
+      ],
+      "method": "stable-slots"
+    },
+    {
+      "state": "running-right",
+      "frames": [
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-right/00.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-right/01.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-right/02.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-right/03.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-right/04.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-right/05.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-right/06.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-right/07.png"
+      ],
+      "method": "stable-slots"
+    },
+    {
+      "state": "running-left",
+      "frames": [
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-left/00.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-left/01.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-left/02.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-left/03.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-left/04.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-left/05.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-left/06.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running-left/07.png"
+      ],
+      "method": "stable-slots"
+    },
+    {
+      "state": "waving",
+      "frames": [
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waving/00.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waving/01.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waving/02.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waving/03.png"
+      ],
+      "method": "stable-slots"
+    },
+    {
+      "state": "jumping",
+      "frames": [
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/jumping/00.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/jumping/01.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/jumping/02.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/jumping/03.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/jumping/04.png"
+      ],
+      "method": "stable-slots"
+    },
+    {
+      "state": "failed",
+      "frames": [
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/failed/00.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/failed/01.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/failed/02.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/failed/03.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/failed/04.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/failed/05.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/failed/06.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/failed/07.png"
+      ],
+      "method": "stable-slots"
+    },
+    {
+      "state": "waiting",
+      "frames": [
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waiting/00.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waiting/01.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waiting/02.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waiting/03.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waiting/04.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/waiting/05.png"
+      ],
+      "method": "stable-slots"
+    },
+    {
+      "state": "running",
+      "frames": [
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running/00.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running/01.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running/02.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running/03.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running/04.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/running/05.png"
+      ],
+      "method": "stable-slots"
+    },
+    {
+      "state": "review",
+      "frames": [
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/review/00.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/review/01.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/review/02.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/review/03.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/review/04.png",
+        "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames-stable/review/05.png"
+      ],
+      "method": "stable-slots"
+    }
+  ]
+}

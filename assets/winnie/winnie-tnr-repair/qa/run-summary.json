@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "installed": false,
+  "spriteVersionNumber": 2,
+  "run_dir": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair",
+  "candidate_package": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/package/winnie",
+  "validation": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/final/validation-extended.json",
+  "contact_sheet": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/qa/contact-sheet-extended.png",
+  "direction_sheet": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/qa/look-directions.png",
+  "blind_direction_validation": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/qa/direction-blind-validation.json",
+  "tnr_ear_review": "pass"
+}

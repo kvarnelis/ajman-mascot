@@ -1,0 +1,61 @@
+{
+  "ok": true,
+  "strip": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/decoded/look-cardinals.png",
+  "directions": [
+    "000",
+    "090",
+    "180",
+    "270"
+  ],
+  "errors": [],
+  "anchors": [
+    {
+      "direction": "000",
+      "source_box": [
+        0,
+        0,
+        486,
+        809
+      ],
+      "used_pixels": 142306,
+      "edge_pixels": 2,
+      "output": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/decoded/look-anchors/000.png"
+    },
+    {
+      "direction": "090",
+      "source_box": [
+        486,
+        0,
+        971,
+        809
+      ],
+      "used_pixels": 135580,
+      "edge_pixels": 0,
+      "output": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/decoded/look-anchors/090.png"
+    },
+    {
+      "direction": "180",
+      "source_box": [
+        971,
+        0,
+        1456,
+        809
+      ],
+      "used_pixels": 117865,
+      "edge_pixels": 0,
+      "output": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/decoded/look-anchors/180.png"
+    },
+    {
+      "direction": "270",
+      "source_box": [
+        1456,
+        0,
+        1942,
+        809
+      ],
+      "used_pixels": 135191,
+      "edge_pixels": 0,
+      "output": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/decoded/look-anchors/270.png"
+    }
+  ]
+}

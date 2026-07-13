@@ -1,0 +1,26 @@
+{
+  "reviewed_by": "independent final visual QA worker",
+  "directions": [
+    {"direction":"000","expected":"up","verdict":"pass"},
+    {"direction":"022.5","expected":"up-right","verdict":"pass"},
+    {"direction":"045","expected":"up-right","verdict":"pass"},
+    {"direction":"067.5","expected":"up-right","verdict":"pass"},
+    {"direction":"090","expected":"right","verdict":"pass"},
+    {"direction":"112.5","expected":"down-right","verdict":"pass"},
+    {"direction":"135","expected":"down-right","verdict":"pass"},
+    {"direction":"157.5","expected":"down-right","verdict":"pass"},
+    {"direction":"180","expected":"down","verdict":"pass"},
+    {"direction":"202.5","expected":"down-left","verdict":"pass"},
+    {"direction":"225","expected":"down-left","verdict":"pass"},
+    {"direction":"247.5","expected":"down-left","verdict":"pass"},
+    {"direction":"270","expected":"left","verdict":"pass"},
+    {"direction":"292.5","expected":"up-left","verdict":"pass"},
+    {"direction":"315","expected":"up-left","verdict":"pass"},
+    {"direction":"337.5","expected":"up-left","verdict":"pass"}
+  ],
+  "tnr_ear_review": {
+    "verdict": "pass",
+    "failures": [],
+    "note": "All used cells preserve the same physical-left flat TNR ear and a pointed physical-right ear."
+  }
+}

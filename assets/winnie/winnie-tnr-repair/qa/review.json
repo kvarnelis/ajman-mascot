@@ -1,0 +1,973 @@
+{
+  "ok": true,
+  "frames_root": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames",
+  "states": [
+    "idle",
+    "running-right",
+    "running-left",
+    "waving",
+    "jumping",
+    "failed",
+    "waiting",
+    "running",
+    "review"
+  ],
+  "errors": [],
+  "warnings": [],
+  "rows": [
+    {
+      "state": "idle",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/idle/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15568,
+          "bbox": [
+            32,
+            5,
+            160,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 281
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/idle/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15324,
+          "bbox": [
+            33,
+            5,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 252
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/idle/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15384,
+          "bbox": [
+            34,
+            5,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 277
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/idle/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15267,
+          "bbox": [
+            35,
+            5,
+            157,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 266
+        },
+        {
+          "index": 4,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/idle/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15434,
+          "bbox": [
+            33,
+            5,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 293
+        },
+        {
+          "index": 5,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/idle/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15359,
+          "bbox": [
+            34,
+            5,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 295
+        }
+      ]
+    },
+    {
+      "state": "running-right",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-right/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15016,
+          "bbox": [
+            5,
+            18,
+            187,
+            190
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 534
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-right/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 16903,
+          "bbox": [
+            11,
+            5,
+            181,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 677
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-right/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14819,
+          "bbox": [
+            5,
+            26,
+            187,
+            181
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 566
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-right/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14360,
+          "bbox": [
+            5,
+            21,
+            187,
+            186
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 571
+        },
+        {
+          "index": 4,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-right/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12722,
+          "bbox": [
+            5,
+            23,
+            187,
+            184
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 472
+        },
+        {
+          "index": 5,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-right/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12758,
+          "bbox": [
+            5,
+            33,
+            187,
+            174
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 470
+        },
+        {
+          "index": 6,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-right/06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 16818,
+          "bbox": [
+            5,
+            7,
+            187,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 619
+        },
+        {
+          "index": 7,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-right/07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13502,
+          "bbox": [
+            5,
+            31,
+            187,
+            176
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 480
+        }
+      ]
+    },
+    {
+      "state": "running-left",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-left/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12882,
+          "bbox": [
+            5,
+            33,
+            187,
+            175
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 686
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-left/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10919,
+          "bbox": [
+            5,
+            36,
+            187,
+            172
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 537
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-left/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10152,
+          "bbox": [
+            15,
+            29,
+            176,
+            178
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 313
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-left/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7667,
+          "bbox": [
+            5,
+            55,
+            187,
+            152
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 447
+        },
+        {
+          "index": 4,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-left/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12074,
+          "bbox": [
+            5,
+            33,
+            187,
+            175
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 590
+        },
+        {
+          "index": 5,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-left/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 9604,
+          "bbox": [
+            13,
+            37,
+            179,
+            171
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 279
+        },
+        {
+          "index": 6,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-left/06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10031,
+          "bbox": [
+            11,
+            32,
+            180,
+            176
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 292
+        },
+        {
+          "index": 7,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running-left/07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 7844,
+          "bbox": [
+            5,
+            53,
+            187,
+            155
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 450
+        }
+      ]
+    },
+    {
+      "state": "waving",
+      "expected_frames": 4,
+      "actual_frames": 4,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waving/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15667,
+          "bbox": [
+            33,
+            5,
+            159,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 156
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waving/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14865,
+          "bbox": [
+            24,
+            5,
+            167,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 159
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waving/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15178,
+          "bbox": [
+            23,
+            5,
+            169,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 179
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waving/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14982,
+          "bbox": [
+            37,
+            5,
+            155,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 200
+        }
+      ]
+    },
+    {
+      "state": "jumping",
+      "expected_frames": 5,
+      "actual_frames": 5,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/jumping/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14570,
+          "bbox": [
+            5,
+            29,
+            187,
+            178
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 257
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/jumping/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14817,
+          "bbox": [
+            20,
+            5,
+            171,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 259
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/jumping/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 18210,
+          "bbox": [
+            5,
+            23,
+            187,
+            185
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 300
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/jumping/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 11965,
+          "bbox": [
+            36,
+            5,
+            156,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 208
+        },
+        {
+          "index": 4,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/jumping/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 20548,
+          "bbox": [
+            8,
+            5,
+            184,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 351
+        }
+      ]
+    },
+    {
+      "state": "failed",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/failed/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13980,
+          "bbox": [
+            42,
+            5,
+            149,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 216
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/failed/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15587,
+          "bbox": [
+            35,
+            5,
+            156,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 243
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/failed/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 19836,
+          "bbox": [
+            13,
+            5,
+            178,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 273
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/failed/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21472,
+          "bbox": [
+            14,
+            5,
+            177,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 296
+        },
+        {
+          "index": 4,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/failed/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 20618,
+          "bbox": [
+            5,
+            23,
+            187,
+            184
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 290
+        },
+        {
+          "index": 5,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/failed/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21980,
+          "bbox": [
+            5,
+            14,
+            187,
+            194
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 334
+        },
+        {
+          "index": 6,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/failed/06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 18072,
+          "bbox": [
+            28,
+            5,
+            163,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 340
+        },
+        {
+          "index": 7,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/failed/07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15772,
+          "bbox": [
+            37,
+            5,
+            155,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 262
+        }
+      ]
+    },
+    {
+      "state": "waiting",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waiting/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13742,
+          "bbox": [
+            46,
+            5,
+            146,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 136
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waiting/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13550,
+          "bbox": [
+            44,
+            5,
+            147,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 140
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waiting/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13820,
+          "bbox": [
+            43,
+            5,
+            149,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 146
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waiting/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14525,
+          "bbox": [
+            38,
+            5,
+            154,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 139
+        },
+        {
+          "index": 4,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waiting/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14215,
+          "bbox": [
+            40,
+            5,
+            151,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 155
+        },
+        {
+          "index": 5,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/waiting/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13948,
+          "bbox": [
+            42,
+            5,
+            149,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 149
+        }
+      ]
+    },
+    {
+      "state": "running",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13074,
+          "bbox": [
+            47,
+            5,
+            144,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 145
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14246,
+          "bbox": [
+            19,
+            5,
+            172,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 215
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15127,
+          "bbox": [
+            42,
+            5,
+            150,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 176
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 19310,
+          "bbox": [
+            11,
+            5,
+            180,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 293
+        },
+        {
+          "index": 4,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12991,
+          "bbox": [
+            47,
+            5,
+            145,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 155
+        },
+        {
+          "index": 5,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/running/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14469,
+          "bbox": [
+            33,
+            5,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 230
+        }
+      ]
+    },
+    {
+      "state": "review",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/review/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 16643,
+          "bbox": [
+            38,
+            5,
+            153,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 188
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/review/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 16514,
+          "bbox": [
+            38,
+            5,
+            153,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 175
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/review/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 16870,
+          "bbox": [
+            37,
+            5,
+            155,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 195
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/review/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15527,
+          "bbox": [
+            38,
+            5,
+            154,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 171
+        },
+        {
+          "index": 4,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/review/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 16767,
+          "bbox": [
+            38,
+            5,
+            154,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 202
+        },
+        {
+          "index": 5,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-tnr-repair/frames/review/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14663,
+          "bbox": [
+            45,
+            5,
+            146,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 141
+        }
+      ]
+    }
+  ]
+}
