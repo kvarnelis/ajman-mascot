@@ -165,6 +165,8 @@ Masko public commits: MIT (© 2026 Masko) — valid regardless of later private 
 
 - **Keep the old (pre-tip, standing) Winnie — as an easter egg (owner 2026-07-12).** The original hatched Winnie (un-tipped, standing idle) is preserved byte-for-byte at `assets/winnie/GOLDEN-winnie-pet-2026-07-12/` (tracked in git; = the pre-install live pet). Do NOT discard her. Optionally expose her as a selectable bonus/easter-egg pet — e.g. install to `~/.codex/pets/winnie-classic/` so the multi-pet picker lists "Winnie (classic)" beside the tipped Winnie, or gate her behind a fun trigger. She is her own preserved snapshot regardless of what the live `winnie` pet becomes.
 
+- **Inter-cat glances (owner idea 2026-07-13).** Cats stay mostly independent — the owner *likes* seeing Ajman stay calm while Winnie goes nuts, so do NOT force constant interaction. But: when one shown cat does something lively ("a little crazy" — running/jumping/waving), a **calm sibling occasionally turns to look at it**, using the look-direction rows (9/10) to glance toward the active cat's on-screen position, then returns to calm. Subtle and *occasional* (not every time), and only when the looker is itself at rest. Implementation: a light cross-`PetInstance` coordinator — when a pet enters an active state, notify the others; a resting sibling picks the look-row frame whose direction points toward the active pet's panel, holds briefly, then resumes idle/pet-mode. Keep it rare and gentle; never interrupt an agent-driven state.
+
 ## Open questions (tracked, non-blocking)
 
 - Do Codex **Desktop** sessions fire user-configured hooks, or only CLI/TUI? (Unverified — rollout tailing covers Desktop either way; test empirically in stage 3.)
