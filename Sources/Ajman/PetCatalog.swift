@@ -62,13 +62,18 @@ struct PetCatalog {
         }
     }
 
-    func load(id: String) throws -> LoadedPet {
+    func load(id: String, steadySize: Bool? = nil) throws -> LoadedPet {
         let candidates = descriptors(in: liveRoot, isBundled: false).filter { $0.id == id }
             + descriptors(in: bundledRoot, isBundled: true).filter { $0.id == id }
         guard !candidates.isEmpty else { throw SpriteSheetError.missingPackage(liveRoot.appendingPathComponent(id)) }
         var lastError: Error?
         for descriptor in candidates {
-            do { return LoadedPet(descriptor: descriptor, sheet: try SpriteSheet.load(directory: descriptor.directory)) }
+            do {
+                return LoadedPet(
+                    descriptor: descriptor,
+                    sheet: try SpriteSheet.load(directory: descriptor.directory, steadySize: steadySize ?? SteadySize.load(from: defaults))
+                )
+            }
             catch {
                 lastError = error
                 log("pet '\(id)' failed from \(descriptor.directory.path): \(error.localizedDescription)")
@@ -86,7 +91,10 @@ struct PetCatalog {
             let ajman = bundledRoot.appendingPathComponent(Self.defaultPetID, isDirectory: true)
             do {
                 let descriptor = try descriptor(at: ajman, isBundled: true)
-                return LoadedPet(descriptor: descriptor, sheet: try SpriteSheet.load(directory: ajman))
+                return LoadedPet(
+                    descriptor: descriptor,
+                    sheet: try SpriteSheet.load(directory: ajman, steadySize: SteadySize.load(from: defaults))
+                )
             } catch { log("bundled ajman fallback failed: \(error.localizedDescription)") }
         }
         return try load(id: Self.defaultPetID)

@@ -16,11 +16,13 @@ final class StatusMenu: NSObject {
     private var scaleItems: [PetScale: NSMenuItem] = [:]
     private var cycleTimer: Timer?
     private let playfulIdleItem = NSMenuItem(title: "Playful Idle", action: #selector(togglePlayfulIdle(_:)), keyEquivalent: "")
+    private let steadySizeItem = NSMenuItem(title: "Steady Size", action: #selector(toggleSteadySize(_:)), keyEquivalent: "")
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
     private let petMenu = NSMenu(title: "Pet")
     private let debugMenu = NSMenu(title: "Debug")
     private var petItems: [String: NSMenuItem] = [:]
     var petSelectionHandler: ((String) -> Void)?
+    var steadySizeHandler: ((Bool) -> Void)?
 
     init(animator: Animator, panel: OverlayPanel, registry: SessionRegistry, petMode: PetMode, pets: [PetDescriptor], activePetID: String) {
         self.animator = animator
@@ -40,6 +42,9 @@ final class StatusMenu: NSObject {
         playfulIdleItem.target = self
         playfulIdleItem.state = petMode.isEnabled ? .on : .off
         menu.addItem(playfulIdleItem)
+        steadySizeItem.target = self
+        steadySizeItem.state = SteadySize.load() ? .on : .off
+        menu.addItem(steadySizeItem)
         menu.addItem(.separator())
         let connect = NSMenuItem(title: "Connect to Claude Code", action: #selector(connectToClaude), keyEquivalent: "")
         connect.target = self; menu.addItem(connect)
@@ -148,6 +153,13 @@ final class StatusMenu: NSObject {
     @objc private func togglePlayfulIdle(_ sender: NSMenuItem) {
         petMode.setEnabled(!petMode.isEnabled)
         sender.state = petMode.isEnabled ? .on : .off
+    }
+
+    @objc private func toggleSteadySize(_ sender: NSMenuItem) {
+        let enabled = sender.state != .on
+        SteadySize.save(enabled)
+        sender.state = enabled ? .on : .off
+        steadySizeHandler?(enabled)
     }
 
     @objc private func toggleLaunchAtLogin(_ sender: NSMenuItem) {

@@ -42,6 +42,16 @@ private func runSelfTest() -> Int32 {
         }
         print("Pet scale: default 0.5; all 6 options round-trip")
 
+        let steadySuiteName = "AjmanSelfTest.SteadySize.\(UUID().uuidString)"
+        guard let steadyDefaults = UserDefaults(suiteName: steadySuiteName) else { throw SelfTestError("could not create steady-size defaults") }
+        defer { steadyDefaults.removePersistentDomain(forName: steadySuiteName) }
+        guard SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size was not on by default") }
+        SteadySize.save(false, to: steadyDefaults)
+        guard !SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size did not persist off") }
+        SteadySize.save(true, to: steadyDefaults)
+        guard SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size did not persist on") }
+        print("Steady size: default on; off/on round-trip")
+
         let selectionSuiteName = "AjmanSelfTest.PetSelection.\(UUID().uuidString)"
         guard let selectionDefaults = UserDefaults(suiteName: selectionSuiteName) else { throw SelfTestError("could not create selection defaults") }
         defer { selectionDefaults.removePersistentDomain(forName: selectionSuiteName) }
@@ -56,6 +66,22 @@ private func runSelfTest() -> Int32 {
         selectionDefaults.set(0.7, forKey: "AjmanPetScale.winnie")
         guard catalog.relativeScale(for: "winnie") == 0.7 else { throw SelfTestError("relative pet scale override did not persist") }
         print("Pet catalog: discovered \(catalog.discover().count); selection and relative scale override round-trip")
+
+        let normalizationPetIDs = ["ajman", "winnie"].filter { id in
+            catalog.discover().contains { $0.id == id }
+        }
+        for id in normalizationPetIDs {
+            let steadySheet = try catalog.load(id: id, steadySize: true).sheet
+            guard let idle = steadySheet.animationTable.definition(for: .idle) else { throw SelfTestError("\(id) idle definition missing") }
+            let idleBounds = steadySheet.contentBounds(for: idle).compactMap { $0 }
+            let idleHeights = idleBounds.map(\.height)
+            guard idleBounds.count == idle.frameCount,
+                  (idleHeights.max() ?? 0) - (idleHeights.min() ?? 0) <= 2,
+                  idleBounds.allSatisfy({ abs($0.minY - CGFloat(SpriteSheet.contentMargin)) <= 1 }) else {
+                throw SelfTestError("\(id) normalized idle frames did not share height/ground line: \(idleBounds)")
+            }
+        }
+        print("Sprite normalization (\(normalizationPetIDs.joined(separator: ", "))): idle heights within 2 px; ground line within 1 px")
 
         try invokeHook(event: "PreToolUse", tool: "Bash")
         guard pump(until: { registry.currentState == .running }) else { throw SelfTestError("PreToolUse did not produce running") }

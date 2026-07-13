@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 activePetID: loadedPet.descriptor.id
             )
             statusMenu.petSelectionHandler = { [weak self] id in self?.switchPet(to: id) }
+            statusMenu.steadySizeHandler = { [weak self] enabled in self?.reloadCurrentPet(steadySize: enabled) }
             registry.didChange = { [weak animator, weak statusMenu, weak petMode] state, count in
                 statusMenu?.updateActivity(state: state, sessionCount: count)
                 guard statusMenu?.manualMode != true else { return }
@@ -122,6 +123,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } catch {
             FileHandle.standardError.write(Data("Ajman: could not switch to pet '\(id)': \(error.localizedDescription)\n".utf8))
+        }
+    }
+
+    private func reloadCurrentPet(steadySize: Bool) {
+        guard let catalog, let animator else { return }
+        do {
+            let loadedPet = try catalog.load(id: activePetID, steadySize: steadySize)
+            animator.replaceSheet(loadedPet.sheet, playing: animator.currentState)
+        } catch {
+            FileHandle.standardError.write(Data("Ajman: could not re-prepare pet '\(activePetID)': \(error.localizedDescription)\n".utf8))
         }
     }
 }

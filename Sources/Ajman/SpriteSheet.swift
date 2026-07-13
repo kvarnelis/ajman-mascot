@@ -44,6 +44,10 @@ struct SpriteSheet {
     static let columns = 8
     static let cellWidth = 192
     static let cellHeight = 208
+    static let contentAlphaThreshold: UInt8 = 10
+    static let contentMargin = 4
+    static let minimumNormalizationScale = 0.7
+    static let maximumNormalizationScale = 1.6
 
     let animationTable: AnimationTable
     let sourceURL: URL
@@ -53,16 +57,16 @@ struct SpriteSheet {
         try PetCatalog().loadSelected().sheet
     }
 
-    static func load(directory: URL) throws -> SpriteSheet {
+    static func load(directory: URL, steadySize: Bool = true) throws -> SpriteSheet {
         let manifestURL = directory.appendingPathComponent("pet.json")
         let sheetURL = directory.appendingPathComponent("spritesheet.webp")
         guard FileManager.default.isReadableFile(atPath: manifestURL.path) else {
             throw SpriteSheetError.missingPackage(directory)
         }
-        return try load(manifestURL: manifestURL, defaultSheetURL: sheetURL)
+        return try load(manifestURL: manifestURL, defaultSheetURL: sheetURL, steadySize: steadySize)
     }
 
-    private static func load(manifestURL: URL, defaultSheetURL: URL) throws -> SpriteSheet {
+    private static func load(manifestURL: URL, defaultSheetURL: URL, steadySize: Bool) throws -> SpriteSheet {
         let manifest: PetManifest
         do {
             manifest = try JSONDecoder().decode(PetManifest.self, from: Data(contentsOf: manifestURL))
@@ -115,10 +119,137 @@ struct SpriteSheet {
                 availableFrames: availableFrames
             )
         }
+        if steadySize {
+            cells = normalized(cells: cells, table: table)
+        }
         return SpriteSheet(animationTable: table, sourceURL: sheetURL, cells: cells)
     }
 
     func frames(for definition: AnimationDefinition) -> [CGImage] {
         Array(cells[definition.row].prefix(definition.frameCount))
+    }
+
+    func contentBounds(for definition: AnimationDefinition) -> [CGRect?] {
+        frames(for: definition).map(Self.contentBounds)
+    }
+
+    private struct FrameLocation: Hashable {
+        let row: Int
+        let column: Int
+    }
+
+    private struct Bitmap {
+        let data: [UInt8]
+    }
+
+    private static func normalized(cells: [[CGImage]], table: AnimationTable) -> [[CGImage]] {
+        var result = cells
+        let used = table.definitions.flatMap { definition in
+            (0..<definition.frameCount).map { FrameLocation(row: definition.row, column: $0) }
+        }
+        let measured = Dictionary(uniqueKeysWithValues: used.compactMap { location -> (FrameLocation, CGRect)? in
+            guard let bitmap = rgbaBitmap(from: cells[location.row][location.column]),
+                  let bounds = contentBounds(in: bitmap.data) else { return nil }
+            return (location, bounds)
+        })
+        let idleBounds = table.definition(for: .idle).map { definition in
+            (0..<definition.frameCount).compactMap { measured[FrameLocation(row: definition.row, column: $0)] }
+        } ?? []
+        let targetCandidates = idleBounds.isEmpty ? Array(measured.values) : idleBounds
+        guard let targetHeight = median(targetCandidates.map(\.height)) else { return result }
+
+        for location in used {
+            guard let bounds = measured[location], bounds.height > 0,
+                  let normalized = normalize(
+                    cells[location.row][location.column],
+                    contentBounds: bounds,
+                    targetHeight: targetHeight
+                  ) else { continue }
+            result[location.row][location.column] = normalized
+        }
+        return result
+    }
+
+    private static func normalize(_ frame: CGImage, contentBounds: CGRect, targetHeight: CGFloat) -> CGImage? {
+        let widthLimit = CGFloat(cellWidth - 2 * contentMargin) / contentBounds.width
+        let heightLimit = CGFloat(cellHeight - contentMargin) / contentBounds.height
+        let desired = targetHeight / contentBounds.height
+        let scale = min(max(desired, minimumNormalizationScale), maximumNormalizationScale, widthLimit, heightLimit)
+        guard scale.isFinite, scale > 0,
+              let context = rgbaContext(width: cellWidth, height: cellHeight) else { return nil }
+
+        context.interpolationQuality = .high
+        let scaledContentWidth = contentBounds.width * scale
+        let contentLeft = (CGFloat(cellWidth) - scaledContentWidth) / 2
+        let drawRect = CGRect(
+            x: contentLeft - contentBounds.minX * scale,
+            y: CGFloat(contentMargin) - contentBounds.minY * scale,
+            width: CGFloat(cellWidth) * scale,
+            height: CGFloat(cellHeight) * scale
+        )
+        context.draw(frame, in: drawRect)
+        guard let rendered = context.makeImage(),
+              let renderedBounds = Self.contentBounds(rendered) else { return context.makeImage() }
+        // CGImage scanlines and CGContext user-space Y run in opposite directions.
+        let verticalCorrection = renderedBounds.minY - CGFloat(contentMargin)
+        guard abs(verticalCorrection) >= 0.5,
+              let corrected = rgbaContext(width: cellWidth, height: cellHeight) else { return rendered }
+        corrected.draw(
+            rendered,
+            in: CGRect(x: 0, y: verticalCorrection, width: CGFloat(cellWidth), height: CGFloat(cellHeight))
+        )
+        return corrected.makeImage() ?? rendered
+    }
+
+    private static func contentBounds(_ image: CGImage) -> CGRect? {
+        guard let bitmap = rgbaBitmap(from: image) else { return nil }
+        return contentBounds(in: bitmap.data)
+    }
+
+    private static func rgbaBitmap(from image: CGImage) -> Bitmap? {
+        guard let context = rgbaContext(width: cellWidth, height: cellHeight) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: cellWidth, height: cellHeight))
+        guard let pointer = context.data else { return nil }
+        let data = Array(UnsafeBufferPointer(
+            start: pointer.assumingMemoryBound(to: UInt8.self),
+            count: cellWidth * cellHeight * 4
+        ))
+        return Bitmap(data: data)
+    }
+
+    private static func rgbaContext(width: Int, height: Int) -> CGContext? {
+        CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+    }
+
+    private static func contentBounds(in rgba: [UInt8]) -> CGRect? {
+        var minX = cellWidth
+        var minY = cellHeight
+        var maxX = -1
+        var maxY = -1
+        for y in 0..<cellHeight {
+            for x in 0..<cellWidth where rgba[(y * cellWidth + x) * 4 + 3] > contentAlphaThreshold {
+                minX = min(minX, x)
+                minY = min(minY, y)
+                maxX = max(maxX, x)
+                maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, maxY >= minY else { return nil }
+        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+    }
+
+    private static func median(_ values: [CGFloat]) -> CGFloat? {
+        guard !values.isEmpty else { return nil }
+        let sorted = values.sorted()
+        let middle = sorted.count / 2
+        return sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
     }
 }
