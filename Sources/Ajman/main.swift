@@ -36,12 +36,12 @@ private func runSelfTest() -> Int32 {
         let suiteName = "AjmanSelfTest.PetScale.\(UUID().uuidString)"
         guard let scaleDefaults = UserDefaults(suiteName: suiteName) else { throw SelfTestError("could not create scale defaults") }
         defer { scaleDefaults.removePersistentDomain(forName: suiteName) }
-        guard PetScale.load(from: scaleDefaults) == .small else { throw SelfTestError("scale default was not 0.5") }
+        guard PetScale.load(from: scaleDefaults) == .twoThirds else { throw SelfTestError("scale default was not 0.6667") }
         for scale in PetScale.allCases {
             scale.save(to: scaleDefaults)
             guard PetScale.load(from: scaleDefaults) == scale else { throw SelfTestError("scale did not round-trip: \(scale.rawValue)") }
         }
-        print("Pet scale: default 0.5; all \(PetScale.allCases.count) options round-trip")
+        print("Pet scale: default 0.6667; all \(PetScale.allCases.count) options round-trip")
 
         let steadySuiteName = "AjmanSelfTest.SteadySize.\(UUID().uuidString)"
         guard let steadyDefaults = UserDefaults(suiteName: steadySuiteName) else { throw SelfTestError("could not create steady-size defaults") }
@@ -61,9 +61,10 @@ private func runSelfTest() -> Int32 {
         guard catalog.selectedPetID == "ajman" else { throw SelfTestError("selected pet default was not ajman") }
         catalog.saveSelection("winnie")
         guard catalog.selectedPetID == "winnie" else { throw SelfTestError("selected pet did not round-trip") }
-        guard catalog.relativeScale(for: "ajman") == 1.0, catalog.relativeScale(for: "winnie") == 0.8 else {
+        guard catalog.relativeScale(for: "ajman") == 1.0, catalog.relativeScale(for: "winnie") == 0.67 else {
             throw SelfTestError("built-in relative pet scales were incorrect")
         }
+        print("Pet catalog defaults: ajman 1.0; winnie 0.67")
         catalog.saveRelativeScale(0.7, for: "winnie")
         guard catalog.relativeScale(for: "winnie") == 0.7 else { throw SelfTestError("relative pet scale override did not persist") }
         guard selectionDefaults.double(forKey: PetCatalog.relativeScaleKey(for: "winnie")) == 0.7 else {

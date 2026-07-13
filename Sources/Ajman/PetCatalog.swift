@@ -16,7 +16,7 @@ struct LoadedPet {
 struct PetCatalog {
     static let selectedPetKey = "AjmanSelectedPet"
     static let defaultPetID = "ajman"
-    static let builtInRelativeScales: [String: Double] = ["ajman": 1.0, "winnie": 0.8]
+    static let builtInRelativeScales: [String: Double] = ["ajman": 1.0, "winnie": 0.67]
 
     static func relativeScaleKey(for id: String) -> String {
         "AjmanPetScale.\(id)"

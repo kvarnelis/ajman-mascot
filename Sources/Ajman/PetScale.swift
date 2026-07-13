@@ -2,7 +2,7 @@ import AppKit
 
 enum PetScale: Double, CaseIterable {
     static let defaultsKey = "AjmanPetScale"
-    static let defaultValue: PetScale = .small
+    static let defaultValue: PetScale = .twoThirds
 
     case small = 0.5
     case twoThirds = 0.6667
