@@ -138,6 +138,78 @@ private func runSelfTest() -> Int32 {
         }
         print("Pet instances: both packages load; distinct per-pet position keys (headless)")
 
+        guard let bundledPets = Bundle.main.resourceURL?.appendingPathComponent("pets", isDirectory: true) else {
+            throw SelfTestError("bundle resource root was unavailable for sleep tests")
+        }
+        let noLivePets = fileManager.temporaryDirectory.appendingPathComponent(
+            "ajman-selftest-no-live-\(UUID().uuidString)", isDirectory: true
+        )
+        let sleepCatalog = PetCatalog(
+            defaults: selectionDefaults,
+            liveRoot: noLivePets,
+            bundledRoot: bundledPets
+        )
+        let sleepingWinnie = try sleepCatalog.load(id: "winnie")
+        let wakefulAjman = try sleepCatalog.load(id: "ajman")
+        guard sleepingWinnie.sleepAnimation?.frameCount == 6 else {
+            throw SelfTestError("Winnie's bundled sleep strip did not load six ordered frames")
+        }
+        guard wakefulAjman.sleepAnimation == nil else {
+            throw SelfTestError("Ajman unexpectedly reported a sleep animation")
+        }
+        print("Sleep assets: Winnie bundled strip loads 6 frames; Ajman reports none")
+
+        let sleepSuiteName = "AjmanSelfTest.Sleep.\(UUID().uuidString)"
+        guard let sleepDefaults = UserDefaults(suiteName: sleepSuiteName) else {
+            throw SelfTestError("could not create sleep defaults")
+        }
+        defer { sleepDefaults.removePersistentDomain(forName: sleepSuiteName) }
+        sleepDefaults.set(true, forKey: PetMode.defaultsKey)
+
+        let sleepLiveState = AnimationState.idle
+        let sleepAnimator = Animator(sheet: sleepingWinnie.sheet, view: nil)
+        let shortDoze = PetMode(
+            animator: sleepAnimator,
+            sleepAnimation: sleepingWinnie.sleepAnimation,
+            currentLiveState: { sleepLiveState },
+            isManualMode: { false },
+            dozeInterval: 0.05,
+            defaults: sleepDefaults
+        )
+        shortDoze.resumeAtRest()
+        guard pump(until: { shortDoze.isSleeping && sleepAnimator.isPlayingSleep }) else {
+            throw SelfTestError("short calm interval did not transition Winnie to sleep")
+        }
+        shortDoze.stir()
+        guard !shortDoze.isSleeping, !sleepAnimator.isPlayingSleep else {
+            throw SelfTestError("simulated bound-agent stir did not wake Winnie")
+        }
+        guard shortDoze.forceSleep() else { throw SelfTestError("manual sleep could not restart Winnie") }
+        shortDoze.wake()
+        guard !shortDoze.isSleeping, !sleepAnimator.isPlayingSleep else {
+            throw SelfTestError("simulated click/wake did not wake Winnie")
+        }
+        shortDoze.teardown()
+        sleepAnimator.stop()
+
+        let noSleepAnimator = Animator(sheet: wakefulAjman.sheet, view: nil)
+        let noSleepMode = PetMode(
+            animator: noSleepAnimator,
+            sleepAnimation: nil,
+            currentLiveState: { sleepLiveState },
+            isManualMode: { false },
+            dozeInterval: 0.05,
+            defaults: sleepDefaults
+        )
+        noSleepMode.resumeAtRest()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        guard !noSleepMode.isSleeping, !noSleepAnimator.isPlayingSleep else {
+            throw SelfTestError("a pet without sleep art entered sleep")
+        }
+        noSleepMode.teardown()
+        noSleepAnimator.stop()
+        print("Sleep behavior: short calm dozes; agent stir and click wake; no-asset pet stays idle")
+
         let normalizationPetIDs = ["ajman", "winnie"].filter { id in
             catalog.discover().contains { $0.id == id }
         }

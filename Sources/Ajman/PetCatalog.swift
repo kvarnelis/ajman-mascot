@@ -10,6 +10,7 @@ struct PetDescriptor: Equatable {
 struct LoadedPet {
     let descriptor: PetDescriptor
     let sheet: SpriteSheet
+    let sleepAnimation: SleepAnimation?
 }
 
 struct PetCatalog {
@@ -34,7 +35,7 @@ struct PetCatalog {
         fileManager: FileManager = .default,
         defaults: UserDefaults = .standard,
         liveRoot: URL? = nil,
-        bundledRoot: URL? = Bundle.main.resourceURL?.appendingPathComponent("Pets", isDirectory: true)
+        bundledRoot: URL? = Bundle.main.resourceURL?.appendingPathComponent("pets", isDirectory: true)
     ) {
         self.fileManager = fileManager
         self.defaults = defaults
@@ -84,7 +85,8 @@ struct PetCatalog {
             do {
                 return LoadedPet(
                     descriptor: descriptor,
-                    sheet: try SpriteSheet.load(directory: descriptor.directory, steadySize: steadySize ?? SteadySize.load(from: defaults))
+                    sheet: try SpriteSheet.load(directory: descriptor.directory, steadySize: steadySize ?? SteadySize.load(from: defaults)),
+                    sleepAnimation: loadSleepAnimation(for: id)
                 )
             }
             catch {
@@ -106,7 +108,8 @@ struct PetCatalog {
                 let descriptor = try descriptor(at: ajman, isBundled: true)
                 return LoadedPet(
                     descriptor: descriptor,
-                    sheet: try SpriteSheet.load(directory: ajman, steadySize: SteadySize.load(from: defaults))
+                    sheet: try SpriteSheet.load(directory: ajman, steadySize: SteadySize.load(from: defaults)),
+                    sleepAnimation: loadSleepAnimation(for: Self.defaultPetID)
                 )
             } catch { log("bundled ajman fallback failed: \(error.localizedDescription)") }
         }
@@ -141,6 +144,18 @@ struct PetCatalog {
             directory: directory,
             isBundled: isBundled
         )
+    }
+
+    private func loadSleepAnimation(for id: String) -> SleepAnimation? {
+        let candidates = [
+            bundledRoot?.appendingPathComponent(id, isDirectory: true).appendingPathComponent("sleep.webp"),
+            liveRoot.appendingPathComponent(id, isDirectory: true).appendingPathComponent("sleep.webp"),
+        ].compactMap { $0 }
+        for url in candidates where fileManager.isReadableFile(atPath: url.path) {
+            do { return try SleepAnimation.load(from: url) }
+            catch { log("pet '\(id)' sleep animation failed from \(url.path): \(error.localizedDescription)") }
+        }
+        return nil
     }
 
     private func log(_ message: String) {

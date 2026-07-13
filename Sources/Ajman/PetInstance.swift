@@ -16,6 +16,7 @@ final class PetInstance {
     let bubbleController: BubbleController
 
     var availableStates: [AnimationState] { animator.availableStates }
+    var hasSleepAnimation: Bool { loadedPet.sleepAnimation != nil }
     var positionPersistenceKey: String { panel.positionPersistenceKey }
 
     private let catalog: PetCatalog
@@ -32,6 +33,7 @@ final class PetInstance {
         defaultPositionIndex: Int,
         defaults: UserDefaults = .standard,
         isManualMode: @escaping () -> Bool,
+        petWasClicked: @escaping () -> Void,
         dismissNotification: @escaping (String) -> Void
     ) throws {
         self.petID = petID
@@ -58,13 +60,14 @@ final class PetInstance {
         animator = Animator(sheet: loadedPet.sheet, view: view)
         petMode = PetMode(
             animator: animator,
+            sleepAnimation: loadedPet.sleepAnimation,
             currentLiveState: { [liveState] in liveState.value },
             isManualMode: isManualMode,
             defaults: defaults
         )
         bubbleController = BubbleController(petPanel: panel)
         bubbleController.dismissHandler = dismissNotification
-        panel.petWasClicked = { [weak petMode] in petMode?.wake() }
+        panel.petWasClicked = petWasClicked
     }
 
     func show(useLegacyPositionFallback: Bool) {
@@ -91,11 +94,20 @@ final class PetInstance {
     }
 
     func resumeLiveReactions() {
+        petMode.stir()
         applyState(liveState.value)
     }
 
     func wake() {
         petMode.wake()
+    }
+
+    func handleAgentActivity() {
+        petMode.stir()
+    }
+
+    func handlePetSwitch() {
+        petMode.stir()
     }
 
     func apply(notificationChange: PetNotificationChange) {
@@ -107,6 +119,7 @@ final class PetInstance {
         guard self.binding != binding else { return }
         self.binding = binding
         bubbleController.removeAll()
+        petMode.stir()
     }
 
     func setScale(_ scale: PetScale) {
@@ -120,6 +133,7 @@ final class PetInstance {
     func setSteadySize(_ enabled: Bool) throws {
         let state = animator.currentState
         loadedPet = try catalog.load(id: petID, steadySize: enabled)
+        petMode.replaceSleepAnimation(loadedPet.sleepAnimation)
         animator.replaceSheet(loadedPet.sheet, playing: state)
     }
 
@@ -131,6 +145,10 @@ final class PetInstance {
         guard animator.availableStates.contains(state) else { return }
         petMode.yieldToHigherPriorityDriver()
         animator.play(state)
+    }
+
+    func setDebugSleep() {
+        _ = petMode.forceSleep()
     }
 
     func resetPosition() {

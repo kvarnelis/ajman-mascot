@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 bindings: bindingMap(),
                 relativeScales: relativeScaleMap(),
                 debugStates: commonDebugStates(),
+                sleepAvailable: pets.contains(where: \.hasSleepAnimation),
                 playfulIdleEnabled: UserDefaults.standard.object(forKey: PetMode.defaultsKey) as? Bool ?? true
             )
             statusMenu = menu
@@ -65,11 +66,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.pets.forEach { $0.apply(notificationChange: change) }
             }
             server.eventHandler = { event in
-                Task { @MainActor in registry.apply(event) }
+                Task { @MainActor in self.handleAgentEvent(event, registry: registry) }
             }
             try server.start()
             codexMonitor.eventHandler = { event in
-                Task { @MainActor in registry.apply(event) }
+                Task { @MainActor in self.handleAgentEvent(event, registry: registry) }
             }
             codexMonitor.start()
         } catch {
@@ -114,6 +115,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.debugStateHandler = { [weak self] state in
             self?.pets.forEach { $0.setDebugState(state) }
         }
+        menu.debugSleepHandler = { [weak self] in
+            self?.pets.forEach { $0.setDebugSleep() }
+        }
         menu.resumeLiveHandler = { [weak self] in
             guard let self, let registry = self.registry else { return }
             for pet in self.pets {
@@ -128,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setPet(id: String, shown: Bool) {
         guard let configuration else { return }
+        statusMenu?.resumeLiveReactionsIfManual()
         if shown {
             guard !pets.contains(where: { $0.petID == id }) else { return }
             do {
@@ -138,7 +143,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 configuration.setShown(true, petID: id)
                 instance.show(useLegacyPositionFallback: targetCount == 1)
                 applyCurrentStateAndNotifications(to: instance)
-                if let state = statusMenu?.debugState { instance.setDebugState(state) }
             } catch {
                 log("could not show pet '\(id)': \(error.localizedDescription)")
             }
@@ -149,6 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             updateDefaultPositionSlots()
         }
+        pets.forEach { $0.handlePetSwitch() }
         refreshMenu()
     }
 
@@ -173,6 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             scale: PetScale.load(),
             defaultPositionIndex: simultaneousCount == 1 ? 0 : defaultPositionIndex(for: id),
             isManualMode: { [weak self] in self?.statusMenu?.manualMode ?? false },
+            petWasClicked: { [weak self] in self?.handlePetClick(id: id) },
             dismissNotification: { [weak registry] id in registry?.dismissNotification(id: id) }
         )
     }
@@ -192,8 +198,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             shownPetIDs: configuration.shownPetIDs,
             bindings: bindingMap(),
             relativeScales: relativeScaleMap(),
-            debugStates: commonDebugStates()
+            debugStates: commonDebugStates(),
+            sleepAvailable: pets.contains(where: \.hasSleepAnimation)
         )
+    }
+
+    private func handleAgentEvent(_ event: AgentEvent, registry: SessionRegistry) {
+        let relevantPets = pets.filter { $0.binding == nil || $0.binding == event.provider }
+        if statusMenu?.manualSleep == true, relevantPets.contains(where: \.hasSleepAnimation) {
+            statusMenu?.resumeLiveReactionsIfManual()
+        }
+        for pet in relevantPets {
+            pet.handleAgentActivity()
+        }
+        registry.apply(event)
+    }
+
+    private func handlePetClick(id: String) {
+        statusMenu?.resumeLiveReactionsIfManual()
+        pets.first(where: { $0.petID == id })?.wake()
     }
 
     private func bindingMap() -> [String: AgentEvent.Provider?] {

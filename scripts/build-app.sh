@@ -33,17 +33,24 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-mkdir -p "$CONTENTS/Resources/Pets"
+mkdir -p "$CONTENTS/Resources/pets"
 for pet_id in ajman winnie; do
   ASSET_DIR="$HOME/.codex/pets/$pet_id"
   if [[ -f "$ASSET_DIR/pet.json" && -f "$ASSET_DIR/spritesheet.webp" ]]; then
-    mkdir -p "$CONTENTS/Resources/Pets/$pet_id"
-    cp "$ASSET_DIR/pet.json" "$CONTENTS/Resources/Pets/$pet_id/pet.json"
-    cp "$ASSET_DIR/spritesheet.webp" "$CONTENTS/Resources/Pets/$pet_id/spritesheet.webp"
+    mkdir -p "$CONTENTS/Resources/pets/$pet_id"
+    cp "$ASSET_DIR/pet.json" "$CONTENTS/Resources/pets/$pet_id/pet.json"
+    cp "$ASSET_DIR/spritesheet.webp" "$CONTENTS/Resources/pets/$pet_id/spritesheet.webp"
   elif [[ "$pet_id" == "ajman" ]]; then
     echo "Required bundled fallback is missing: $ASSET_DIR" >&2
     exit 1
   fi
+done
+
+for sleep_asset in "$REPO_ROOT"/assets/pets/*/sleep.webp; do
+  [[ -f "$sleep_asset" ]] || continue
+  pet_id="$(basename "$(dirname "$sleep_asset")")"
+  mkdir -p "$CONTENTS/Resources/pets/$pet_id"
+  cp "$sleep_asset" "$CONTENTS/Resources/pets/$pet_id/sleep.webp"
 done
 
 ln -sfn "build/Ajman.app" "$REPO_ROOT/Ajman.app"
