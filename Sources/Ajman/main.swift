@@ -45,12 +45,12 @@ private func runSelfTest() -> Int32 {
         let steadySuiteName = "AjmanSelfTest.SteadySize.\(UUID().uuidString)"
         guard let steadyDefaults = UserDefaults(suiteName: steadySuiteName) else { throw SelfTestError("could not create steady-size defaults") }
         defer { steadyDefaults.removePersistentDomain(forName: steadySuiteName) }
-        guard SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size was not on by default") }
+        guard !SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size was not off by default") }
         SteadySize.save(false, to: steadyDefaults)
         guard !SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size did not persist off") }
         SteadySize.save(true, to: steadyDefaults)
         guard SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size did not persist on") }
-        print("Steady size: default on; off/on round-trip")
+        print("Steady size: default off; off/on round-trip")
 
         let selectionSuiteName = "AjmanSelfTest.PetSelection.\(UUID().uuidString)"
         guard let selectionDefaults = UserDefaults(suiteName: selectionSuiteName) else { throw SelfTestError("could not create selection defaults") }

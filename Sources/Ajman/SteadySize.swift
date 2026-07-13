@@ -30,7 +30,7 @@ enum SteadySize {
     }
 
     static func load(from defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: defaultsKey) == nil ? true : defaults.bool(forKey: defaultsKey)
+        defaults.object(forKey: defaultsKey) == nil ? false : defaults.bool(forKey: defaultsKey)
     }
 
     static func save(_ enabled: Bool, to defaults: UserDefaults = .standard) {
