@@ -113,6 +113,10 @@ final class PetInstance {
         panel.apply(scale: scale)
     }
 
+    func setRelativeScale(_ scale: Double) {
+        panel.apply(relativeScale: scale)
+    }
+
     func setSteadySize(_ enabled: Bool) throws {
         let state = animator.currentState
         loadedPet = try catalog.load(id: petID, steadySize: enabled)

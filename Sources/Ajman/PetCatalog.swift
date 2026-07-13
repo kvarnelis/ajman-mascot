@@ -17,6 +17,14 @@ struct PetCatalog {
     static let defaultPetID = "ajman"
     static let builtInRelativeScales: [String: Double] = ["ajman": 1.0, "winnie": 0.8]
 
+    static func relativeScaleKey(for id: String) -> String {
+        "AjmanPetScale.\(id)"
+    }
+
+    static func builtInRelativeScale(for id: String) -> Double {
+        builtInRelativeScales[id] ?? 1.0
+    }
+
     private let fileManager: FileManager
     private let defaults: UserDefaults
     private let liveRoot: URL
@@ -44,12 +52,17 @@ struct PetCatalog {
     }
 
     func relativeScale(for id: String) -> Double {
-        let key = "AjmanPetScale.\(id)"
+        let key = Self.relativeScaleKey(for: id)
         if defaults.object(forKey: key) != nil {
             let value = defaults.double(forKey: key)
             if value.isFinite, value > 0 { return value }
         }
-        return Self.builtInRelativeScales[id] ?? 1.0
+        return Self.builtInRelativeScale(for: id)
+    }
+
+    func saveRelativeScale(_ scale: Double, for id: String) {
+        guard scale.isFinite, scale > 0 else { return }
+        defaults.set(scale, forKey: Self.relativeScaleKey(for: id))
     }
 
     func discover() -> [PetDescriptor] {

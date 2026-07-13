@@ -47,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 pets: descriptors,
                 shownPetIDs: shown,
                 bindings: bindingMap(),
+                relativeScales: relativeScaleMap(),
                 debugStates: commonDebugStates(),
                 playfulIdleEnabled: UserDefaults.standard.object(forKey: PetMode.defaultsKey) as? Bool ?? true
             )
@@ -96,6 +97,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.scaleHandler = { [weak self] scale in
             scale.save()
             self?.pets.forEach { $0.setScale(scale) }
+        }
+        menu.relativeScaleHandler = { [weak self] id, scale in
+            self?.catalog?.saveRelativeScale(scale, for: id)
+            self?.pets.first(where: { $0.petID == id })?.setRelativeScale(scale)
         }
         menu.steadySizeHandler = { [weak self] enabled in
             self?.pets.forEach { pet in
@@ -186,6 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pets: discoveredPets,
             shownPetIDs: configuration.shownPetIDs,
             bindings: bindingMap(),
+            relativeScales: relativeScaleMap(),
             debugStates: commonDebugStates()
         )
     }
@@ -197,6 +203,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             result.updateValue(configuration.binding(for: descriptor.id), forKey: descriptor.id)
         }
         return result
+    }
+
+    private func relativeScaleMap() -> [String: Double] {
+        guard let catalog else { return [:] }
+        return Dictionary(uniqueKeysWithValues: discoveredPets.map { ($0.id, catalog.relativeScale(for: $0.id)) })
     }
 
     private func commonDebugStates() -> [AnimationState] {

@@ -64,9 +64,17 @@ private func runSelfTest() -> Int32 {
         guard catalog.relativeScale(for: "ajman") == 1.0, catalog.relativeScale(for: "winnie") == 0.8 else {
             throw SelfTestError("built-in relative pet scales were incorrect")
         }
-        selectionDefaults.set(0.7, forKey: "AjmanPetScale.winnie")
+        catalog.saveRelativeScale(0.7, for: "winnie")
         guard catalog.relativeScale(for: "winnie") == 0.7 else { throw SelfTestError("relative pet scale override did not persist") }
-        print("Pet catalog: discovered \(catalog.discover().count); selection and relative scale override round-trip")
+        guard selectionDefaults.double(forKey: PetCatalog.relativeScaleKey(for: "winnie")) == 0.7 else {
+            throw SelfTestError("relative pet scale override did not round-trip through AjmanPetScale.winnie")
+        }
+        catalog.saveRelativeScale(0.8, for: "winnie")
+        let defaultEffectiveScale = PetScale.threeQuarter.rawValue * catalog.relativeScale(for: "winnie")
+        guard abs(defaultEffectiveScale - 0.6) < 0.000_001 else {
+            throw SelfTestError("effective pet scale was not overall × per-cat: \(defaultEffectiveScale)")
+        }
+        print("Pet catalog: discovered \(catalog.discover().count); per-pet override round-trip; effective 0.75 × 0.8 = \(defaultEffectiveScale)")
 
         let menagerieSuiteName = "AjmanSelfTest.Menagerie.\(UUID().uuidString)"
         guard let menagerieDefaults = UserDefaults(suiteName: menagerieSuiteName) else {

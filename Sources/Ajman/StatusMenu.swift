@@ -13,6 +13,7 @@ final class StatusMenu: NSObject {
     private let petMenu = NSMenu(title: "Pets")
     private let debugMenu = NSMenu(title: "Debug")
     private var scaleItems: [PetScale: NSMenuItem] = [:]
+    private var relativeScaleItems: [String: [Double: NSMenuItem]] = [:]
     private var stateItems: [AnimationState: NSMenuItem] = [:]
     private var debugStates: [AnimationState]
     private var cycleTimer: Timer?
@@ -25,6 +26,7 @@ final class StatusMenu: NSObject {
     var showPetHandler: ((String, Bool) -> Void)?
     var bindingHandler: ((String, AgentEvent.Provider?) -> Void)?
     var scaleHandler: ((PetScale) -> Void)?
+    var relativeScaleHandler: ((String, Double) -> Void)?
     var steadySizeHandler: ((Bool) -> Void)?
     var playfulIdleHandler: ((Bool) -> Void)?
     var debugStateHandler: ((AnimationState) -> Void)?
@@ -36,6 +38,7 @@ final class StatusMenu: NSObject {
         pets: [PetDescriptor],
         shownPetIDs: Set<String>,
         bindings: [String: AgentEvent.Provider?],
+        relativeScales: [String: Double],
         debugStates: [AnimationState],
         playfulIdleEnabled: Bool
     ) {
@@ -50,7 +53,12 @@ final class StatusMenu: NSObject {
         activityItem.isEnabled = false
         menu.addItem(activityItem)
 
-        rebuildPetMenu(pets: pets, shownPetIDs: shownPetIDs, bindings: bindings)
+        rebuildPetMenu(
+            pets: pets,
+            shownPetIDs: shownPetIDs,
+            bindings: bindings,
+            relativeScales: relativeScales
+        )
         let petsItem = NSMenuItem(title: "Pets", action: nil, keyEquivalent: "")
         petsItem.submenu = petMenu
         menu.addItem(petsItem)
@@ -71,7 +79,7 @@ final class StatusMenu: NSObject {
         menu.addItem(disconnect)
         menu.addItem(.separator())
 
-        let sizeMenu = NSMenu(title: "Size")
+        let sizeMenu = NSMenu(title: "Overall Size")
         for scale in PetScale.allCases {
             let item = NSMenuItem(title: scale.menuTitle, action: #selector(selectScale(_:)), keyEquivalent: "")
             item.target = self
@@ -79,7 +87,7 @@ final class StatusMenu: NSObject {
             sizeMenu.addItem(item)
             scaleItems[scale] = item
         }
-        let sizeItem = NSMenuItem(title: "Size", action: nil, keyEquivalent: "")
+        let sizeItem = NSMenuItem(title: "Overall Size", action: nil, keyEquivalent: "")
         sizeItem.submenu = sizeMenu
         menu.addItem(sizeItem)
 
@@ -107,9 +115,15 @@ final class StatusMenu: NSObject {
         pets: [PetDescriptor],
         shownPetIDs: Set<String>,
         bindings: [String: AgentEvent.Provider?],
+        relativeScales: [String: Double],
         debugStates: [AnimationState]
     ) {
-        rebuildPetMenu(pets: pets, shownPetIDs: shownPetIDs, bindings: bindings)
+        rebuildPetMenu(
+            pets: pets,
+            shownPetIDs: shownPetIDs,
+            bindings: bindings,
+            relativeScales: relativeScales
+        )
         if self.debugStates != debugStates {
             self.debugStates = debugStates
             stopCycling()
@@ -130,9 +144,11 @@ final class StatusMenu: NSObject {
     private func rebuildPetMenu(
         pets: [PetDescriptor],
         shownPetIDs: Set<String>,
-        bindings: [String: AgentEvent.Provider?]
+        bindings: [String: AgentEvent.Provider?],
+        relativeScales: [String: Double]
     ) {
         petMenu.removeAllItems()
+        relativeScaleItems.removeAll()
         for pet in pets {
             let submenu = NSMenu(title: pet.displayName)
             let show = NSMenuItem(title: "Show on desktop", action: #selector(togglePet(_:)), keyEquivalent: "")
@@ -153,6 +169,26 @@ final class StatusMenu: NSObject {
             let reacts = NSMenuItem(title: "Reacts to", action: nil, keyEquivalent: "")
             reacts.submenu = reactsMenu
             submenu.addItem(reacts)
+
+            let currentRelativeScale = relativeScales[pet.id] ?? PetCatalog.builtInRelativeScale(for: pet.id)
+            let sizeMenu = NSMenu(title: "Size")
+            var items: [Double: NSMenuItem] = [:]
+            for scale in relativeScaleOptions(for: pet.id, current: currentRelativeScale) {
+                let item = NSMenuItem(
+                    title: relativeScaleTitle(scale, for: pet.id, current: currentRelativeScale),
+                    action: #selector(selectRelativeScale(_:)),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.representedObject = [pet.id, String(scale)]
+                item.state = scale == currentRelativeScale ? .on : .off
+                sizeMenu.addItem(item)
+                items[scale] = item
+            }
+            relativeScaleItems[pet.id] = items
+            let size = NSMenuItem(title: "Size", action: nil, keyEquivalent: "")
+            size.submenu = sizeMenu
+            submenu.addItem(size)
 
             let item = NSMenuItem(title: pet.displayName, action: nil, keyEquivalent: "")
             item.submenu = submenu
@@ -203,6 +239,13 @@ final class StatusMenu: NSObject {
               let scale = PetScale(rawValue: factor) else { return }
         scaleHandler?(scale)
         updateScaleChecks(for: scale)
+    }
+
+    @objc private func selectRelativeScale(_ sender: NSMenuItem) {
+        guard let values = sender.representedObject as? [String], values.count == 2,
+              let scale = Double(values[1]) else { return }
+        relativeScaleHandler?(values[0], scale)
+        updateRelativeScaleChecks(for: values[0], scale: scale)
     }
 
     @objc private func toggleSteadySize(_ sender: NSMenuItem) {
@@ -274,6 +317,26 @@ final class StatusMenu: NSObject {
 
     private func updateScaleChecks(for scale: PetScale) {
         for (candidate, item) in scaleItems { item.state = candidate == scale ? .on : .off }
+    }
+
+    private func updateRelativeScaleChecks(for id: String, scale: Double) {
+        for (candidate, item) in relativeScaleItems[id] ?? [:] {
+            item.state = candidate == scale ? .on : .off
+        }
+    }
+
+    private func relativeScaleOptions(for id: String, current: Double) -> [Double] {
+        let standard = [0.5, 0.67, 0.8, 1.0, 1.25, 1.5]
+        return Array(Set(standard + [PetCatalog.builtInRelativeScale(for: id), current])).sorted()
+    }
+
+    private func relativeScaleTitle(_ scale: Double, for id: String, current: Double) -> String {
+        let formatted = scale.formatted(.number.precision(.fractionLength(1...2))) + "×"
+        if scale == PetCatalog.builtInRelativeScale(for: id) { return formatted + " (default)" }
+        if scale == current, ![0.5, 0.67, 0.8, 1.0, 1.25, 1.5].contains(scale) {
+            return formatted + " (current)"
+        }
+        return formatted
     }
 
     @objc private func resetPosition() {
