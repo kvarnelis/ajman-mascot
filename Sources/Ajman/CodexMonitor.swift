@@ -170,14 +170,16 @@ final class CodexMonitor {
         case "Stop":
             message = assistantMessage(in: payload) ?? state.latestAssistantMessage
         case "CodexFailure":
-            message = string(in: payload, keys: ["error", "message", "reason"])
+            message = displayString(in: payload, keys: ["error", "message", "reason"])
         case "Notification":
-            message = string(in: payload, keys: ["message", "reason", "prompt", "question"])
+            message = displayString(in: payload, keys: ["message", "reason", "prompt", "question"])
         default:
             message = nil
         }
         let eventTitle = title(in: payload) ?? (mapped == "Stop" ? state.latestTitle : nil)
-        let detail = ["Notification", "PreToolUse"].contains(mapped) ? AgentEvent.commandText(in: payload) : nil
+        let detail = ["Notification", "PreToolUse"].contains(mapped)
+            ? AgentEvent.commandText(in: payload).flatMap { AgentEvent.displayText($0) }
+            : nil
         emit(mapped, payload: payload, state: state, title: eventTitle, message: message, detail: detail)
     }
 
@@ -239,8 +241,15 @@ final class CodexMonitor {
         return nil
     }
 
+    private func displayString(in dictionary: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = AgentEvent.displayText(dictionary[key]) { return value }
+        }
+        return nil
+    }
+
     private func assistantMessage(in payload: [String: Any]) -> String? {
-        string(
+        displayString(
             in: payload,
             keys: ["last_agent_message", "last_assistant_message", "last-assistant-message", "lastAssistantMessage", "message", "text"]
         )
@@ -248,7 +257,7 @@ final class CodexMonitor {
 
     private func title(in payload: [String: Any]) -> String? {
         for key in ["title", "turn_title"] {
-            if let value = AgentEvent.text(payload[key], limit: 512) { return value }
+            if let value = AgentEvent.displayText(payload[key], limit: 512) { return value }
         }
         return nil
     }

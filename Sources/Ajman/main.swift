@@ -74,7 +74,8 @@ private func runSelfTest() -> Int32 {
         guard abs(defaultEffectiveScale - 0.6) < 0.000_001 else {
             throw SelfTestError("effective pet scale was not overall × per-cat: \(defaultEffectiveScale)")
         }
-        print("Pet catalog: discovered \(catalog.discover().count); per-pet override round-trip; effective 0.75 × 0.8 = \(defaultEffectiveScale)")
+        let formattedEffectiveScale = defaultEffectiveScale.formatted(.number.precision(.fractionLength(1)))
+        print("Pet catalog: discovered \(catalog.discover().count); per-pet override round-trip; effective 0.75 × 0.8 = \(formattedEffectiveScale)")
 
         let menagerieSuiteName = "AjmanSelfTest.Menagerie.\(UUID().uuidString)"
         guard let menagerieDefaults = UserDefaults(suiteName: menagerieSuiteName) else {
@@ -234,16 +235,20 @@ private func runSelfTest() -> Int32 {
             try JSONSerialization.data(withJSONObject: ["type": type, "payload": payload])
         }
         let codexMessage = "Codex extracted the actual rollout answer. The parser kept the final message."
+        let rawApprovalOutcome = "{\"outcome\":\"allow\"}"
         codexMonitor.consumeFixtureLines([
             try rolloutLine("session_meta", payload: ["id": "codex-selftest", "cwd": "/tmp", "originator": "Codex Desktop"]),
             try rolloutLine("event_msg", payload: ["type": "agent_message", "message": codexMessage]),
             try rolloutLine("event_msg", payload: ["type": "task_complete"]),
-            try rolloutLine("event_msg", payload: ["type": "exec_approval_request", "command": "swift test", "cwd": "/tmp"]),
+            try rolloutLine("event_msg", payload: [
+                "type": "exec_approval_request", "command": "swift test", "message": rawApprovalOutcome, "cwd": "/tmp",
+            ]),
         ])
         guard let codexStop = codexEvents.first(where: { $0.event == "Stop" }),
               codexStop.message == codexMessage,
               let codexApproval = codexEvents.first(where: { $0.event == "Notification" }),
-              codexApproval.detail == "swift test" else {
+              codexApproval.detail == "swift test",
+              codexApproval.message == nil else {
             throw SelfTestError("Codex rollout message/approval extraction failed")
         }
         let codexRegistry = SessionRegistry(startTimer: false)
@@ -260,6 +265,51 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("Codex exec approval command did not reach the waiting card")
         }
         print("Codex rollout: agent_message -> specific completion; exec approval -> Run: swift test")
+
+        let rawDecisionEvent = AgentEvent(
+            provider: .codex,
+            event: "Notification",
+            sessionId: "codex-decision-selftest",
+            cwd: "/tmp",
+            toolName: nil,
+            transcriptPath: nil,
+            title: rawApprovalOutcome,
+            message: rawApprovalOutcome,
+            detail: rawApprovalOutcome,
+            timestamp: Date(),
+            raw: ["type": .string("exec_approval_request"), "outcome": .string("allow")]
+        )
+        let rawDecisionRegistry = SessionRegistry(startTimer: false)
+        rawDecisionRegistry.apply(rawDecisionEvent)
+        guard let rawDecisionCard = rawDecisionRegistry.currentNotifications(for: .codex).first,
+              !rawDecisionCard.title.contains("{\"outcome\""),
+              !rawDecisionCard.preview.contains("{\"outcome\""),
+              rawDecisionCard.title == "Codex needs you",
+              rawDecisionCard.preview == "This session is waiting for your input." else {
+            throw SelfTestError("Codex approval outcome JSON reached the card")
+        }
+
+        let decisionMonitor = CodexMonitor(environment: ["CODEX_HOME": "/tmp/ajman-selftest-codex-decision"])
+        var decisionEvents: [AgentEvent] = []
+        decisionMonitor.eventHandler = { decisionEvents.append($0) }
+        decisionMonitor.consumeFixtureLines([
+            try rolloutLine("session_meta", payload: ["id": "codex-guardian-selftest", "cwd": "/tmp", "originator": "Codex Desktop"]),
+            try rolloutLine("event_msg", payload: ["type": "task_started"]),
+            try rolloutLine("event_msg", payload: ["type": "agent_message", "message": rawApprovalOutcome]),
+            try rolloutLine("event_msg", payload: ["type": "task_complete", "last_agent_message": rawApprovalOutcome]),
+        ])
+        guard let decisionStop = decisionEvents.first(where: { $0.event == "Stop" }), decisionStop.message == nil else {
+            throw SelfTestError("Codex monitor accepted approval outcome JSON as assistant prose")
+        }
+        let decisionCompletionRegistry = SessionRegistry(startTimer: false)
+        decisionCompletionRegistry.apply(decisionStop)
+        guard let decisionCompletionCard = decisionCompletionRegistry.currentNotifications(for: .codex).first,
+              decisionCompletionCard.title == "Codex finished",
+              decisionCompletionCard.preview == "The turn is ready for review.",
+              !decisionCompletionCard.fullText.contains("{\"outcome\"") else {
+            throw SelfTestError("Codex guardian outcome JSON reached the completion card")
+        }
+        print("Codex JSON regression: approval outcome rejected; command and real assistant prose preserved")
 
         let temp = fileManager.temporaryDirectory.appendingPathComponent("ajman-selftest-\(UUID().uuidString)")
         defer { try? fileManager.removeItem(at: temp) }

@@ -84,47 +84,50 @@ final class SessionRegistry {
 
     private static func content(for event: AgentEvent, kind: PetNotification.Kind) -> (title: String, preview: String, fullText: String) {
         let provider = event.provider == .claude ? "Claude" : "Codex"
-        let message = bounded(event.message)
-        let detail = bounded(event.detail)
-        let combined = bounded([detail, message].compactMap { $0 }.reduce(into: [String]()) { values, value in
+        let message = boundedDisplayText(event.message)
+        let detail = boundedDisplayText(event.detail)
+        let command = isCommand(event) ? detail : nil
+        let sourceTitle = boundedDisplayText(event.title, limit: 512)
+        let toolName = boundedDisplayText(event.toolName, limit: 256)
+        let combined = bounded([command, message].compactMap { $0 }.reduce(into: [String]()) { values, value in
             if !values.contains(value) { values.append(value) }
         }.joined(separator: "\n\n"))
 
         switch kind {
         case .waiting:
             let title: String
-            if let detail, isCommand(event) {
-                title = "\(provider) · Run: \(headline(detail, limit: 32))"
-            } else if let tool = event.toolName, !tool.isEmpty {
+            if let command {
+                title = "\(provider) · Run: \(headline(command, limit: 32))"
+            } else if let tool = toolName {
                 title = "\(provider) · \(headline(tool, limit: 40))"
-            } else if let sourceTitle = event.title {
+            } else if let sourceTitle {
                 title = "\(provider) · \(headline(sourceTitle, limit: 40))"
             } else {
                 title = "\(provider) needs you"
             }
-            let preview = compact(detail ?? message) ?? "This session is waiting for your input."
+            let preview = compact(command ?? message) ?? "This session is waiting for your input."
             return (title, preview, combined ?? preview)
 
         case .done:
             guard let message else {
-                let title = event.title.map { "\(provider) · \(headline($0, limit: 40))" } ?? "\(provider) finished"
+                let title = sourceTitle.map { "\(provider) · \(headline($0, limit: 40))" } ?? "\(provider) finished"
                 return (title, "The turn is ready for review.", "The turn is ready for review.")
             }
-            if let sourceTitle = event.title {
+            if let sourceTitle {
                 return ("\(provider) · \(headline(sourceTitle, limit: 40))", compact(message) ?? message, message)
             }
             let parts = headlineAndRemainder(message)
             return ("\(provider) · \(parts.headline)", compact(parts.remainder) ?? compact(message) ?? message, message)
 
         case .failed:
-            guard let error = message ?? detail else {
+            guard let error = message else {
                 return ("\(provider) failed", "The session reported an error.", "The session reported an error.")
             }
             return ("\(provider) · \(headline(error, limit: 40))", compact(error) ?? error, error)
 
         case .running:
-            let title = event.toolName.map { "\(provider) · \(headline($0, limit: 40))" } ?? "\(provider) is working"
-            let preview = compact(detail ?? message) ?? "Work is in progress."
+            let title = toolName.map { "\(provider) · \(headline($0, limit: 40))" } ?? "\(provider) is working"
+            let preview = compact(command ?? message) ?? "Work is in progress."
             return (title, preview, combined ?? preview)
         }
     }
@@ -176,6 +179,10 @@ final class SessionRegistry {
     private static func bounded(_ value: String?) -> String? {
         guard let value else { return nil }
         return AgentEvent.text(value, limit: AgentEvent.maximumCapturedTextLength)
+    }
+
+    private static func boundedDisplayText(_ value: String?, limit: Int = AgentEvent.maximumCapturedTextLength) -> String? {
+        AgentEvent.displayText(value, limit: limit)
     }
 
     func reduce(now: Date = Date()) {
