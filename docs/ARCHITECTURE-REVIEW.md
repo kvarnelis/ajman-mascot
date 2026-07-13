@@ -145,6 +145,8 @@ Masko public commits: MIT (© 2026 Masko) — valid regardless of later private 
 
 - **Simultaneous pets, one per agent (owner idea 2026-07-12).** Beyond the switch-between picker: optionally show MULTIPLE pets at once — a little menagerie — each **bound to one agent**. Default binding: **Ajman ↔ Claude Code, Winnie ↔ Codex** (configurable per pet, in the menu). Each pet is driven only by its bound provider's activity, and shows Pet-Mode idle when that agent is quiet. Natural fit: EventCore already keys state per `provider+session`, so filter the reducer by provider and render one pet per provider. Implementation: multiple `OverlayPanel`s (per-pet position + size persistence), a pet↔provider binding map, route each provider's reduced state to its matching pet's Animator. The read-at-a-glance payoff: "Ajman's working" = Claude working; "Winnie's ears up" = Codex wants you.
 
+- **Keep the old (pre-tip, standing) Winnie — as an easter egg (owner 2026-07-12).** The original hatched Winnie (un-tipped, standing idle) is preserved byte-for-byte at `assets/winnie/GOLDEN-winnie-pet-2026-07-12/` (tracked in git; = the pre-install live pet). Do NOT discard her. Optionally expose her as a selectable bonus/easter-egg pet — e.g. install to `~/.codex/pets/winnie-classic/` so the multi-pet picker lists "Winnie (classic)" beside the tipped Winnie, or gate her behind a fun trigger. She is her own preserved snapshot regardless of what the live `winnie` pet becomes.
+
 ## Open questions (tracked, non-blocking)
 
 - Do Codex **Desktop** sessions fire user-configured hooks, or only CLI/TUI? (Unverified — rollout tailing covers Desktop either way; test empirically in stage 3.)
