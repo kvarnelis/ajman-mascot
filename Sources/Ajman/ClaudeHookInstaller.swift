@@ -2,7 +2,7 @@ import Foundation
 
 enum ClaudeHookInstaller {
     static let events = [
-        "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
+        "SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse",
         "PostToolUseFailure", "Notification", "SubagentStart", "SubagentStop", "Stop", "SessionEnd",
     ]
 

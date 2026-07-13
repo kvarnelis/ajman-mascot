@@ -8,7 +8,7 @@ enum ActivityReducer {
         case "SessionStart": return .idle
         case "UserPromptSubmit", "PostToolUse", "SubagentStart", "SubagentStop": return .running
         case "PreToolUse": return readOnlyTools.contains(event.toolName ?? "") ? .review : .running
-        case "Notification": return .waiting
+        case "Notification", "PermissionRequest": return .waiting
         case "Stop": return .review
         case "SessionEnd": return nil
         default:

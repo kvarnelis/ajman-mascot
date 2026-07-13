@@ -99,7 +99,7 @@ final class BubbleCardView: NSView {
     @objc private func toggleExpanded() {
         expanded.toggle()
         previewLabel.maximumNumberOfLines = expanded ? 0 : 2
-        previewLabel.stringValue = expanded ? notification.preview : Self.collapsed(notification.preview)
+        previewLabel.stringValue = expanded ? notification.fullText : Self.collapsed(notification.preview)
         expandButton.title = expanded ? "⌃" : "⌄"
         onHeightChange?()
     }

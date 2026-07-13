@@ -53,7 +53,7 @@ final class SessionRegistry {
     private func updateNotification(for event: AgentEvent, id: String, sessionId: String) {
         let kind: PetNotification.Kind?
         switch event.event {
-        case "Notification": kind = .waiting
+        case "Notification", "PermissionRequest": kind = .waiting
         case "Stop": kind = .done
         default: kind = event.event.hasSuffix("Failure") ? .failed : nil
         }
@@ -67,69 +67,115 @@ final class SessionRegistry {
             return
         }
 
+        let content = Self.content(for: event, kind: kind)
         let notification = PetNotification(
             id: id,
             provider: event.provider,
             sessionId: sessionId,
             kind: kind,
-            title: Self.title(for: event, kind: kind),
-            preview: Self.preview(for: event, kind: kind),
+            title: content.title,
+            preview: content.preview,
+            fullText: content.fullText,
             timestamp: event.timestamp
         )
         notifications[id] = notification
         notificationDidChange?(.upsert(notification))
     }
 
-    private static func title(for event: AgentEvent, kind: PetNotification.Kind) -> String {
+    private static func content(for event: AgentEvent, kind: PetNotification.Kind) -> (title: String, preview: String, fullText: String) {
         let provider = event.provider == .claude ? "Claude" : "Codex"
+        let message = bounded(event.message)
+        let detail = bounded(event.detail)
+        let combined = bounded([detail, message].compactMap { $0 }.reduce(into: [String]()) { values, value in
+            if !values.contains(value) { values.append(value) }
+        }.joined(separator: "\n\n"))
+
         switch kind {
-        case .waiting: return "\(provider) needs you"
-        case .done: return "\(provider) finished"
-        case .failed: return "\(provider) hit an error"
-        case .running: return event.toolName.map { "\(provider): \($0)" } ?? "\(provider) is working"
+        case .waiting:
+            let title: String
+            if let detail, isCommand(event) {
+                title = "\(provider) · Run: \(headline(detail, limit: 32))"
+            } else if let tool = event.toolName, !tool.isEmpty {
+                title = "\(provider) · \(headline(tool, limit: 40))"
+            } else if let sourceTitle = event.title {
+                title = "\(provider) · \(headline(sourceTitle, limit: 40))"
+            } else {
+                title = "\(provider) needs you"
+            }
+            let preview = compact(detail ?? message) ?? "This session is waiting for your input."
+            return (title, preview, combined ?? preview)
+
+        case .done:
+            guard let message else {
+                let title = event.title.map { "\(provider) · \(headline($0, limit: 40))" } ?? "\(provider) finished"
+                return (title, "The turn is ready for review.", "The turn is ready for review.")
+            }
+            if let sourceTitle = event.title {
+                return ("\(provider) · \(headline(sourceTitle, limit: 40))", compact(message) ?? message, message)
+            }
+            let parts = headlineAndRemainder(message)
+            return ("\(provider) · \(parts.headline)", compact(parts.remainder) ?? compact(message) ?? message, message)
+
+        case .failed:
+            guard let error = message ?? detail else {
+                return ("\(provider) failed", "The session reported an error.", "The session reported an error.")
+            }
+            return ("\(provider) · \(headline(error, limit: 40))", compact(error) ?? error, error)
+
+        case .running:
+            let title = event.toolName.map { "\(provider) · \(headline($0, limit: 40))" } ?? "\(provider) is working"
+            let preview = compact(detail ?? message) ?? "Work is in progress."
+            return (title, preview, combined ?? preview)
         }
     }
 
-    private static func preview(for event: AgentEvent, kind: PetNotification.Kind) -> String {
-        let preferredKeys = ["message", "last_assistant_message", "lastAssistantMessage", "summary", "reason", "error", "content", "text"]
-        if let message = firstString(in: .object(event.raw), preferredKeys: preferredKeys) {
-            return clean(message)
+    private static func isCommand(_ event: AgentEvent) -> Bool {
+        if let tool = event.toolName?.lowercased(), ["bash", "shell", "exec", "command"].contains(where: tool.contains) { return true }
+        if case .string(let type)? = event.raw["type"] {
+            let normalized = type.lowercased().filter(\.isLetter)
+            return normalized.contains("execcommand") || normalized.contains("execapproval")
         }
-        if let tool = event.toolName, !tool.isEmpty {
-            return kind == .waiting ? "Approval needed for \(tool)." : tool
-        }
-        switch kind {
-        case .waiting: return "This session is waiting for your input."
-        case .done: return "The turn is ready for review."
-        case .failed: return "The session reported an error."
-        case .running: return "Work is in progress."
-        }
+        return AgentEvent.commandText(in: event.raw.mapValues(anyValue)) != nil
     }
 
-    private static func firstString(in value: JSONValue, preferredKeys: [String]) -> String? {
+    private static func anyValue(_ value: JSONValue) -> Any {
         switch value {
-        case .object(let dictionary):
-            for key in preferredKeys {
-                if let candidate = dictionary[key], let string = firstString(in: candidate, preferredKeys: preferredKeys), !string.isEmpty {
-                    return string
-                }
-            }
-            for candidate in dictionary.values {
-                if case .object = candidate, let string = firstString(in: candidate, preferredKeys: preferredKeys), !string.isEmpty { return string }
-                if case .array = candidate, let string = firstString(in: candidate, preferredKeys: preferredKeys), !string.isEmpty { return string }
-            }
-        case .array(let values):
-            for candidate in values {
-                if let string = firstString(in: candidate, preferredKeys: preferredKeys), !string.isEmpty { return string }
-            }
-        case .string(let string): return string
-        default: break
+        case .string(let value): return value
+        case .number(let value): return value
+        case .bool(let value): return value
+        case .object(let value): return value.mapValues(anyValue)
+        case .array(let value): return value.map(anyValue)
+        case .null: return NSNull()
         }
-        return nil
     }
 
-    private static func clean(_ value: String) -> String {
-        value.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    private static func headlineAndRemainder(_ value: String) -> (headline: String, remainder: String?) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstLineEnd = trimmed.firstIndex(of: "\n")
+        let sentenceEnd = trimmed.indices.first { index in
+            ".!?".contains(trimmed[index]) && trimmed.index(after: index) < trimmed.endIndex && trimmed[trimmed.index(after: index)].isWhitespace
+        }.map { trimmed.index(after: $0) }
+        let boundary = [firstLineEnd, sentenceEnd].compactMap { $0 }.min()
+        let source = boundary.map { String(trimmed[..<$0]) } ?? trimmed
+        let remainder = boundary.map { String(trimmed[$0...]).trimmingCharacters(in: .whitespacesAndNewlines) }
+        return (headline(source, limit: 40), remainder?.isEmpty == false ? remainder : nil)
+    }
+
+    private static func headline(_ value: String, limit: Int) -> String {
+        let value = compact(value) ?? ""
+        guard value.count > limit else { return value }
+        return String(value.prefix(max(1, limit - 1))) + "…"
+    }
+
+    private static func compact(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let compacted = value.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        return compacted.isEmpty ? nil : compacted
+    }
+
+    private static func bounded(_ value: String?) -> String? {
+        guard let value else { return nil }
+        return AgentEvent.text(value, limit: AgentEvent.maximumCapturedTextLength)
     }
 
     func reduce(now: Date = Date()) {

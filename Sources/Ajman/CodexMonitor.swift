@@ -8,6 +8,8 @@ final class CodexMonitor {
         var sessionID: String?
         var cwd: String?
         var originator: String?
+        var latestAssistantMessage: String?
+        var latestTitle: String?
     }
 
     private static let pollInterval: TimeInterval = 1
@@ -149,12 +151,44 @@ final class CodexMonitor {
             return
         }
         guard !metadataOnly, normalized(tag) == "eventmsg",
-              let eventType = string(in: payload, keys: ["type", "event", "name"]),
-              let mapped = mappedEvent(eventType) else { return }
-        emit(mapped, payload: payload, state: state)
+              let eventType = string(in: payload, keys: ["type", "event", "name"]) else { return }
+
+        let eventKind = normalized(eventType)
+        if eventKind == "agentmessage" {
+            state.latestAssistantMessage = assistantMessage(in: payload) ?? state.latestAssistantMessage
+            state.latestTitle = title(in: payload) ?? state.latestTitle
+            return
+        }
+        if eventKind == "taskstarted" || eventKind == "turnstarted" {
+            state.latestAssistantMessage = nil
+            state.latestTitle = nil
+        }
+        guard let mapped = mappedEvent(eventType) else { return }
+
+        let message: String?
+        switch mapped {
+        case "Stop":
+            message = assistantMessage(in: payload) ?? state.latestAssistantMessage
+        case "CodexFailure":
+            message = string(in: payload, keys: ["error", "message", "reason"])
+        case "Notification":
+            message = string(in: payload, keys: ["message", "reason", "prompt", "question"])
+        default:
+            message = nil
+        }
+        let eventTitle = title(in: payload) ?? (mapped == "Stop" ? state.latestTitle : nil)
+        let detail = ["Notification", "PreToolUse"].contains(mapped) ? AgentEvent.commandText(in: payload) : nil
+        emit(mapped, payload: payload, state: state, title: eventTitle, message: message, detail: detail)
     }
 
-    private func emit(_ event: String, payload: [String: Any], state: FileState) {
+    private func emit(
+        _ event: String,
+        payload: [String: Any],
+        state: FileState,
+        title: String? = nil,
+        message: String? = nil,
+        detail: String? = nil
+    ) {
         let sessionID = string(in: payload, keys: ["session_id", "thread_id", "id"]) ?? state.sessionID
         let cwd = string(in: payload, keys: ["cwd"]) ?? state.cwd
         var raw = payload.mapValues(JSONValue.init)
@@ -164,8 +198,11 @@ final class CodexMonitor {
             event: event,
             sessionId: sessionID,
             cwd: cwd,
-            toolName: string(in: payload, keys: ["tool_name", "name", "command"]),
+            toolName: string(in: payload, keys: ["tool_name", "name"]),
             transcriptPath: nil,
+            title: title,
+            message: message,
+            detail: detail,
             timestamp: Date(),
             raw: raw
         ))
@@ -197,8 +234,28 @@ final class CodexMonitor {
 
     private func string(in dictionary: [String: Any], keys: [String]) -> String? {
         for key in keys {
-            if let value = dictionary[key] as? String, !value.isEmpty { return value }
+            if let value = AgentEvent.text(dictionary[key]) { return value }
         }
         return nil
+    }
+
+    private func assistantMessage(in payload: [String: Any]) -> String? {
+        string(
+            in: payload,
+            keys: ["last_agent_message", "last_assistant_message", "last-assistant-message", "lastAssistantMessage", "message", "text"]
+        )
+    }
+
+    private func title(in payload: [String: Any]) -> String? {
+        for key in ["title", "turn_title"] {
+            if let value = AgentEvent.text(payload[key], limit: 512) { return value }
+        }
+        return nil
+    }
+
+    /// Release-build test seam: uses the production parser without touching ~/.codex.
+    func consumeFixtureLines(_ lines: [Data]) {
+        var state = FileState(offset: 0)
+        for line in lines { consumeLine(line, state: &state, metadataOnly: false) }
     }
 }

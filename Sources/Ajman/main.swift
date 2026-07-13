@@ -20,13 +20,14 @@ private func runSelfTest() -> Int32 {
         while Date() < deadline, !predicate() { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
         return predicate()
     }
-    func invokeHook(event: String, tool: String? = nil) throws {
+    func invokeHook(event: String, tool: String? = nil, fields: [String: Any] = [:]) throws {
         let binary = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("ajman-hook")
         let process = Process(); process.executableURL = binary
         process.environment = ProcessInfo.processInfo.environment.merging(["AJMAN_SOCKET_PATH": selfTestSocket.path]) { _, testValue in testValue }
         let pipe = Pipe(); process.standardInput = pipe; process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
         var json: [String: Any] = ["hook_event_name": event, "session_id": "selftest", "cwd": "/tmp"]
         if let tool { json["tool_name"] = tool }
+        for (key, value) in fields { json[key] = value }
         try process.run(); pipe.fileHandleForWriting.write(try JSONSerialization.data(withJSONObject: json)); try pipe.fileHandleForWriting.close(); process.waitUntilExit()
         guard process.terminationStatus == 0 else { throw CocoaError(.executableRuntimeMismatch) }
     }
@@ -113,37 +114,20 @@ private func runSelfTest() -> Int32 {
         }
         print("Provider reducer: Claude waiting; Codex running; global waiting")
 
-        let instanceSuiteName = "AjmanSelfTest.PetInstances.\(UUID().uuidString)"
-        guard let instanceDefaults = UserDefaults(suiteName: instanceSuiteName) else {
-            throw SelfTestError("could not create pet-instance defaults")
-        }
-        defer { instanceDefaults.removePersistentDomain(forName: instanceSuiteName) }
-        let instanceCatalog = PetCatalog(defaults: instanceDefaults)
-        guard instanceCatalog.discover().contains(where: { $0.id == "ajman" }),
-              instanceCatalog.discover().contains(where: { $0.id == "winnie" }) else {
+        guard catalog.discover().contains(where: { $0.id == "ajman" }),
+              catalog.discover().contains(where: { $0.id == "winnie" }),
+              (try? catalog.load(id: "ajman")) != nil,
+              (try? catalog.load(id: "winnie")) != nil else {
             throw SelfTestError("Ajman and Winnie packages are required for the two-instance test")
         }
-        let ajmanInstance = try PetInstance(
-            petID: "ajman", binding: .claude, catalog: instanceCatalog,
-            scale: .small, defaultPositionIndex: 0, defaults: instanceDefaults,
-            isManualMode: { false }, dismissNotification: { _ in }
-        )
-        let winnieInstance = try PetInstance(
-            petID: "winnie", binding: .codex, catalog: instanceCatalog,
-            scale: .small, defaultPositionIndex: 1, defaults: instanceDefaults,
-            isManualMode: { false }, dismissNotification: { _ in }
-        )
-        defer {
-            ajmanInstance.teardown()
-            winnieInstance.teardown()
+        let ajmanPositionKey = OverlayPanel.positionPersistenceKey(for: "ajman")
+        let winniePositionKey = OverlayPanel.positionPersistenceKey(for: "winnie")
+        guard ajmanPositionKey == "AjmanPanelOrigin.ajman",
+              winniePositionKey == "AjmanPanelOrigin.winnie",
+              ajmanPositionKey != winniePositionKey else {
+            throw SelfTestError("pet instances did not have distinct position keys")
         }
-        guard ajmanInstance.panel !== winnieInstance.panel,
-              ajmanInstance.positionPersistenceKey == "AjmanPanelOrigin.ajman",
-              winnieInstance.positionPersistenceKey == "AjmanPanelOrigin.winnie",
-              ajmanInstance.positionPersistenceKey != winnieInstance.positionPersistenceKey else {
-            throw SelfTestError("two PetInstances did not own distinct panels and position keys")
-        }
-        print("Pet instances: two panels; distinct per-pet position keys")
+        print("Pet instances: both packages load; distinct per-pet position keys (headless)")
 
         let normalizationPetIDs = ["ajman", "winnie"].filter { id in
             catalog.discover().contains { $0.id == id }
@@ -187,12 +171,31 @@ private func runSelfTest() -> Int32 {
         try invokeHook(event: "PreToolUse", tool: "Bash")
         guard pump(until: { registry.currentState == .running }) else { throw SelfTestError("PreToolUse did not produce running") }
         print("UDS transport: PreToolUse(Bash) -> running")
-        try invokeHook(event: "Notification")
+        let notificationMessage = "Permission requested for the specific release step."
+        try invokeHook(event: "Notification", fields: ["message": notificationMessage])
         guard pump(until: { registry.currentState == .waiting }) else { throw SelfTestError("Notification did not produce waiting") }
-        print("UDS transport: Notification -> waiting")
-        guard case .upsert(let waiting)? = notificationChanges.last, waiting.kind == .waiting else {
-            throw SelfTestError("Notification did not raise a waiting card")
+        guard case .upsert(let waiting)? = notificationChanges.last,
+              waiting.kind == .waiting,
+              waiting.preview.contains(notificationMessage),
+              waiting.fullText.contains(notificationMessage) else {
+            throw SelfTestError("Notification message did not reach the waiting card")
         }
+        print("Bubble content: Claude Notification preview contains real message: \(waiting.preview)")
+
+        try invokeHook(
+            event: "PermissionRequest",
+            tool: "Bash",
+            fields: ["tool_input": ["command": "swift test"]]
+        )
+        guard pump(until: {
+            if case .upsert(let notification)? = notificationChanges.last {
+                return notification.title.contains("Claude · Run: swift test") && notification.preview == "swift test"
+            }
+            return false
+        }) else {
+            throw SelfTestError("Claude PermissionRequest command did not reach the waiting card")
+        }
+        print("Bubble content: Claude PermissionRequest -> Claude · Run: swift test")
         try invokeHook(event: "PostToolUse", tool: "Bash")
         guard pump(until: {
             notificationChanges.contains { change in
@@ -201,6 +204,54 @@ private func runSelfTest() -> Int32 {
             }
         }) else { throw SelfTestError("follow-up event did not dismiss waiting card") }
         print("Bubble lifecycle: waiting card raised; PostToolUse dismissed it")
+
+        let completionMessage = "Implemented specific bubble content. All verification checks passed."
+        try invokeHook(event: "Stop", fields: ["last_assistant_message": completionMessage])
+        guard pump(until: {
+            if case .upsert(let notification)? = notificationChanges.last {
+                return notification.kind == .done && notification.fullText.contains(completionMessage)
+            }
+            return false
+        }), case .upsert(let completed)? = notificationChanges.last,
+           completed.preview.contains("All verification checks passed"),
+           !completed.preview.contains("The turn is ready for review") else {
+            throw SelfTestError("Stop last_assistant_message did not replace the generic completion card")
+        }
+        print("Bubble content: Claude Stop preview contains real assistant text: \(completed.preview)")
+
+        let codexMonitor = CodexMonitor(environment: ["CODEX_HOME": "/tmp/ajman-selftest-codex"])
+        var codexEvents: [AgentEvent] = []
+        codexMonitor.eventHandler = { codexEvents.append($0) }
+        func rolloutLine(_ type: String, payload: [String: Any]) throws -> Data {
+            try JSONSerialization.data(withJSONObject: ["type": type, "payload": payload])
+        }
+        let codexMessage = "Codex extracted the actual rollout answer. The parser kept the final message."
+        codexMonitor.consumeFixtureLines([
+            try rolloutLine("session_meta", payload: ["id": "codex-selftest", "cwd": "/tmp", "originator": "Codex Desktop"]),
+            try rolloutLine("event_msg", payload: ["type": "agent_message", "message": codexMessage]),
+            try rolloutLine("event_msg", payload: ["type": "task_complete"]),
+            try rolloutLine("event_msg", payload: ["type": "exec_approval_request", "command": "swift test", "cwd": "/tmp"]),
+        ])
+        guard let codexStop = codexEvents.first(where: { $0.event == "Stop" }),
+              codexStop.message == codexMessage,
+              let codexApproval = codexEvents.first(where: { $0.event == "Notification" }),
+              codexApproval.detail == "swift test" else {
+            throw SelfTestError("Codex rollout message/approval extraction failed")
+        }
+        let codexRegistry = SessionRegistry(startTimer: false)
+        codexRegistry.apply(codexStop)
+        guard let codexCard = codexRegistry.currentNotifications(for: .codex).first,
+              codexCard.fullText.contains(codexMessage),
+              codexCard.preview.contains("The parser kept the final message") else {
+            throw SelfTestError("Codex agent_message did not reach the completion card")
+        }
+        codexRegistry.apply(codexApproval)
+        guard let approvalCard = codexRegistry.currentNotifications(for: .codex).first,
+              approvalCard.title.contains("Run: swift test"),
+              approvalCard.preview == "swift test" else {
+            throw SelfTestError("Codex exec approval command did not reach the waiting card")
+        }
+        print("Codex rollout: agent_message -> specific completion; exec approval -> Run: swift test")
 
         let temp = fileManager.temporaryDirectory.appendingPathComponent("ajman-selftest-\(UUID().uuidString)")
         defer { try? fileManager.removeItem(at: temp) }
@@ -226,11 +277,15 @@ private func runSelfTest() -> Int32 {
         guard userSurvivedInstall, allEventsAdded, backupExists else {
             throw SelfTestError("installer fixture assertions failed (user=\(userSurvivedInstall), events=\(installed.eventsAdded.count), backup=\(backupExists))")
         }
-        print("Installer fixture: user hook preserved; 10 Ajman event groups added; backup exists")
+        print("Installer fixture: user hook preserved; \(ClaudeHookInstaller.events.count) Ajman event groups added; backup exists")
         let uninstalled = try ClaudeHookInstaller.uninstall(settingsPath: settings)
         let afterUninstall = try JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as! [String: Any]
-        guard containsCommand(afterUninstall, command: userCommand), !containsCommand(afterUninstall, command: hookPath), uninstalled.commandsRemoved == 10 else { throw SelfTestError("uninstaller fixture assertions failed") }
-        print("Uninstaller fixture: 10 Ajman commands removed; user hook preserved")
+        guard containsCommand(afterUninstall, command: userCommand),
+              !containsCommand(afterUninstall, command: hookPath),
+              uninstalled.commandsRemoved == ClaudeHookInstaller.events.count else {
+            throw SelfTestError("uninstaller fixture assertions failed")
+        }
+        print("Uninstaller fixture: \(ClaudeHookInstaller.events.count) Ajman commands removed; user hook preserved")
         print("SELFTEST OK")
         return 0
     } catch {

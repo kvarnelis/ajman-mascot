@@ -13,6 +13,10 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
     private var mouseDownTimestamp: TimeInterval?
     var displaySize: NSSize { Self.displaySize(global: petScale, relative: relativeScale) }
 
+    static func positionPersistenceKey(for petID: String) -> String {
+        "AjmanPanelOrigin.\(petID)"
+    }
+
     init(
         contentView: NSView,
         scale: PetScale,
@@ -25,7 +29,7 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
         self.relativeScale = relativeScale
         self.defaultPositionIndex = defaultPositionIndex
         self.defaults = defaults
-        positionPersistenceKey = "AjmanPanelOrigin.\(petID)"
+        positionPersistenceKey = Self.positionPersistenceKey(for: petID)
         let size = Self.displaySize(global: scale, relative: relativeScale)
         super.init(
             contentRect: NSRect(origin: .zero, size: size),
