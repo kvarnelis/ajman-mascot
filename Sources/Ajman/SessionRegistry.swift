@@ -117,7 +117,10 @@ final class SessionRegistry {
                 return ("\(provider) · \(headline(sourceTitle, limit: 40))", compact(message) ?? message, message)
             }
             let parts = headlineAndRemainder(message)
-            return ("\(provider) · \(parts.headline)", compact(parts.remainder) ?? compact(message) ?? message, message)
+            let preview = event.provider == .codex
+                ? (compact(message) ?? message)
+                : (compact(parts.remainder) ?? compact(message) ?? message)
+            return ("\(provider) · \(parts.headline)", preview, message)
 
         case .failed:
             guard let error = message else {

@@ -10,6 +10,7 @@ final class CodexMonitor {
         var originator: String?
         var latestAssistantMessage: String?
         var latestTitle: String?
+        var completionEmittedForTurn = false
     }
 
     private static let pollInterval: TimeInterval = 1
@@ -21,6 +22,7 @@ final class CodexMonitor {
     private let queue = DispatchQueue(label: "net.varnelis.ajman.codex-monitor", qos: .utility)
     private var timer: DispatchSourceTimer?
     private var files: [String: FileState] = [:]
+    private var latestAssistantTextBySession: [String: String] = [:]
     var eventHandler: ((AgentEvent) -> Void)?
 
     init(environment: [String: String] = ProcessInfo.processInfo.environment) {
@@ -50,6 +52,7 @@ final class CodexMonitor {
             self?.timer?.cancel()
             self?.timer = nil
             self?.files.removeAll()
+            self?.latestAssistantTextBySession.removeAll()
         }
     }
 
@@ -155,24 +158,53 @@ final class CodexMonitor {
 
         let eventKind = normalized(eventType)
         if eventKind == "agentmessage" {
-            state.latestAssistantMessage = assistantMessage(in: payload) ?? state.latestAssistantMessage
+            if let message = assistantMessage(in: payload) {
+                state.latestAssistantMessage = message
+                if let sessionID = sessionID(in: payload, state: state) {
+                    latestAssistantTextBySession[sessionID] = message
+                }
+            }
             state.latestTitle = title(in: payload) ?? state.latestTitle
+
+            // Modern Codex rollouts may end a turn with a final_answer message
+            // and no task_complete event. The phase is the completion signal;
+            // commentary messages above are cached but do not finish the turn.
+            if normalized(string(in: payload, keys: ["phase"]) ?? "") == "finalanswer" {
+                state.completionEmittedForTurn = true
+                emit(
+                    "Stop",
+                    payload: payload,
+                    state: state,
+                    title: state.latestTitle,
+                    message: latestAssistantMessage(in: payload, state: state)
+                )
+            }
             return
         }
         if eventKind == "taskstarted" || eventKind == "turnstarted" {
+            if let sessionID = sessionID(in: payload, state: state) {
+                latestAssistantTextBySession.removeValue(forKey: sessionID)
+            }
             state.latestAssistantMessage = nil
             state.latestTitle = nil
+            state.completionEmittedForTurn = false
         }
         guard let mapped = mappedEvent(eventType) else { return }
+
+        // Older rollouts include task_complete after final_answer. The card was
+        // already emitted from the stronger signal, so avoid a duplicate update.
+        if mapped == "Stop", state.completionEmittedForTurn { return }
 
         let message: String?
         switch mapped {
         case "Stop":
-            message = assistantMessage(in: payload) ?? state.latestAssistantMessage
+            state.completionEmittedForTurn = true
+            message = latestAssistantMessage(in: payload, state: state)
         case "CodexFailure":
             message = displayString(in: payload, keys: ["error", "message", "reason"])
         case "Notification":
             message = displayString(in: payload, keys: ["message", "reason", "prompt", "question"])
+                ?? latestAssistantMessage(in: payload, state: state)
         default:
             message = nil
         }
@@ -191,7 +223,7 @@ final class CodexMonitor {
         message: String? = nil,
         detail: String? = nil
     ) {
-        let sessionID = string(in: payload, keys: ["session_id", "thread_id", "id"]) ?? state.sessionID
+        let sessionID = sessionID(in: payload, state: state)
         let cwd = string(in: payload, keys: ["cwd"]) ?? state.cwd
         var raw = payload.mapValues(JSONValue.init)
         if let originator = state.originator { raw["originator"] = .string(originator) }
@@ -253,6 +285,16 @@ final class CodexMonitor {
             in: payload,
             keys: ["last_agent_message", "last_assistant_message", "last-assistant-message", "lastAssistantMessage", "message", "text"]
         )
+    }
+
+    private func latestAssistantMessage(in payload: [String: Any], state: FileState) -> String? {
+        assistantMessage(in: payload)
+            ?? sessionID(in: payload, state: state).flatMap { latestAssistantTextBySession[$0] }
+            ?? state.latestAssistantMessage
+    }
+
+    private func sessionID(in payload: [String: Any], state: FileState) -> String? {
+        string(in: payload, keys: ["session_id", "thread_id", "id"]) ?? state.sessionID
     }
 
     private func title(in payload: [String: Any]) -> String? {

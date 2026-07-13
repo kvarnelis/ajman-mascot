@@ -234,28 +234,34 @@ private func runSelfTest() -> Int32 {
         func rolloutLine(_ type: String, payload: [String: Any]) throws -> Data {
             try JSONSerialization.data(withJSONObject: ["type": type, "payload": payload])
         }
-        let codexMessage = "Codex extracted the actual rollout answer. The parser kept the final message."
+        let earlierCodexMessage = "Codex is still working through the rollout."
+        let codexMessage = "Real Codex answer reached the card. The latest assistant text stayed intact."
         let rawApprovalOutcome = "{\"outcome\":\"allow\"}"
         codexMonitor.consumeFixtureLines([
             try rolloutLine("session_meta", payload: ["id": "codex-selftest", "cwd": "/tmp", "originator": "Codex Desktop"]),
-            try rolloutLine("event_msg", payload: ["type": "agent_message", "message": codexMessage]),
-            try rolloutLine("event_msg", payload: ["type": "task_complete"]),
+            try rolloutLine("event_msg", payload: ["type": "task_started"]),
+            try rolloutLine("event_msg", payload: ["type": "agent_message", "message": earlierCodexMessage, "phase": "commentary"]),
+            try rolloutLine("event_msg", payload: ["type": "token_count", "info": ["total_token_usage": 123]]),
             try rolloutLine("event_msg", payload: [
                 "type": "exec_approval_request", "command": "swift test", "message": rawApprovalOutcome, "cwd": "/tmp",
             ]),
+            try rolloutLine("event_msg", payload: ["type": "agent_message", "message": codexMessage, "phase": "final_answer"]),
         ])
         guard let codexStop = codexEvents.first(where: { $0.event == "Stop" }),
               codexStop.message == codexMessage,
+              codexEvents.filter({ $0.event == "Stop" }).count == 1,
               let codexApproval = codexEvents.first(where: { $0.event == "Notification" }),
               codexApproval.detail == "swift test",
-              codexApproval.message == nil else {
+              codexApproval.message == earlierCodexMessage,
+              codexApproval.message != rawApprovalOutcome else {
             throw SelfTestError("Codex rollout message/approval extraction failed")
         }
         let codexRegistry = SessionRegistry(startTimer: false)
         codexRegistry.apply(codexStop)
         guard let codexCard = codexRegistry.currentNotifications(for: .codex).first,
               codexCard.fullText.contains(codexMessage),
-              codexCard.preview.contains("The parser kept the final message") else {
+              codexCard.preview.contains(codexMessage),
+              codexCard.title == "Codex · Real Codex answer reached the card." else {
             throw SelfTestError("Codex agent_message did not reach the completion card")
         }
         codexRegistry.apply(codexApproval)
@@ -264,7 +270,9 @@ private func runSelfTest() -> Int32 {
               approvalCard.preview == "swift test" else {
             throw SelfTestError("Codex exec approval command did not reach the waiting card")
         }
-        print("Codex rollout: agent_message -> specific completion; exec approval -> Run: swift test")
+        print("Codex rollout: event_msg/agent_message/message final_answer -> specific completion without task_complete")
+        print("Codex card: title=\(codexCard.title); preview contains real message")
+        print("Codex approval: exec approval -> Run: swift test")
 
         let rawDecisionEvent = AgentEvent(
             provider: .codex,
@@ -295,8 +303,7 @@ private func runSelfTest() -> Int32 {
         decisionMonitor.consumeFixtureLines([
             try rolloutLine("session_meta", payload: ["id": "codex-guardian-selftest", "cwd": "/tmp", "originator": "Codex Desktop"]),
             try rolloutLine("event_msg", payload: ["type": "task_started"]),
-            try rolloutLine("event_msg", payload: ["type": "agent_message", "message": rawApprovalOutcome]),
-            try rolloutLine("event_msg", payload: ["type": "task_complete", "last_agent_message": rawApprovalOutcome]),
+            try rolloutLine("event_msg", payload: ["type": "agent_message", "message": rawApprovalOutcome, "phase": "final_answer"]),
         ])
         guard let decisionStop = decisionEvents.first(where: { $0.event == "Stop" }), decisionStop.message == nil else {
             throw SelfTestError("Codex monitor accepted approval outcome JSON as assistant prose")
@@ -308,6 +315,10 @@ private func runSelfTest() -> Int32 {
               decisionCompletionCard.preview == "The turn is ready for review.",
               !decisionCompletionCard.fullText.contains("{\"outcome\"") else {
             throw SelfTestError("Codex guardian outcome JSON reached the completion card")
+        }
+        guard AgentEvent.displayText(rawApprovalOutcome) == nil,
+              AgentEvent.displayText(codexMessage) == codexMessage else {
+            throw SelfTestError("Codex display-text guard rejected prose or accepted JSON")
         }
         print("Codex JSON regression: approval outcome rejected; command and real assistant prose preserved")
 
