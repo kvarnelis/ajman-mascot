@@ -5,6 +5,7 @@ enum PetScale: Double, CaseIterable {
     static let defaultValue: PetScale = .small
 
     case small = 0.5
+    case twoThirds = 0.6667
     case threeQuarter = 0.75
     case medium = 1.0
     case oneAndHalf = 1.5
@@ -21,6 +22,7 @@ enum PetScale: Double, CaseIterable {
     var menuTitle: String {
         switch self {
         case .small: "0.5× (Small)"
+        case .twoThirds: "Two-Thirds (⅔)"
         case .threeQuarter: "0.75×"
         case .medium: "1.0× (Medium)"
         case .oneAndHalf: "1.5×"

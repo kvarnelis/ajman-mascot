@@ -40,7 +40,7 @@ private func runSelfTest() -> Int32 {
             scale.save(to: scaleDefaults)
             guard PetScale.load(from: scaleDefaults) == scale else { throw SelfTestError("scale did not round-trip: \(scale.rawValue)") }
         }
-        print("Pet scale: default 0.5; all 6 options round-trip")
+        print("Pet scale: default 0.5; all \(PetScale.allCases.count) options round-trip")
 
         let steadySuiteName = "AjmanSelfTest.SteadySize.\(UUID().uuidString)"
         guard let steadyDefaults = UserDefaults(suiteName: steadySuiteName) else { throw SelfTestError("could not create steady-size defaults") }
