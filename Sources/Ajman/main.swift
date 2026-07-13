@@ -80,8 +80,31 @@ private func runSelfTest() -> Int32 {
                   idleBounds.allSatisfy({ abs($0.minY - CGFloat(SpriteSheet.contentMargin)) <= 1 }) else {
                 throw SelfTestError("\(id) normalized idle frames did not share height/ground line: \(idleBounds)")
             }
+            var checkedFrameCount = 0
+            for definition in steadySheet.animationTable.definitions {
+                let bounds = steadySheet.contentBounds(for: definition)
+                guard bounds.count == definition.frameCount else {
+                    throw SelfTestError("\(id) \(definition.state.rawValue) returned \(bounds.count)/\(definition.frameCount) normalized bounds")
+                }
+                for (column, frameBounds) in bounds.enumerated() {
+                    guard let frameBounds else {
+                        throw SelfTestError("\(id) \(definition.state.rawValue)[\(column)] has no normalized content")
+                    }
+                    guard frameBounds.minX >= 0, frameBounds.minY >= 0,
+                          frameBounds.maxX <= CGFloat(SpriteSheet.cellWidth),
+                          frameBounds.maxY <= CGFloat(SpriteSheet.cellHeight),
+                          abs(frameBounds.minY - CGFloat(SpriteSheet.contentMargin)) <= 1 else {
+                        throw SelfTestError("\(id) \(definition.state.rawValue)[\(column)] normalized content clips or missed ground line: \(frameBounds)")
+                    }
+                    checkedFrameCount += 1
+                }
+            }
+            guard checkedFrameCount == steadySheet.animationTable.usedFrameCount else {
+                throw SelfTestError("\(id) checked \(checkedFrameCount)/\(steadySheet.animationTable.usedFrameCount) used frames for clipping")
+            }
+            print("Sprite normalization \(id): all \(checkedFrameCount) used frames inside 192x208; ground line within 1 px")
         }
-        print("Sprite normalization (\(normalizationPetIDs.joined(separator: ", "))): idle heights within 2 px; ground line within 1 px")
+        print("Sprite normalization (\(normalizationPetIDs.joined(separator: ", "))): idle heights within 2 px; no clipping")
 
         try invokeHook(event: "PreToolUse", tool: "Bash")
         guard pump(until: { registry.currentState == .running }) else { throw SelfTestError("PreToolUse did not produce running") }

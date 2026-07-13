@@ -45,9 +45,8 @@ struct SpriteSheet {
     static let cellWidth = 192
     static let cellHeight = 208
     static let contentAlphaThreshold: UInt8 = 10
-    static let contentMargin = 4
-    static let minimumNormalizationScale = 0.7
-    static let maximumNormalizationScale = 1.6
+    static let contentMargin = Int(SteadySize.margin)
+    static let topSafety = Int(SteadySize.topSafety)
 
     let animationTable: AnimationTable
     let sourceURL: URL
@@ -156,26 +155,31 @@ struct SpriteSheet {
             (0..<definition.frameCount).compactMap { measured[FrameLocation(row: definition.row, column: $0)] }
         } ?? []
         let targetCandidates = idleBounds.isEmpty ? Array(measured.values) : idleBounds
-        guard let targetHeight = median(targetCandidates.map(\.height)) else { return result }
+        guard let targetBox = SteadySize.targetBox(
+            idleBounds: targetCandidates,
+            cellWidth: cellWidth,
+            cellHeight: cellHeight
+        ) else { return result }
 
         for location in used {
-            guard let bounds = measured[location], bounds.height > 0,
+            guard let bounds = measured[location],
                   let normalized = normalize(
                     cells[location.row][location.column],
                     contentBounds: bounds,
-                    targetHeight: targetHeight
+                    targetBox: targetBox
                   ) else { continue }
             result[location.row][location.column] = normalized
         }
         return result
     }
 
-    private static func normalize(_ frame: CGImage, contentBounds: CGRect, targetHeight: CGFloat) -> CGImage? {
-        let widthLimit = CGFloat(cellWidth - 2 * contentMargin) / contentBounds.width
-        let heightLimit = CGFloat(cellHeight - contentMargin) / contentBounds.height
-        let desired = targetHeight / contentBounds.height
-        let scale = min(max(desired, minimumNormalizationScale), maximumNormalizationScale, widthLimit, heightLimit)
-        guard scale.isFinite, scale > 0,
+    private static func normalize(_ frame: CGImage, contentBounds: CGRect, targetBox: CGSize) -> CGImage? {
+        guard let scale = SteadySize.scale(
+            contentSize: contentBounds.size,
+            targetBox: targetBox,
+            cellWidth: cellWidth,
+            cellHeight: cellHeight
+        ),
               let context = rgbaContext(width: cellWidth, height: cellHeight) else { return nil }
 
         context.interpolationQuality = .high
@@ -183,7 +187,7 @@ struct SpriteSheet {
         let contentLeft = (CGFloat(cellWidth) - scaledContentWidth) / 2
         let drawRect = CGRect(
             x: contentLeft - contentBounds.minX * scale,
-            y: CGFloat(contentMargin) - contentBounds.minY * scale,
+            y: SteadySize.margin - contentBounds.minY * scale,
             width: CGFloat(cellWidth) * scale,
             height: CGFloat(cellHeight) * scale
         )
@@ -191,7 +195,7 @@ struct SpriteSheet {
         guard let rendered = context.makeImage(),
               let renderedBounds = Self.contentBounds(rendered) else { return context.makeImage() }
         // CGImage scanlines and CGContext user-space Y run in opposite directions.
-        let verticalCorrection = renderedBounds.minY - CGFloat(contentMargin)
+        let verticalCorrection = renderedBounds.minY - SteadySize.margin
         guard abs(verticalCorrection) >= 0.5,
               let corrected = rgbaContext(width: cellWidth, height: cellHeight) else { return rendered }
         corrected.draw(
@@ -246,10 +250,4 @@ struct SpriteSheet {
         return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 
-    private static func median(_ values: [CGFloat]) -> CGFloat? {
-        guard !values.isEmpty else { return nil }
-        let sorted = values.sorted()
-        let middle = sorted.count / 2
-        return sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
-    }
 }
