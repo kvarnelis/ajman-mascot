@@ -40,6 +40,7 @@ final class PetInstance {
     private let liveState = LiveStateBox()
     private var glanceTimer: Timer?
     private var scratchBehavior: ScratchBehavior?
+    private var scratchStartingOrigin: NSPoint?
     private(set) var isGlancing = false
     private var tornDown = false
 
@@ -119,11 +120,15 @@ final class PetInstance {
                 )
             },
             willStart: { [weak self] in
+                self?.scratchStartingOrigin = self?.panel.frame.origin
                 self?.cancelGlance(returnToRest: false)
                 self?.petMode.yieldToHigherPriorityDriver()
             },
             moveToEdge: { [weak self] side, completion in
                 self?.moveToScratchEdge(side: side, completion: completion)
+            },
+            moveBackToStart: { [weak self] completion in
+                self?.moveBackToScratchStart(completion: completion)
             },
             showPose: { [weak self] side in
                 guard let self, let scratchAnimation else { return false }
@@ -132,7 +137,9 @@ final class PetInstance {
             setRaking: { [weak self] enabled in self?.animator.setScratchRaking(enabled) },
             showIdle: { [weak self] in self?.animator.play(.idle) },
             didFinish: { [weak self] in
-                guard let self, self.liveState.value == .idle, !self.isManualMode() else { return }
+                guard let self else { return }
+                self.scratchStartingOrigin = nil
+                guard self.liveState.value == .idle, !self.isManualMode() else { return }
                 self.petMode.resumeAtRest()
             },
             chooseSide: { [weak self] in self?.farScratchSide() }
@@ -371,6 +378,24 @@ final class PetInstance {
             visibleMinX: visible.minX,
             visibleMaxX: visible.maxX,
             scale: scale
+        )
+    }
+
+    private func moveBackToScratchStart(completion: @escaping @MainActor () -> Void) {
+        guard let target = scratchStartingOrigin else {
+            completion()
+            return
+        }
+
+        let current = panel.frame.origin
+        animator.play(ScratchEdgeGeometry.travelState(fromOriginX: current.x, toOriginX: target.x))
+        let distance = hypot(target.x - current.x, target.y - current.y)
+        let duration = min(max(TimeInterval(distance / 110), 0.8), 4.0)
+        scratchMover.move(
+            to: target,
+            duration: duration,
+            shouldContinue: { [weak self] in self?.scratchBehavior?.isPerforming == true },
+            completion: completion
         )
     }
 

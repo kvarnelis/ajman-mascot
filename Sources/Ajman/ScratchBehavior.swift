@@ -13,8 +13,8 @@ enum ScratchSide: CaseIterable {
 
     var poseIndex: Int {
         switch self {
-        case .right: 0
-        case .left: 1
+        case .left: 0
+        case .right: 1
         }
     }
 }
@@ -50,6 +50,10 @@ enum ScratchEdgeGeometry {
             side: .right, visibleMinX: visibleMinX, visibleMaxX: visibleMaxX, scale: scale
         )
         return abs(leftX - currentOriginX) >= abs(rightX - currentOriginX) ? .left : .right
+    }
+
+    nonisolated static func travelState(fromOriginX: CGFloat, toOriginX: CGFloat) -> AnimationState {
+        toOriginX < fromOriginX ? .runningLeft : .runningRight
     }
 }
 
@@ -145,8 +149,8 @@ struct ScratchEligibility {
     }
 }
 
-/// An infrequent idle-only trip to a display edge, followed by a held reach-up
-/// pose and a brief layer-local rake. The panel remains at the edge afterward.
+/// An infrequent idle-only round trip to a display edge, followed by a held
+/// reach-up pose and a brief layer-local rake before returning home.
 @MainActor
 final class ScratchBehavior {
     nonisolated static let scheduleRange: ClosedRange<TimeInterval> = 24...38
@@ -162,6 +166,7 @@ final class ScratchBehavior {
     private let eligibility: () -> ScratchEligibility
     private let willStart: () -> Void
     private let moveToEdge: (ScratchSide, @escaping @MainActor () -> Void) -> Void
+    private let moveBackToStart: (@escaping @MainActor () -> Void) -> Void
     private let showPose: (ScratchSide) -> Bool
     private let setRaking: (Bool) -> Void
     private let showIdle: () -> Void
@@ -183,6 +188,7 @@ final class ScratchBehavior {
         eligibility: @escaping () -> ScratchEligibility,
         willStart: @escaping () -> Void,
         moveToEdge: @escaping (ScratchSide, @escaping @MainActor () -> Void) -> Void,
+        moveBackToStart: @escaping (@escaping @MainActor () -> Void) -> Void,
         showPose: @escaping (ScratchSide) -> Bool,
         setRaking: @escaping (Bool) -> Void,
         showIdle: @escaping () -> Void,
@@ -196,6 +202,7 @@ final class ScratchBehavior {
         self.eligibility = eligibility
         self.willStart = willStart
         self.moveToEdge = moveToEdge
+        self.moveBackToStart = moveBackToStart
         self.showPose = showPose
         self.setRaking = setRaking
         self.showIdle = showIdle
@@ -273,7 +280,10 @@ final class ScratchBehavior {
                 self.after(Self.rakeDuration, id: id) { [weak self] in
                     guard let self else { return }
                     self.updateRaking(false)
-                    self.after(0.18, id: id) { [weak self] in self?.finish(id: id) }
+                    self.after(0.18, id: id) { [weak self] in
+                        guard let self else { return }
+                        self.moveBackToStart { [weak self] in self?.finish(id: id) }
+                    }
                 }
             }
         }

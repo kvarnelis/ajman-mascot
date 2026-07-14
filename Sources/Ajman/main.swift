@@ -297,9 +297,9 @@ private func runSelfTest() -> Int32 {
         }
         guard let ajmanScratch = sleepingAjman.scratchAnimation,
               ajmanScratch.frameCount == 2,
-              ScratchSide.right.poseIndex == 0,
-              ScratchSide.left.poseIndex == 1 else {
-            throw SelfTestError("Ajman's bundled scratch strip did not load right and left orientations")
+              ScratchSide.left.poseIndex == 0,
+              ScratchSide.right.poseIndex == 1 else {
+            throw SelfTestError("Ajman's bundled scratch strip did not map left/right paws to left/right edges")
         }
         guard ScratchEdgeGeometry.leftPawX == 37,
               ScratchEdgeGeometry.rightPawX == 155,
@@ -309,6 +309,8 @@ private func runSelfTest() -> Int32 {
               ScratchEdgeGeometry.targetOriginX(
                   side: .right, visibleMinX: 0, visibleMaxX: 1_000, scale: 0.75
               ) == 883.75,
+              ScratchEdgeGeometry.travelState(fromOriginX: 500, toOriginX: 100) == .runningLeft,
+              ScratchEdgeGeometry.travelState(fromOriginX: 100, toOriginX: 500) == .runningRight,
               ScratchEdgeGeometry.farSide(
                   currentOriginX: 850, visibleMinX: 0, visibleMaxX: 1_000, scale: 0.75
               ) == .left else {
@@ -334,6 +336,21 @@ private func runSelfTest() -> Int32 {
               abs((movementOrigin?.x ?? -.infinity) - movementTarget.x) < 0.5 else {
             throw SelfTestError("scratch panel did not reach its edge before completing")
         }
+        let recordedStart = NSPoint(x: 100, y: 100)
+        var returnCompleted = false
+        movementMover.move(to: recordedStart, duration: 0.12) {
+            returnCompleted = true
+        }
+        guard pump(until: {
+            guard let x = movementOrigin?.x else { return false }
+            return x < movementTarget.x && x > recordedStart.x
+        }), !returnCompleted else {
+            throw SelfTestError("scratch panel did not travel back toward its recorded start after the rake")
+        }
+        guard pump(until: { returnCompleted }),
+              abs((movementOrigin?.x ?? .infinity) - recordedStart.x) < 0.5 else {
+            throw SelfTestError("scratch panel did not return to its recorded start after the rake")
+        }
         movementMover.cancel()
         let winnieSleepAnimator = Animator(
             sheet: sleepingWinnie.sheet,
@@ -350,7 +367,7 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("Winnie's held sleep pose did not rotate to a different pose")
         }
         winnieSleepAnimator.stop()
-        print("Calm assets: Winnie sleep loads and rotates 8 weighted poses; Ajman loaf/sleep/wake/scratch load 8/8/5/2; scratch panel moves before pose")
+        print("Calm assets: Winnie sleep loads and rotates 8 weighted poses; Ajman loaf/sleep/wake/scratch load 8/8/5/2; scratch panel reaches the edge and returns to its recorded start")
 
         var scratchEligibility = ScratchEligibility(
             hasAsset: true,
@@ -371,6 +388,10 @@ private func runSelfTest() -> Int32 {
                 scratchEvents.append(side == .left ? "move-left" : "move-right")
                 completion()
             },
+            moveBackToStart: { completion in
+                scratchEvents.append("move-home")
+                completion()
+            },
             showPose: { side in
                 scratchEvents.append(side == .left ? "pose-left" : "pose-right")
                 return true
@@ -385,7 +406,7 @@ private func runSelfTest() -> Int32 {
         }
         guard scratchBehavior.forceStart(side: .right),
               !scratchBehavior.isPerforming,
-              scratchEvents == ["start", "move-right", "pose-right", "rake-on", "rake-off", "idle", "finish"] else {
+              scratchEvents == ["start", "move-right", "pose-right", "rake-on", "rake-off", "move-home", "idle", "finish"] else {
             throw SelfTestError("debug scratch did not bypass eligibility and finish: \(scratchEvents)")
         }
         scratchEvents.removeAll()
@@ -414,11 +435,11 @@ private func runSelfTest() -> Int32 {
         )
         guard scratchBehavior.startIfEligible(side: .left),
               !scratchBehavior.isPerforming,
-              scratchEvents == ["start", "move-left", "pose-left", "rake-on", "rake-off", "idle", "finish"] else {
+              scratchEvents == ["start", "move-left", "pose-left", "rake-on", "rake-off", "move-home", "idle", "finish"] else {
             throw SelfTestError("idle scratch did not approach, rake, and return to idle: \(scratchEvents)")
         }
         scratchBehavior.teardown()
-        print("Scratch behavior: debug force bypasses eligibility; active/sleep gates reject; idle approaches, rakes, and returns")
+        print("Scratch behavior: debug force bypasses eligibility; active/sleep gates reject; idle approaches, rakes, runs home, and returns")
 
         let sleepSuiteName = "AjmanSelfTest.Sleep.\(UUID().uuidString)"
         guard let sleepDefaults = UserDefaults(suiteName: sleepSuiteName) else {
