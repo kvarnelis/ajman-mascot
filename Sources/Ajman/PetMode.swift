@@ -73,11 +73,21 @@ final class PetMode {
     func setTemperament(_ temperament: Temperament) {
         guard self.temperament != temperament else { return }
         self.temperament = temperament
-        guard isEnabled, priorityAllowsPetMode, ownsRestingAnimation,
-              !isLoafing, !isSleeping, !isWaking else { return }
+        guard isEnabled, priorityAllowsPetMode, ownsRestingAnimation else { return }
+        if temperament == .insane, isLoafing || isSleeping {
+            beginWakeTransition()
+            return
+        }
+        guard !isLoafing, !isSleeping, !isWaking else { return }
         idleTimer?.invalidate()
         idleTimer = nil
+        loafTimer?.invalidate()
+        loafTimer = nil
+        dozeTimer?.invalidate()
+        dozeTimer = nil
         scheduleOccasionalBeat()
+        scheduleLoaf()
+        scheduleDoze()
     }
 
     /// Called whenever the live/manual driver changes who should own animation.
@@ -182,16 +192,20 @@ final class PetMode {
 
     private func scheduleLoaf() {
         guard isEnabled, priorityAllowsPetMode, loafAnimation != nil,
-              !isLoafing, !isSleeping, !isWaking, loafTimer == nil else { return }
-        loafTimer = Timer.scheduledTimer(withTimeInterval: loafInterval, repeats: false) { [weak self] _ in
+              !isLoafing, !isSleeping, !isWaking, loafTimer == nil,
+              temperament.allowsAutomaticRest else { return }
+        let interval = temperament.scaledAutomaticRest(interval: loafInterval)
+        loafTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.loafIfStillCalm() }
         }
     }
 
     private func scheduleDoze() {
         guard isEnabled, priorityAllowsPetMode, sleepAnimation != nil,
-              !isSleeping, !isWaking, dozeTimer == nil else { return }
-        dozeTimer = Timer.scheduledTimer(withTimeInterval: dozeInterval, repeats: false) { [weak self] _ in
+              !isSleeping, !isWaking, dozeTimer == nil,
+              temperament.allowsAutomaticRest else { return }
+        let interval = temperament.scaledAutomaticRest(interval: dozeInterval)
+        dozeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.dozeIfStillCalm() }
         }
     }

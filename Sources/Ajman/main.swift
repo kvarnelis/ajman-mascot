@@ -250,6 +250,9 @@ private func runSelfTest() -> Int32 {
         let idleFrameWaits = Temperament.allCases.map { $0.scaledIdleFrameDuration(1) }
         let calmPoseWaits = Temperament.allCases.map { $0.scaledCalmPose(interval: Animator.sleepPoseHoldRange.lowerBound) }
         let breathingScales = Temperament.allCases.map { $0.scaledBreathingScale(PetView.sleepBreathingScale) }
+        let restMultipliers = Temperament.allCases.map(\.automaticRestIntervalMultiplier)
+        let loafOnsets = Temperament.allCases.map { $0.scaledAutomaticRest(interval: PetMode.defaultLoafInterval) }
+        let sleepOnsets = Temperament.allCases.map { $0.scaledAutomaticRest(interval: PetMode.defaultDozeInterval) }
         guard zip(frequencies, frequencies.dropFirst()).allSatisfy({ $0 < $1 }),
               zip(fidgetFrequencies, fidgetFrequencies.dropFirst()).allSatisfy({ $0 < $1 }),
               zip(fidgetAmplitudes, fidgetAmplitudes.dropFirst()).allSatisfy({ $0 <= $1 }),
@@ -262,6 +265,16 @@ private func runSelfTest() -> Int32 {
               calmPoseWaits[2] == calmPoseWaits[3], calmPoseWaits[3] == calmPoseWaits[4],
               breathingScales[0] < breathingScales[1], breathingScales[1] < breathingScales[2],
               breathingScales[2] == breathingScales[3], breathingScales[3] == breathingScales[4],
+              zip(restMultipliers, restMultipliers.dropFirst()).allSatisfy({ $0 < $1 }),
+              zip(loafOnsets, loafOnsets.dropFirst()).allSatisfy({ $0 < $1 }),
+              zip(sleepOnsets, sleepOnsets.dropFirst()).allSatisfy({ $0 < $1 }),
+              restMultipliers == [0.1, 0.5, 1, 20, .infinity],
+              loafOnsets == [4.5, 22.5, 45, 900, .infinity],
+              sleepOnsets == [12, 60, 120, 2_400, .infinity],
+              !Temperament.insane.allowsAutomaticRest,
+              Temperament.catatonic.allowsAutomaticRest,
+              ajmanTemperament.scaledAutomaticRest(interval: PetMode.defaultDozeInterval)
+                > winnieTemperament.scaledAutomaticRest(interval: PetMode.defaultDozeInterval),
               idleLiveliness == [0.05, 0.3, 1, 2, 4],
               fidgetFrequencies == [0.01, 0.15, 1, 2, 4],
               fidgetAmplitudes == [0.02, 0.25, 1, 1, 1],
@@ -270,7 +283,7 @@ private func runSelfTest() -> Int32 {
               fidgetAmplitudes[2...].allSatisfy({ $0 == 1 }) else {
             throw SelfTestError("temperament did not monotonically govern idle cadence, fidget rate/amplitude, calm poses, and breathing")
         }
-        print("Temperament: idle 0.05/0.3/1/2/4x; fidget rate 0.01/0.15/1/2/4x; Catatonic suppresses beats, Calm uses head-only 0.25x beats/rakes; breathing/calm poses low-end scaled")
+        print("Temperament: idle 0.05/0.3/1/2/4x; auto-rest 0.1/0.5/1/20x/disabled (loaf 4.5/22.5/45/900s/never; sleep 12/60/120/2400s/never); low-end beats/breathing scaled")
 
         let expectedLivelyStates: Set<AnimationState> = [
             .jumping, .waving, .runningRight, .runningLeft, .running,
@@ -695,6 +708,51 @@ private func runSelfTest() -> Int32 {
         shortDoze.teardown()
         sleepAnimator.stop()
 
+        let catatonicAnimator = Animator(sheet: sleepingAjman.sheet, view: nil)
+        let catatonicDoze = PetMode(
+            animator: catatonicAnimator,
+            loafAnimation: ajmanLoaf,
+            sleepAnimation: ajmanSleep,
+            wakeAnimation: ajmanWake,
+            currentLiveState: { .idle },
+            isManualMode: { false },
+            loafInterval: 0.04,
+            dozeInterval: 0.14,
+            defaults: sleepDefaults
+        )
+        catatonicDoze.resumeAtRest()
+        catatonicDoze.setTemperament(.catatonic)
+        guard pump(until: { catatonicDoze.isSleeping && catatonicAnimator.isPlayingSleep }) else {
+            throw SelfTestError("Catatonic did not auto-sleep on its near-immediate scaled threshold")
+        }
+        catatonicDoze.teardown()
+        catatonicAnimator.stop()
+
+        let insaneAnimator = Animator(sheet: sleepingAjman.sheet, view: nil)
+        let insaneDoze = PetMode(
+            animator: insaneAnimator,
+            loafAnimation: ajmanLoaf,
+            sleepAnimation: ajmanSleep,
+            wakeAnimation: ajmanWake,
+            currentLiveState: { .idle },
+            isManualMode: { false },
+            loafInterval: 0.03,
+            dozeInterval: 0.05,
+            defaults: sleepDefaults
+        )
+        insaneDoze.resumeAtRest()
+        insaneDoze.setTemperament(.insane)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        guard !insaneDoze.isLoafing, !insaneDoze.isSleeping,
+              !insaneAnimator.isPlayingLoaf, !insaneAnimator.isPlayingSleep else {
+            throw SelfTestError("Insane entered automatic loaf or sleep")
+        }
+        guard insaneDoze.forceSleep(), insaneDoze.isSleeping, insaneAnimator.isPlayingSleep else {
+            throw SelfTestError("Insane temperament blocked manual Actions -> Sleep")
+        }
+        insaneDoze.teardown()
+        insaneAnimator.stop()
+
         let noSleepAnimator = Animator(sheet: sleepingAjman.sheet, view: nil)
         let noSleepMode = PetMode(
             animator: noSleepAnimator,
@@ -715,7 +773,7 @@ private func runSelfTest() -> Int32 {
         }
         noSleepMode.teardown()
         noSleepAnimator.stop()
-        print("Calm behavior: idle -> rotating loaf -> sleep; activity/click hold one wake pose then active/idle; no-asset pet stays idle")
+        print("Calm behavior: Normal idle -> rotating loaf -> sleep unchanged; Catatonic auto-sleeps immediately; Insane never auto-rests but manual Sleep works; activity/click/no-asset guards pass")
 
         let normalizationPetIDs = ["ajman", "winnie"].filter { id in
             catalog.discover().contains { $0.id == id }

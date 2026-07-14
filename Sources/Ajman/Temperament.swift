@@ -59,6 +59,25 @@ enum Temperament: String, CaseIterable {
         }
     }
 
+    /// How long a continuously calm pet waits before automatically loafing or
+    /// sleeping. Normal preserves the original timings, Frisky makes rest rare
+    /// in an ordinary session, and Insane disables automatic rest altogether.
+    var automaticRestIntervalMultiplier: Double {
+        switch self {
+        case .catatonic: 0.1
+        case .calm: 0.5
+        case .normal: 1
+        case .frisky: 20
+        case .insane: .infinity
+        }
+    }
+
+    var allowsAutomaticRest: Bool { automaticRestIntervalMultiplier.isFinite }
+
+    func scaledAutomaticRest(interval: TimeInterval) -> TimeInterval {
+        interval * automaticRestIntervalMultiplier
+    }
+
     func scaled(interval: TimeInterval) -> TimeInterval {
         interval * intervalMultiplier
     }
