@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var codexMonitor: CodexMonitor?
     private var catalog: PetCatalog?
     private var configuration: MenagerieConfiguration?
+    private var updateManager: UpdateManager?
     private var discoveredPets: [PetDescriptor] = []
     private let glanceCoordinator = InterCatGlanceCoordinator()
 
@@ -57,6 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusMenu = menu
             wireMenu(menu)
 
+            let updateManager = UpdateManager { [weak self] in self?.updateAnchorWindow() }
+            self.updateManager = updateManager
+            updateManager.promptsChanged = { [weak menu] enabled in menu?.updateChecksEnabled(enabled) }
+            updateManager.start()
+
             registry.didChange = { [weak self] state, count in
                 guard let self else { return }
                 self.statusMenu?.updateActivity(state: state, sessionCount: count)
@@ -88,6 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        updateManager?.stop()
         codexMonitor?.stop()
         server?.stop()
         pets.forEach { $0.teardown() }
@@ -137,6 +144,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.resetPositionsHandler = { [weak self] in
             self?.pets.forEach { $0.resetPosition() }
         }
+        menu.previewUpdateHandler = { [weak self] in self?.updateManager?.preview() }
+        menu.updateChecksHandler = { [weak self] enabled in self?.updateManager?.setPromptsEnabled(enabled) }
     }
 
     private func setPet(id: String, shown: Bool) {
@@ -299,6 +308,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let others = discoveredPets.filter { $0.id != "ajman" && $0.id != "winnie" }
             return 2 + (others.firstIndex(where: { $0.id == id }) ?? others.count)
         }
+    }
+
+    private func updateAnchorWindow() -> NSWindow? {
+        pets.first(where: { $0.petID == "winnie" && $0.panel.isVisible })?.panel
+            ?? pets.first(where: { $0.panel.isVisible })?.panel
     }
 
     private func log(_ message: String) {

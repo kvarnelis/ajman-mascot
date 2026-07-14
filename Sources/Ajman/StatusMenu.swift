@@ -12,6 +12,7 @@ final class StatusMenu: NSObject {
     private let playfulIdleItem = NSMenuItem(title: "Playful Idle", action: #selector(togglePlayfulIdle(_:)), keyEquivalent: "")
     private let steadySizeItem = NSMenuItem(title: "Steady Size", action: #selector(toggleSteadySize(_:)), keyEquivalent: "")
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
+    private let updateChecksItem = NSMenuItem(title: "Check for updates", action: #selector(toggleUpdateChecks(_:)), keyEquivalent: "")
     private let petMenu = NSMenu(title: "Pets")
     private let debugMenu = NSMenu(title: "Actions")
     private var scaleItems: [PetScale: NSMenuItem] = [:]
@@ -43,6 +44,8 @@ final class StatusMenu: NSObject {
     var debugScratchHandler: (() -> Void)?
     var resumeLiveHandler: (() -> Void)?
     var resetPositionsHandler: (() -> Void)?
+    var previewUpdateHandler: (() -> Void)?
+    var updateChecksHandler: ((Bool) -> Void)?
 
     init(
         registry: SessionRegistry,
@@ -269,6 +272,15 @@ final class StatusMenu: NSObject {
         let resume = NSMenuItem(title: "Resume Live Reactions", action: #selector(resumeLiveReactions), keyEquivalent: "")
         resume.target = self
         debugMenu.addItem(resume)
+        debugMenu.addItem(.separator())
+        let previewUpdate = NSMenuItem(
+            title: "Preview update bubble", action: #selector(previewUpdateBubble), keyEquivalent: ""
+        )
+        previewUpdate.target = self
+        debugMenu.addItem(previewUpdate)
+        updateChecksItem.target = self
+        updateChecksItem.state = UpdatePreferences().promptsEnabled ? .on : .off
+        debugMenu.addItem(updateChecksItem)
         updateDebugChecks()
     }
 
@@ -444,6 +456,18 @@ final class StatusMenu: NSObject {
 
     @objc private func resetPosition() {
         resetPositionsHandler?()
+    }
+
+    func updateChecksEnabled(_ enabled: Bool) {
+        updateChecksItem.state = enabled ? .on : .off
+    }
+
+    @objc private func previewUpdateBubble() { previewUpdateHandler?() }
+
+    @objc private func toggleUpdateChecks(_ sender: NSMenuItem) {
+        let enabled = sender.state != .on
+        sender.state = enabled ? .on : .off
+        updateChecksHandler?(enabled)
     }
 
     @objc private func toggleLaunchAtLogin(_ sender: NSMenuItem) {

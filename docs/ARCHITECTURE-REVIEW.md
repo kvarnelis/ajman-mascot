@@ -122,7 +122,29 @@ the status menu to every live instance. Removing an instance explicitly invalida
 PetMode timers, cancels its Animator timer, removes bubble observers/expiry timers, and
 closes both panels before releasing it.
 
-**Explicitly out of v1:** answering permissions (v2 — both agents support it now), exact terminal-tab focus (v2, Claude first), global hotkeys, Accessibility permission, auto-update, any network egress, Claude Desktop/ChatGPT adapters.
+### Consent-gated update bubble (implemented 2026-07-14)
+
+`UpdateManager` performs a quiet launch check and a repeating 24-hour check by spawning the
+authenticated local `gh` CLI for `gh release view --repo kvarnelis/ajman-mascot`. It stores no
+token and treats a missing/unauthed CLI, no releases, malformed tags, and all other check errors
+as “show nothing.” `AppVersion` compares the running `0.1.0` against optional-`v`, SemVer-style
+release tags. Prompts require a newer tag, enabled update checks, and a tag not recorded as
+skipped.
+
+The Actions menu exposes both **Preview update bubble** and the persistent **Check for updates**
+toggle. The cartoon AppKit panel prefers Winnie's visible window as its anchor, falls back to
+another visible pet, and offers Update, Later, and Don't ask again. Preview uses the real panel
+and controls but deliberately has no release attached, so Update is a safe no-op. Don't ask again
+persists `AjmanUpdatePromptsDisabled`; the menu toggle reverses it.
+
+For a real release, Update downloads a zipped `Ajman.app` asset with `gh release download` into a
+unique temporary directory, expands it, checks its bundle id, executable, release version, and
+code signature, then spawns a temporary helper and quits. The helper waits for the running PID,
+backs up the current app, swaps the verified app into place, refreshes the root `Ajman.app` link
+when running from `build/`, and relaunches. Any swap/relaunch failure restores the previous app;
+a durable Application Support marker makes the restored app explain the failure in the bubble.
+
+**Explicitly out of v1:** answering permissions (v2 — both agents support it now), exact terminal-tab focus (v2, Claude first), global hotkeys, Accessibility permission, direct HTTP/token-backed update networking, Claude Desktop/ChatGPT adapters.
 
 ## Parts to lift (with MIT attribution headers)
 

@@ -2,6 +2,7 @@ import AppKit
 
 @MainActor
 private func runSelfTest() -> Int32 {
+    _ = NSApplication.shared
     let fileManager = FileManager.default
     let registry = SessionRegistry(startTimer: false)
     var notificationChanges: [PetNotificationChange] = []
@@ -33,6 +34,45 @@ private func runSelfTest() -> Int32 {
     }
 
     do {
+        guard AjmanApp.version == AppVersion("v0.1.0"),
+              AppVersion("1.2.4")! > AppVersion("1.2.3")!,
+              AppVersion("1.2")! == AppVersion("1.2.0")!,
+              AppVersion("1.2.3-beta.2")! < AppVersion("1.2.3")!,
+              AppVersion("1.2.3")! < AppVersion("2.0.0")! else {
+            throw SelfTestError("update version comparison failed for newer/older/equal tags")
+        }
+        print("Updates: semver-ish newer/older/equal comparison passes; running version \(AjmanApp.version)")
+
+        let updateSuiteName = "AjmanSelfTest.Updates.\(UUID().uuidString)"
+        guard let updateDefaults = UserDefaults(suiteName: updateSuiteName) else {
+            throw SelfTestError("could not create update defaults")
+        }
+        defer { updateDefaults.removePersistentDomain(forName: updateSuiteName) }
+        let updatePreferences = UpdatePreferences(defaults: updateDefaults)
+        guard updatePreferences.shouldPrompt(for: "0.1.1") else {
+            throw SelfTestError("an enabled newer update did not prompt")
+        }
+        updatePreferences.promptsEnabled = false
+        guard !updatePreferences.shouldPrompt(for: "9.0.0"),
+              updateDefaults.bool(forKey: UpdatePreferences.promptsDisabledKey) else {
+            throw SelfTestError("don't-ask-again did not persistently disable prompts")
+        }
+        updatePreferences.promptsEnabled = true
+        updatePreferences.skippedVersion = "0.2.0"
+        guard !updatePreferences.shouldPrompt(for: "0.2.0"), updatePreferences.shouldPrompt(for: "0.2.1") else {
+            throw SelfTestError("skipped update version was not isolated")
+        }
+        let previewBubble = UpdateBubbleController()
+        previewBubble.showPreview(
+            anchoredTo: nil,
+            fallbackAnchor: NSRect(x: 100, y: 100, width: 80, height: 80)
+        )
+        guard previewBubble.isVisible, previewBubble.controlCount == 3 else {
+            throw SelfTestError("preview update bubble did not construct/show with three controls")
+        }
+        previewBubble.dismiss()
+        print("Updates: don't-ask-again persists/re-enables; preview bubble shows Update/Later/Don't ask again")
+
         let suiteName = "AjmanSelfTest.PetScale.\(UUID().uuidString)"
         guard let scaleDefaults = UserDefaults(suiteName: suiteName) else { throw SelfTestError("could not create scale defaults") }
         defer { scaleDefaults.removePersistentDomain(forName: suiteName) }
