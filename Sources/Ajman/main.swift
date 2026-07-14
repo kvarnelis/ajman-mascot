@@ -349,6 +349,12 @@ private func runSelfTest() -> Int32 {
         guard !scratchBehavior.startIfEligible(side: .left) else {
             throw SelfTestError("scratch started while the live state was active")
         }
+        guard scratchBehavior.forceStart(side: .right),
+              !scratchBehavior.isPerforming,
+              scratchEvents == ["start", "move-right", "pose-right", "rake-on", "rake-off", "idle", "finish"] else {
+            throw SelfTestError("debug scratch did not bypass eligibility and finish: \(scratchEvents)")
+        }
+        scratchEvents.removeAll()
         scratchEligibility = ScratchEligibility(
             hasAsset: true,
             isShown: true,
@@ -378,7 +384,7 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("idle scratch did not approach, rake, and return to idle: \(scratchEvents)")
         }
         scratchBehavior.teardown()
-        print("Scratch behavior: two orientations load; active/sleep gates reject; idle approaches, rakes, and returns")
+        print("Scratch behavior: debug force bypasses eligibility; active/sleep gates reject; idle approaches, rakes, and returns")
 
         let sleepSuiteName = "AjmanSelfTest.Sleep.\(UUID().uuidString)"
         guard let sleepDefaults = UserDefaults(suiteName: sleepSuiteName) else {

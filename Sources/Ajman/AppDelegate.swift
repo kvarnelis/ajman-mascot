@@ -119,6 +119,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.debugSleepHandler = { [weak self] in
             self?.pets.forEach { $0.setDebugSleep() }
         }
+        menu.debugScratchHandler = { [weak self] in
+            self?.pets.forEach { $0.setDebugScratch() }
+        }
         menu.resumeLiveHandler = { [weak self] in
             guard let self, let registry = self.registry else { return }
             for pet in self.pets {

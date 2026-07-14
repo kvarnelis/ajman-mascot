@@ -252,6 +252,12 @@ final class PetInstance {
         _ = petMode.forceSleep()
     }
 
+    func setDebugScratch() {
+        cancelGlance(returnToRest: false)
+        scratchBehavior?.cancel(returnToIdle: false)
+        _ = scratchBehavior?.forceStart(side: .left)
+    }
+
     @discardableResult
     func glanceToward(screenPoint: NSPoint) -> Bool {
         guard glanceEligibility.canReact,

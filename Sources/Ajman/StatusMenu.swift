@@ -8,11 +8,12 @@ final class StatusMenu: NSObject {
     private let activityItem = NSMenuItem(title: "Agents: Idle — 0 sessions", action: nil, keyEquivalent: "")
     private let cycleItem = NSMenuItem(title: "Cycle All States", action: #selector(toggleCycle(_:)), keyEquivalent: "")
     private let sleepItem = NSMenuItem(title: "Sleep", action: #selector(selectSleep(_:)), keyEquivalent: "")
+    private let scratchItem = NSMenuItem(title: "Scratch", action: #selector(selectScratch(_:)), keyEquivalent: "")
     private let playfulIdleItem = NSMenuItem(title: "Playful Idle", action: #selector(togglePlayfulIdle(_:)), keyEquivalent: "")
     private let steadySizeItem = NSMenuItem(title: "Steady Size", action: #selector(toggleSteadySize(_:)), keyEquivalent: "")
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
     private let petMenu = NSMenu(title: "Pets")
-    private let debugMenu = NSMenu(title: "Debug")
+    private let debugMenu = NSMenu(title: "Actions")
     private var scaleItems: [PetScale: NSMenuItem] = [:]
     private var relativeScaleItems: [String: [Double: NSMenuItem]] = [:]
     private var stateItems: [AnimationState: NSMenuItem] = [:]
@@ -24,7 +25,8 @@ final class StatusMenu: NSObject {
 
     private(set) var manualMode = false
     private(set) var manualSleep = false
-    var debugState: AnimationState? { manualMode && !manualSleep ? cycleState : nil }
+    private(set) var manualScratch = false
+    var debugState: AnimationState? { manualMode && !manualSleep && !manualScratch ? cycleState : nil }
 
     var showPetHandler: ((String, Bool) -> Void)?
     var bindingHandler: ((String, AgentEvent.Provider?) -> Void)?
@@ -34,6 +36,7 @@ final class StatusMenu: NSObject {
     var playfulIdleHandler: ((Bool) -> Void)?
     var debugStateHandler: ((AnimationState) -> Void)?
     var debugSleepHandler: (() -> Void)?
+    var debugScratchHandler: (() -> Void)?
     var resumeLiveHandler: (() -> Void)?
     var resetPositionsHandler: (() -> Void)?
 
@@ -98,7 +101,7 @@ final class StatusMenu: NSObject {
         menu.addItem(sizeItem)
 
         rebuildDebugMenu()
-        let debugItem = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
+        let debugItem = NSMenuItem(title: "Actions", action: nil, keyEquivalent: "")
         debugItem.submenu = debugMenu
         menu.addItem(debugItem)
 
@@ -135,7 +138,8 @@ final class StatusMenu: NSObject {
             self.debugStates = debugStates
             self.sleepAvailable = sleepAvailable
             stopCycling()
-            if manualMode, !manualSleep, cycleState.map({ !debugStates.contains($0) }) ?? true {
+            if manualMode, !manualSleep, !manualScratch,
+               cycleState.map({ !debugStates.contains($0) }) ?? true {
                 cycleState = debugStates.first
                 if let cycleState { debugStateHandler?(cycleState) }
             }
@@ -224,6 +228,8 @@ final class StatusMenu: NSObject {
             sleepItem.target = self
             debugMenu.addItem(sleepItem)
         }
+        scratchItem.target = self
+        debugMenu.addItem(scratchItem)
         debugMenu.addItem(.separator())
         cycleItem.target = self
         debugMenu.addItem(cycleItem)
@@ -235,7 +241,8 @@ final class StatusMenu: NSObject {
 
     private func refreshActivityIndicator() {
         if manualMode {
-            activityItem.title = "Manual: \(manualSleep ? "Sleep" : cycleState?.title ?? "Debug") — live paused"
+            let title = manualSleep ? "Sleep" : manualScratch ? "Scratch" : cycleState?.title ?? "Actions"
+            activityItem.title = "Manual: \(title) — live paused"
         } else {
             updateActivity(state: registry.currentState(for: nil), sessionCount: registry.sessionCount(for: nil))
         }
@@ -286,6 +293,7 @@ final class StatusMenu: NSObject {
               let state = AnimationState(rawValue: raw) else { return }
         manualMode = true
         manualSleep = false
+        manualScratch = false
         cycleState = state
         debugStateHandler?(state)
         updateDebugChecks()
@@ -300,6 +308,7 @@ final class StatusMenu: NSObject {
         guard !debugStates.isEmpty else { return }
         manualMode = true
         manualSleep = false
+        manualScratch = false
         cycleItem.state = .on
         playNextDebugState()
         cycleTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
@@ -327,8 +336,20 @@ final class StatusMenu: NSObject {
         stopCycling()
         manualMode = true
         manualSleep = true
+        manualScratch = false
         cycleState = nil
         debugSleepHandler?()
+        updateDebugChecks()
+        refreshActivityIndicator()
+    }
+
+    @objc private func selectScratch(_ sender: NSMenuItem) {
+        stopCycling()
+        manualMode = true
+        manualSleep = false
+        manualScratch = true
+        cycleState = nil
+        debugScratchHandler?()
         updateDebugChecks()
         refreshActivityIndicator()
     }
@@ -337,6 +358,7 @@ final class StatusMenu: NSObject {
         stopCycling()
         manualMode = false
         manualSleep = false
+        manualScratch = false
         cycleState = nil
         updateDebugChecks()
         resumeLiveHandler?()
@@ -351,6 +373,7 @@ final class StatusMenu: NSObject {
     private func updateDebugChecks() {
         for (state, item) in stateItems { item.state = state == cycleState && manualMode ? .on : .off }
         sleepItem.state = manualMode && manualSleep ? .on : .off
+        scratchItem.state = manualMode && manualScratch ? .on : .off
     }
 
     private func updateScaleChecks(for scale: PetScale) {

@@ -71,6 +71,7 @@ final class ScratchBehavior {
     private var sequenceID = 0
     private var lastScratchAt: Date?
     private var isRaking = false
+    private var recordsSpacing = false
     private(set) var isPerforming = false
 
     init(
@@ -126,7 +127,14 @@ final class ScratchBehavior {
     @discardableResult
     func startIfEligible(side: ScratchSide? = nil) -> Bool {
         guard !isPerforming, animation != nil, eligibility().canStart else { return false }
-        begin(side: side ?? chooseSide())
+        begin(side: side ?? chooseSide(), recordsSpacing: true)
+        return true
+    }
+
+    @discardableResult
+    func forceStart(side: ScratchSide) -> Bool {
+        guard !isPerforming, animation != nil else { return false }
+        begin(side: side, recordsSpacing: false)
         return true
     }
 
@@ -142,9 +150,10 @@ final class ScratchBehavior {
         _ = startIfEligible()
     }
 
-    private func begin(side: ScratchSide) {
+    private func begin(side: ScratchSide, recordsSpacing: Bool) {
         willStart()
         isPerforming = true
+        self.recordsSpacing = recordsSpacing
         sequenceID += 1
         let id = sequenceID
         moveToEdge(side) { [weak self] in
@@ -170,7 +179,7 @@ final class ScratchBehavior {
         updateRaking(false)
         showIdle()
         isPerforming = false
-        lastScratchAt = now()
+        if recordsSpacing { lastScratchAt = now() }
         didFinish()
     }
 
