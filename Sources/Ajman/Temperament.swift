@@ -22,6 +22,11 @@ enum Temperament: String, CaseIterable {
 
     var intervalMultiplier: Double { 1 / frequencyMultiplier }
 
+    /// The always-visible idle loop is the main signal of a pet's energy.
+    /// Use the same five-level gradient as autonomous whims so temperament
+    /// governs both the background motion and the occasional larger actions.
+    var idleLivelinessMultiplier: Double { frequencyMultiplier }
+
     func scaled(interval: TimeInterval) -> TimeInterval {
         interval * intervalMultiplier
     }
@@ -32,6 +37,10 @@ enum Temperament: String, CaseIterable {
 
     func scaled(probability: Double) -> Double {
         min(max(probability * frequencyMultiplier, 0), 1)
+    }
+
+    func scaledIdleFrameDuration(_ duration: TimeInterval) -> TimeInterval {
+        duration / idleLivelinessMultiplier
     }
 
     static func defaultsKey(for petID: String) -> String {

@@ -183,6 +183,17 @@ private func runSelfTest() -> Int32 {
               Temperament.load(for: "other", from: temperamentDefaults) == .normal else {
             throw SelfTestError("temperament levels or per-pet defaults were incorrect")
         }
+        Temperament.frisky.save(for: "ajman", to: temperamentDefaults)
+        Temperament.calm.save(for: "winnie", to: temperamentDefaults)
+        let ajmanTemperament = Temperament.load(for: "ajman", from: temperamentDefaults)
+        let winnieTemperament = Temperament.load(for: "winnie", from: temperamentDefaults)
+        guard ajmanTemperament == .frisky,
+              winnieTemperament == .calm,
+              temperamentDefaults.string(forKey: "AjmanTemperament.ajman") == Temperament.frisky.rawValue,
+              temperamentDefaults.string(forKey: "AjmanTemperament.winnie") == Temperament.calm.rawValue,
+              ajmanTemperament.scaledIdleFrameDuration(1) < winnieTemperament.scaledIdleFrameDuration(1) else {
+            throw SelfTestError("Ajman/Winnie temperament identity or per-pet idle liveliness was swapped")
+        }
         for temperament in Temperament.allCases {
             temperament.save(for: "ajman", to: temperamentDefaults)
             guard Temperament.load(for: "ajman", from: temperamentDefaults) == temperament else {
@@ -193,13 +204,17 @@ private func runSelfTest() -> Int32 {
         let fidgetWaits = Temperament.allCases.map { $0.scaled(interval: PetMode.randomIntervalRange.lowerBound) }
         let scratchProbabilities = Temperament.allCases.map { $0.scaled(probability: ScratchBehavior.triggerProbability) }
         let scratchSpacing = Temperament.allCases.map { $0.scaled(interval: ScratchBehavior.minimumSpacing) }
+        let idleLiveliness = Temperament.allCases.map(\.idleLivelinessMultiplier)
+        let idleFrameWaits = Temperament.allCases.map { $0.scaledIdleFrameDuration(1) }
         guard zip(frequencies, frequencies.dropFirst()).allSatisfy({ $0 < $1 }),
               zip(fidgetWaits, fidgetWaits.dropFirst()).allSatisfy({ $0 > $1 }),
               zip(scratchProbabilities, scratchProbabilities.dropFirst()).allSatisfy({ $0 < $1 }),
-              zip(scratchSpacing, scratchSpacing.dropFirst()).allSatisfy({ $0 > $1 }) else {
-            throw SelfTestError("higher temperament did not increase whim frequency and shorten waits")
+              zip(scratchSpacing, scratchSpacing.dropFirst()).allSatisfy({ $0 > $1 }),
+              zip(idleLiveliness, idleLiveliness.dropFirst()).allSatisfy({ $0 < $1 }),
+              zip(idleFrameWaits, idleFrameWaits.dropFirst()).allSatisfy({ $0 > $1 }) else {
+            throw SelfTestError("higher temperament did not monotonically increase whims and visible idle liveliness")
         }
-        print("Temperament: Catatonic/Calm/Normal/Frisky/Insane = 0.15/0.5/1/2/4x; Ajman Calm, Winnie Frisky; persistence and monotonic whim scaling pass")
+        print("Temperament: per-pet Ajman/Winnie identity isolated; 0.15/0.5/1/2/4x whims and visible idle cadence are monotonic")
 
         let expectedLivelyStates: Set<AnimationState> = [
             .jumping, .waving, .runningRight, .runningLeft, .running,
@@ -339,6 +354,19 @@ private func runSelfTest() -> Int32 {
         )
         let sleepingWinnie = try sleepCatalog.load(id: "winnie")
         let sleepingAjman = try sleepCatalog.load(id: "ajman")
+        let temperamentAnimator = Animator(sheet: sleepingAjman.sheet, view: nil)
+        guard let normalIdleDurations = temperamentAnimator.playbackDurations(of: .idle) else {
+            throw SelfTestError("idle animation durations were unavailable")
+        }
+        temperamentAnimator.setTemperament(.catatonic)
+        let catatonicIdleDurations = temperamentAnimator.playbackDurations(of: .idle)
+        temperamentAnimator.setTemperament(.insane)
+        let insaneIdleDurations = temperamentAnimator.playbackDurations(of: .idle)
+        guard catatonicIdleDurations == normalIdleDurations.map({ $0 / Temperament.catatonic.idleLivelinessMultiplier }),
+              insaneIdleDurations == normalIdleDurations.map({ $0 / Temperament.insane.idleLivelinessMultiplier }) else {
+            throw SelfTestError("Animator did not apply temperament to the visible idle frame cadence")
+        }
+        temperamentAnimator.stop()
         guard let winnieSleep = sleepingWinnie.sleepAnimation,
               winnieSleep.frameCount == 8,
               winnieSleep.poseWeights.count == 8,

@@ -12,6 +12,7 @@ final class Animator {
     private var sheet: SpriteSheet
     private weak var view: PetView?
     private let sleepHoldRange: ClosedRange<TimeInterval>
+    private var temperament: Temperament
     private var timer: DispatchSourceTimer?
     private var frames: [CGImage] = []
     private var frameDurations: [TimeInterval] = []
@@ -34,11 +35,23 @@ final class Animator {
     init(
         sheet: SpriteSheet,
         view: PetView?,
-        sleepHoldRange: ClosedRange<TimeInterval> = Animator.sleepPoseHoldRange
+        sleepHoldRange: ClosedRange<TimeInterval> = Animator.sleepPoseHoldRange,
+        temperament: Temperament = .normal
     ) {
         self.sheet = sheet
         self.view = view
         self.sleepHoldRange = sleepHoldRange
+        self.temperament = temperament
+    }
+
+    func setTemperament(_ temperament: Temperament) {
+        guard self.temperament != temperament else { return }
+        self.temperament = temperament
+        // Restart only the passive idle loop so the new visible-energy setting
+        // takes effect now without disturbing agent, debug, or calm-pose states.
+        if currentState == .idle, !isPlayingCalmPose {
+            play(.idle, force: true)
+        }
     }
 
     func replaceSheet(_ sheet: SpriteSheet, playing state: AnimationState) {
@@ -72,7 +85,7 @@ final class Animator {
         view?.setScratchRaking(false)
         currentState = state
         frames = sheet.frames(for: definition)
-        frameDurations = definition.durations
+        frameDurations = playbackDurations(for: definition)
         frameIndex = 0
         stateDidChange?(state)
         showCurrentFrameAndScheduleNext()
@@ -144,7 +157,11 @@ final class Animator {
     }
 
     func duration(of state: AnimationState) -> TimeInterval? {
-        sheet.animationTable.definition(for: state)?.durations.reduce(0, +)
+        sheet.animationTable.definition(for: state).map { playbackDurations(for: $0).reduce(0, +) }
+    }
+
+    func playbackDurations(of state: AnimationState) -> [TimeInterval]? {
+        sheet.animationTable.definition(for: state).map(playbackDurations(for:))
     }
 
     func stop() {
@@ -229,6 +246,11 @@ final class Animator {
         }
         self.timer = timer
         timer.resume()
+    }
+
+    private func playbackDurations(for definition: AnimationDefinition) -> [TimeInterval] {
+        guard definition.state == .idle else { return definition.durations }
+        return definition.durations.map(temperament.scaledIdleFrameDuration)
     }
 
     deinit {

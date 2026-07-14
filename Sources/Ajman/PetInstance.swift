@@ -80,7 +80,7 @@ final class PetInstance {
             defaultPositionIndex: defaultPositionIndex,
             defaults: defaults
         )
-        animator = Animator(sheet: loadedPet.sheet, view: view)
+        animator = Animator(sheet: loadedPet.sheet, view: view, temperament: temperament)
         scratchMover = ScratchPanelMover(panel: panel)
         petMode = PetMode(
             animator: animator,
@@ -262,6 +262,7 @@ final class PetInstance {
         guard self.temperament != temperament else { return }
         self.temperament = temperament
         temperament.save(for: petID, to: defaults)
+        animator.setTemperament(temperament)
         petMode.setTemperament(temperament)
         scratchBehavior?.rescheduleForTemperamentChange()
     }
