@@ -518,6 +518,28 @@ private func runSelfTest() -> Int32 {
             }
             print("Sprite normalization \(id): all \(checkedFrameCount) used frames inside 192x208; ground line within 1 px")
         }
+        if normalizationPetIDs.contains("winnie") {
+            let winnieSheet = try catalog.load(id: "winnie", steadySize: false).sheet
+            guard let idle = winnieSheet.animationTable.definition(for: .idle),
+                  let failed = winnieSheet.animationTable.definition(for: .failed),
+                  let idleTarget = SteadySize.targetBox(
+                    idleBounds: winnieSheet.contentBounds(for: idle).compactMap { $0 },
+                    cellWidth: SpriteSheet.cellWidth,
+                    cellHeight: SpriteSheet.cellHeight
+                  ) else {
+                throw SelfTestError("Winnie idle/failed definitions could not be measured")
+            }
+            let failedBounds = winnieSheet.contentBounds(for: failed).compactMap { $0 }
+            guard failedBounds.count == failed.frameCount,
+                  failedBounds.allSatisfy({
+                    $0.width <= idleTarget.width + 2
+                        && $0.height <= idleTarget.height + 2
+                        && abs($0.minY - CGFloat(SpriteSheet.contentMargin)) <= 1
+                  }) else {
+                throw SelfTestError("Winnie failed frames were not fitted to her idle size: \(failedBounds)")
+            }
+            print("Winnie failed scale: all \(failed.frameCount) frames fit her idle box with Steady Size off")
+        }
         print("Sprite normalization (\(normalizationPetIDs.joined(separator: ", "))): idle heights within 2 px; no clipping")
 
         try invokeHook(event: "PreToolUse", tool: "Bash")

@@ -120,6 +120,13 @@ struct SpriteSheet {
         }
         if steadySize {
             cells = normalized(cells: cells, table: table)
+        } else {
+            let manifestID = manifest.id?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let petID = (manifestID?.isEmpty == false ? manifestID : nil)
+                ?? manifestURL.deletingLastPathComponent().lastPathComponent
+            if petID.caseInsensitiveCompare("winnie") == .orderedSame {
+                cells = normalized(cells: cells, table: table, states: [.failed])
+            }
         }
         return SpriteSheet(animationTable: table, sourceURL: sheetURL, cells: cells)
     }
@@ -141,11 +148,20 @@ struct SpriteSheet {
         let data: [UInt8]
     }
 
-    private static func normalized(cells: [[CGImage]], table: AnimationTable) -> [[CGImage]] {
+    private static func normalized(
+        cells: [[CGImage]],
+        table: AnimationTable,
+        states: Set<AnimationState>? = nil
+    ) -> [[CGImage]] {
         var result = cells
         let used = table.definitions.flatMap { definition in
             (0..<definition.frameCount).map { FrameLocation(row: definition.row, column: $0) }
         }
+        let selected = table.definitions
+            .filter { states?.contains($0.state) ?? true }
+            .flatMap { definition in
+                (0..<definition.frameCount).map { FrameLocation(row: definition.row, column: $0) }
+            }
         let measured = Dictionary(uniqueKeysWithValues: used.compactMap { location -> (FrameLocation, CGRect)? in
             guard let bitmap = rgbaBitmap(from: cells[location.row][location.column]),
                   let bounds = contentBounds(in: bitmap.data) else { return nil }
@@ -161,7 +177,7 @@ struct SpriteSheet {
             cellHeight: cellHeight
         ) else { return result }
 
-        for location in used {
+        for location in selected {
             guard let bounds = measured[location],
                   let normalized = normalize(
                     cells[location.row][location.column],
