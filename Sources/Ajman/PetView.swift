@@ -29,6 +29,9 @@ final class PetView: NSView {
 
     required init?(coder: NSCoder) { nil }
 
+    /// Control-click/right-click is owned by the pet action cycle, never a context menu.
+    override func menu(for event: NSEvent) -> NSMenu? { nil }
+
     override func layout() {
         super.layout()
         imageLayer.bounds = bounds

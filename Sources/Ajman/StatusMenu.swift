@@ -17,6 +17,9 @@ final class StatusMenu: NSObject {
     private var scaleItems: [PetScale: NSMenuItem] = [:]
     private var relativeScaleItems: [String: [Double: NSMenuItem]] = [:]
     private var stateItems: [AnimationState: NSMenuItem] = [:]
+    private var temperamentItems: [String: [Temperament: NSMenuItem]] = [:]
+    private var pets: [PetDescriptor]
+    private var temperaments: [String: Temperament]
     private var debugStates: [AnimationState]
     private var sleepAvailable: Bool
     private var cycleTimer: Timer?
@@ -32,6 +35,7 @@ final class StatusMenu: NSObject {
     var bindingHandler: ((String, AgentEvent.Provider?) -> Void)?
     var scaleHandler: ((PetScale) -> Void)?
     var relativeScaleHandler: ((String, Double) -> Void)?
+    var temperamentHandler: ((String, Temperament) -> Void)?
     var steadySizeHandler: ((Bool) -> Void)?
     var playfulIdleHandler: ((Bool) -> Void)?
     var debugStateHandler: ((AnimationState) -> Void)?
@@ -46,11 +50,14 @@ final class StatusMenu: NSObject {
         shownPetIDs: Set<String>,
         bindings: [String: AgentEvent.Provider?],
         relativeScales: [String: Double],
+        temperaments: [String: Temperament],
         debugStates: [AnimationState],
         sleepAvailable: Bool,
         playfulIdleEnabled: Bool
     ) {
         self.registry = registry
+        self.pets = pets
+        self.temperaments = temperaments
         self.debugStates = debugStates
         self.sleepAvailable = sleepAvailable
         self.playfulIdleEnabled = playfulIdleEnabled
@@ -125,6 +132,7 @@ final class StatusMenu: NSObject {
         shownPetIDs: Set<String>,
         bindings: [String: AgentEvent.Provider?],
         relativeScales: [String: Double],
+        temperaments: [String: Temperament],
         debugStates: [AnimationState],
         sleepAvailable: Bool
     ) {
@@ -134,6 +142,8 @@ final class StatusMenu: NSObject {
             bindings: bindings,
             relativeScales: relativeScales
         )
+        self.pets = pets
+        self.temperaments = temperaments
         if self.debugStates != debugStates || self.sleepAvailable != sleepAvailable {
             self.debugStates = debugStates
             self.sleepAvailable = sleepAvailable
@@ -149,8 +159,8 @@ final class StatusMenu: NSObject {
                 cycleState = nil
                 resumeLiveHandler?()
             }
-            rebuildDebugMenu()
         }
+        rebuildDebugMenu()
         refreshActivityIndicator()
     }
 
@@ -217,6 +227,7 @@ final class StatusMenu: NSObject {
     private func rebuildDebugMenu() {
         debugMenu.removeAllItems()
         stateItems.removeAll()
+        temperamentItems.removeAll()
         for state in debugStates {
             let item = NSMenuItem(title: state.title, action: #selector(selectState(_:)), keyEquivalent: "")
             item.target = self
@@ -230,6 +241,28 @@ final class StatusMenu: NSObject {
         }
         scratchItem.target = self
         debugMenu.addItem(scratchItem)
+        debugMenu.addItem(.separator())
+        for pet in pets {
+            let temperamentMenu = NSMenu(title: "\(pet.displayName) Temperament")
+            let current = temperaments[pet.id] ?? Temperament.defaultValue(for: pet.id)
+            var items: [Temperament: NSMenuItem] = [:]
+            for temperament in Temperament.allCases {
+                let item = NSMenuItem(
+                    title: temperament.title,
+                    action: #selector(selectTemperament(_:)),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.representedObject = [pet.id, temperament.rawValue]
+                item.state = temperament == current ? .on : .off
+                temperamentMenu.addItem(item)
+                items[temperament] = item
+            }
+            temperamentItems[pet.id] = items
+            let temperamentItem = NSMenuItem(title: "\(pet.displayName) Temperament", action: nil, keyEquivalent: "")
+            temperamentItem.submenu = temperamentMenu
+            debugMenu.addItem(temperamentItem)
+        }
         debugMenu.addItem(.separator())
         cycleItem.target = self
         debugMenu.addItem(cycleItem)
@@ -271,6 +304,16 @@ final class StatusMenu: NSObject {
               let scale = Double(values[1]) else { return }
         relativeScaleHandler?(values[0], scale)
         updateRelativeScaleChecks(for: values[0], scale: scale)
+    }
+
+    @objc private func selectTemperament(_ sender: NSMenuItem) {
+        guard let values = sender.representedObject as? [String], values.count == 2,
+              let temperament = Temperament(rawValue: values[1]) else { return }
+        temperaments[values[0]] = temperament
+        temperamentHandler?(values[0], temperament)
+        for (candidate, item) in temperamentItems[values[0]] ?? [:] {
+            item.state = candidate == temperament ? .on : .off
+        }
     }
 
     @objc private func toggleSteadySize(_ sender: NSMenuItem) {
@@ -318,8 +361,7 @@ final class StatusMenu: NSObject {
     }
 
     private func playNextDebugState() {
-        let currentIndex = cycleState.flatMap(debugStates.firstIndex(of:)) ?? -1
-        let state = debugStates[(currentIndex + 1) % debugStates.count]
+        guard let state = PetActionCycle.next(after: cycleState, availableStates: debugStates) else { return }
         cycleState = state
         debugStateHandler?(state)
         updateDebugChecks()

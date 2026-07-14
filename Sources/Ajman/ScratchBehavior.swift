@@ -175,6 +175,7 @@ final class ScratchBehavior {
     private let randomUnit: () -> Double
     private let chooseSide: () -> ScratchSide?
     private let now: () -> Date
+    private let temperament: () -> Temperament
 
     private var whimTimer: Timer?
     private var sequenceID = 0
@@ -196,7 +197,8 @@ final class ScratchBehavior {
         scheduler: Scheduler? = nil,
         randomUnit: @escaping () -> Double = { Double.random(in: 0..<1) },
         chooseSide: @escaping () -> ScratchSide? = { ScratchSide.allCases.randomElement() },
-        now: @escaping () -> Date = Date.init
+        now: @escaping () -> Date = Date.init,
+        temperament: @escaping () -> Temperament = { .normal }
     ) {
         self.animation = animation
         self.eligibility = eligibility
@@ -215,11 +217,12 @@ final class ScratchBehavior {
         self.randomUnit = randomUnit
         self.chooseSide = chooseSide
         self.now = now
+        self.temperament = temperament
     }
 
     func resumeScheduling() {
         guard animation != nil, !isPerforming, whimTimer == nil else { return }
-        let delay = TimeInterval.random(in: Self.scheduleRange)
+        let delay = TimeInterval.random(in: temperament().scaled(range: Self.scheduleRange))
         whimTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.considerWhim() }
         }
@@ -254,11 +257,22 @@ final class ScratchBehavior {
         cancel(returnToIdle: false)
     }
 
+    func rescheduleForTemperamentChange() {
+        guard !isPerforming else { return }
+        whimTimer?.invalidate()
+        whimTimer = nil
+        resumeScheduling()
+    }
+
     private func considerWhim() {
         whimTimer?.invalidate()
         whimTimer = nil
-        guard randomUnit() < Self.triggerProbability else { return }
-        if let lastScratchAt, now().timeIntervalSince(lastScratchAt) < Self.minimumSpacing { return }
+        let temperament = temperament()
+        guard randomUnit() < temperament.scaled(probability: Self.triggerProbability) else { return }
+        if let lastScratchAt,
+           now().timeIntervalSince(lastScratchAt) < temperament.scaled(interval: Self.minimumSpacing) {
+            return
+        }
         _ = startIfEligible()
     }
 

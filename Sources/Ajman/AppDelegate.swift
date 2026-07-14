@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 shownPetIDs: shown,
                 bindings: bindingMap(),
                 relativeScales: relativeScaleMap(),
+                temperaments: temperamentMap(),
                 debugStates: commonDebugStates(),
                 sleepAvailable: pets.contains(where: \.hasSleepAnimation),
                 playfulIdleEnabled: UserDefaults.standard.object(forKey: PetMode.defaultsKey) as? Bool ?? true
@@ -103,6 +104,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.relativeScaleHandler = { [weak self] id, scale in
             self?.catalog?.saveRelativeScale(scale, for: id)
             self?.pets.first(where: { $0.petID == id })?.setRelativeScale(scale)
+        }
+        menu.temperamentHandler = { [weak self] id, temperament in
+            temperament.save(for: id)
+            self?.pets.first(where: { $0.petID == id })?.setTemperament(temperament)
         }
         menu.steadySizeHandler = { [weak self] enabled in
             self?.pets.forEach { pet in
@@ -194,6 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let candidates = pets.map { pet in
             InterCatGlanceCandidate(
                 petID: pet.petID,
+                temperament: { [weak pet] in pet?.temperament ?? .normal },
                 isEligible: { [weak pet] in pet?.glanceEligibility.canReact ?? false },
                 requestGlance: { [weak pet] point in pet?.glanceToward(screenPoint: point) ?? false }
             )
@@ -220,6 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             shownPetIDs: configuration.shownPetIDs,
             bindings: bindingMap(),
             relativeScales: relativeScaleMap(),
+            temperaments: temperamentMap(),
             debugStates: commonDebugStates(),
             sleepAvailable: pets.contains(where: \.hasSleepAnimation)
         )
@@ -255,9 +262,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return Dictionary(uniqueKeysWithValues: discoveredPets.map { ($0.id, catalog.relativeScale(for: $0.id)) })
     }
 
+    private func temperamentMap() -> [String: Temperament] {
+        Dictionary(uniqueKeysWithValues: discoveredPets.map { descriptor in
+            let current = pets.first(where: { $0.petID == descriptor.id })?.temperament
+                ?? Temperament.load(for: descriptor.id)
+            return (descriptor.id, current)
+        })
+    }
+
     private func commonDebugStates() -> [AnimationState] {
-        guard !pets.isEmpty else { return AnimationState.allCases }
-        return AnimationState.allCases.filter { state in
+        guard !pets.isEmpty else { return PetActionCycle.order }
+        return PetActionCycle.order.filter { state in
             pets.allSatisfy { $0.availableStates.contains(state) }
         }
     }

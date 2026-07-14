@@ -46,8 +46,21 @@ struct InterCatGlanceEligibility {
 @MainActor
 struct InterCatGlanceCandidate {
     let petID: String
+    let temperament: () -> Temperament
     let isEligible: () -> Bool
     let requestGlance: (NSPoint) -> Bool
+
+    init(
+        petID: String,
+        temperament: @escaping () -> Temperament = { .normal },
+        isEligible: @escaping () -> Bool,
+        requestGlance: @escaping (NSPoint) -> Bool
+    ) {
+        self.petID = petID
+        self.temperament = temperament
+        self.isEligible = isEligible
+        self.requestGlance = requestGlance
+    }
 }
 
 @MainActor
@@ -81,11 +94,12 @@ final class InterCatGlanceCoordinator {
         let timestamp = now()
         for candidate in candidates where candidate.petID != sourcePetID {
             guard candidate.isEligible() else { continue }
+            let temperament = candidate.temperament()
             if let lastGlance = lastGlanceByPetID[candidate.petID],
-               timestamp.timeIntervalSince(lastGlance) < cooldown {
+               timestamp.timeIntervalSince(lastGlance) < temperament.scaled(interval: cooldown) {
                 continue
             }
-            guard randomUnit() < probability else { continue }
+            guard randomUnit() < temperament.scaled(probability: probability) else { continue }
             if candidate.requestGlance(sourceCenter) {
                 lastGlanceByPetID[candidate.petID] = timestamp
             }

@@ -9,8 +9,10 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
     private(set) var petScale: PetScale
     private(set) var relativeScale: Double
     var petWasClicked: (() -> Void)?
+    var petActionCycleRequested: (() -> Void)?
     private var mouseDownScreenLocation: NSPoint?
     private var mouseDownTimestamp: TimeInterval?
+    private var mouseDownDisposition: PetClickDisposition?
     var displaySize: NSSize { Self.displaySize(global: petScale, relative: relativeScale) }
 
     static func positionPersistenceKey(for petID: String) -> String {
@@ -56,15 +58,43 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
         case .leftMouseDown:
             mouseDownScreenLocation = NSEvent.mouseLocation
             mouseDownTimestamp = event.timestamp
+            mouseDownDisposition = PetClickDisposition.classify(
+                buttonNumber: event.buttonNumber,
+                modifiers: event.modifierFlags
+            )
+            if mouseDownDisposition == .advanceAction { return }
         case .leftMouseUp:
             if let start = mouseDownScreenLocation,
                let timestamp = mouseDownTimestamp,
                hypot(NSEvent.mouseLocation.x - start.x, NSEvent.mouseLocation.y - start.y) < 4,
                event.timestamp - timestamp < 0.4 {
-                petWasClicked?()
+                if mouseDownDisposition == .advanceAction {
+                    petActionCycleRequested?()
+                } else {
+                    petWasClicked?()
+                }
             }
             mouseDownScreenLocation = nil
             mouseDownTimestamp = nil
+            let disposition = mouseDownDisposition
+            mouseDownDisposition = nil
+            if disposition == .advanceAction { return }
+        case .rightMouseDown:
+            mouseDownScreenLocation = NSEvent.mouseLocation
+            mouseDownTimestamp = event.timestamp
+            mouseDownDisposition = .advanceAction
+            return
+        case .rightMouseUp:
+            if let start = mouseDownScreenLocation,
+               let timestamp = mouseDownTimestamp,
+               hypot(NSEvent.mouseLocation.x - start.x, NSEvent.mouseLocation.y - start.y) < 4,
+               event.timestamp - timestamp < 0.4 {
+                petActionCycleRequested?()
+            }
+            mouseDownScreenLocation = nil
+            mouseDownTimestamp = nil
+            mouseDownDisposition = nil
+            return
         default:
             break
         }

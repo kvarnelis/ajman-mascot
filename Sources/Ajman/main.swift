@@ -139,6 +139,68 @@ private func runSelfTest() -> Int32 {
         }
         print("Pet instances: both packages load; distinct per-pet position keys (headless)")
 
+        let cycleOrder: [AnimationState] = [
+            .idle, .runningRight, .runningLeft, .waving, .jumping, .failed,
+            .waiting, .running, .review, .lookDirectionsA, .lookDirectionsB,
+        ]
+        guard PetActionCycle.order == cycleOrder,
+              PetClickDisposition.classify(buttonNumber: 0, modifiers: []) == .normal,
+              PetClickDisposition.classify(buttonNumber: 0, modifiers: [.control]) == .advanceAction,
+              PetClickDisposition.classify(buttonNumber: 1, modifiers: []) == .advanceAction else {
+            throw SelfTestError("pet click classification or shared action-cycle order was incorrect")
+        }
+        var perPetActions: [String: AnimationState] = ["ajman": .idle, "winnie": .idle]
+        func simulateActionClick(petID: String, buttonNumber: Int, modifiers: NSEvent.ModifierFlags) {
+            guard PetClickDisposition.classify(buttonNumber: buttonNumber, modifiers: modifiers) == .advanceAction,
+                  let current = perPetActions[petID],
+                  let next = PetActionCycle.next(after: current, availableStates: cycleOrder) else { return }
+            perPetActions[petID] = next
+        }
+        simulateActionClick(petID: "ajman", buttonNumber: 0, modifiers: [.control])
+        guard perPetActions["ajman"] == .runningRight, perPetActions["winnie"] == .idle else {
+            throw SelfTestError("control-click advanced more than the clicked pet")
+        }
+        simulateActionClick(petID: "ajman", buttonNumber: 1, modifiers: [])
+        guard perPetActions["ajman"] == .runningLeft, perPetActions["winnie"] == .idle else {
+            throw SelfTestError("right-click did not advance only the clicked pet")
+        }
+        simulateActionClick(petID: "winnie", buttonNumber: 1, modifiers: [])
+        guard perPetActions["ajman"] == .runningLeft, perPetActions["winnie"] == .runningRight,
+              PetActionCycle.next(after: .lookDirectionsB, availableStates: cycleOrder) == .idle else {
+            throw SelfTestError("per-pet action cycle did not remain isolated or wrap")
+        }
+        print("Pet action clicks: control/right advance only the clicked pet; shared 11-state order wraps")
+
+        let temperamentSuiteName = "AjmanSelfTest.Temperament.\(UUID().uuidString)"
+        guard let temperamentDefaults = UserDefaults(suiteName: temperamentSuiteName) else {
+            throw SelfTestError("could not create temperament defaults")
+        }
+        defer { temperamentDefaults.removePersistentDomain(forName: temperamentSuiteName) }
+        let expectedTemperaments: [Temperament] = [.catatonic, .calm, .normal, .frisky, .insane]
+        guard Temperament.allCases == expectedTemperaments,
+              Temperament.load(for: "ajman", from: temperamentDefaults) == .calm,
+              Temperament.load(for: "winnie", from: temperamentDefaults) == .frisky,
+              Temperament.load(for: "other", from: temperamentDefaults) == .normal else {
+            throw SelfTestError("temperament levels or per-pet defaults were incorrect")
+        }
+        for temperament in Temperament.allCases {
+            temperament.save(for: "ajman", to: temperamentDefaults)
+            guard Temperament.load(for: "ajman", from: temperamentDefaults) == temperament else {
+                throw SelfTestError("temperament did not persist: \(temperament.rawValue)")
+            }
+        }
+        let frequencies = Temperament.allCases.map(\.frequencyMultiplier)
+        let fidgetWaits = Temperament.allCases.map { $0.scaled(interval: PetMode.randomIntervalRange.lowerBound) }
+        let scratchProbabilities = Temperament.allCases.map { $0.scaled(probability: ScratchBehavior.triggerProbability) }
+        let scratchSpacing = Temperament.allCases.map { $0.scaled(interval: ScratchBehavior.minimumSpacing) }
+        guard zip(frequencies, frequencies.dropFirst()).allSatisfy({ $0 < $1 }),
+              zip(fidgetWaits, fidgetWaits.dropFirst()).allSatisfy({ $0 > $1 }),
+              zip(scratchProbabilities, scratchProbabilities.dropFirst()).allSatisfy({ $0 < $1 }),
+              zip(scratchSpacing, scratchSpacing.dropFirst()).allSatisfy({ $0 > $1 }) else {
+            throw SelfTestError("higher temperament did not increase whim frequency and shorten waits")
+        }
+        print("Temperament: Catatonic/Calm/Normal/Frisky/Insane = 0.15/0.5/1/2/4x; Ajman Calm, Winnie Frisky; persistence and monotonic whim scaling pass")
+
         let expectedLivelyStates: Set<AnimationState> = [
             .jumping, .waving, .runningRight, .runningLeft, .running,
         ]

@@ -24,6 +24,7 @@ final class PetMode {
     private var wakeTimer: Timer?
     private var wakeUntil: Date?
     private var lastFunState: AnimationState?
+    private var temperament: Temperament
     private var ownsRestingAnimation = false
 
     private(set) var isEnabled: Bool
@@ -41,6 +42,7 @@ final class PetMode {
         loafInterval: TimeInterval = PetMode.defaultLoafInterval,
         dozeInterval: TimeInterval = PetMode.defaultDozeInterval,
         wakeHoldRange: ClosedRange<TimeInterval> = PetMode.wakeHoldRange,
+        temperament: Temperament = .normal,
         defaults: UserDefaults = .standard
     ) {
         self.animator = animator
@@ -52,6 +54,7 @@ final class PetMode {
         self.loafInterval = loafInterval
         self.dozeInterval = dozeInterval
         wakeHoldDurationRange = wakeHoldRange
+        self.temperament = temperament
         isEnabled = defaults.object(forKey: Self.defaultsKey) as? Bool ?? true
     }
 
@@ -65,6 +68,16 @@ final class PetMode {
         ownsRestingAnimation = true
         animator?.play(.idle)
         if enabled { scheduleRestTimers() }
+    }
+
+    func setTemperament(_ temperament: Temperament) {
+        guard self.temperament != temperament else { return }
+        self.temperament = temperament
+        guard isEnabled, priorityAllowsPetMode, ownsRestingAnimation,
+              !isLoafing, !isSleeping, !isWaking else { return }
+        idleTimer?.invalidate()
+        idleTimer = nil
+        scheduleOccasionalBeat()
     }
 
     /// Called whenever the live/manual driver changes who should own animation.
@@ -245,7 +258,7 @@ final class PetMode {
     private func scheduleOccasionalBeat() {
         guard isEnabled, priorityAllowsPetMode, !isLoafing, !isSleeping, !isWaking,
               idleTimer == nil, beatTimer == nil else { return }
-        let delay = TimeInterval.random(in: Self.randomIntervalRange)
+        let delay = TimeInterval.random(in: temperament.scaled(range: Self.randomIntervalRange))
         idleTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.playOccasionalBeat() }
         }

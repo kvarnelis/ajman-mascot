@@ -17,6 +17,7 @@ final class PetInstance {
     private let scratchMover: ScratchPanelMover
 
     var availableStates: [AnimationState] { animator.availableStates }
+    private(set) var temperament: Temperament
     var hasSleepAnimation: Bool { loadedPet.sleepAnimation != nil }
     var positionPersistenceKey: String { panel.positionPersistenceKey }
     var screenCenter: NSPoint { NSPoint(x: panel.frame.midX, y: panel.frame.midY) }
@@ -42,6 +43,7 @@ final class PetInstance {
     private var scratchBehavior: ScratchBehavior?
     private var scratchStartingOrigin: NSPoint?
     private(set) var isGlancing = false
+    private var isDirectCycling = false
     private var tornDown = false
 
     init(
@@ -61,6 +63,7 @@ final class PetInstance {
         self.catalog = catalog
         self.defaults = defaults
         self.isManualMode = isManualMode
+        temperament = Temperament.load(for: petID, from: defaults)
         loadedPet = try catalog.load(id: petID)
 
         let relativeScale = catalog.relativeScale(for: petID)
@@ -86,13 +89,15 @@ final class PetInstance {
             wakeAnimation: loadedPet.wakeAnimation,
             currentLiveState: { [liveState] in liveState.value },
             isManualMode: isManualMode,
+            temperament: temperament,
             defaults: defaults
         )
         bubbleController = BubbleController(petPanel: panel)
         bubbleController.dismissHandler = dismissNotification
         panel.petWasClicked = petWasClicked
+        panel.petActionCycleRequested = { [weak self] in self?.cycleToNextAction() }
         animator.stateDidChange = { [weak self] state in
-            guard state.isLively, let self, self.panel.isVisible else { return }
+            guard state.isLively, let self, self.panel.isVisible, !self.isDirectCycling else { return }
             livelyAnimationBegan(self.petID, self.screenCenter)
         }
 
@@ -142,7 +147,8 @@ final class PetInstance {
                 guard self.liveState.value == .idle, !self.isManualMode() else { return }
                 self.petMode.resumeAtRest()
             },
-            chooseSide: { [weak self] in self?.farScratchSide() }
+            chooseSide: { [weak self] in self?.farScratchSide() },
+            temperament: { [weak self] in self?.temperament ?? .normal }
         )
     }
 
@@ -252,6 +258,27 @@ final class PetInstance {
         if enabled { scratchBehavior?.resumeScheduling() }
     }
 
+    func setTemperament(_ temperament: Temperament) {
+        guard self.temperament != temperament else { return }
+        self.temperament = temperament
+        temperament.save(for: petID, to: defaults)
+        petMode.setTemperament(temperament)
+        scratchBehavior?.rescheduleForTemperamentChange()
+    }
+
+    func cycleToNextAction() {
+        guard let next = PetActionCycle.next(
+            after: animator.currentState,
+            availableStates: animator.availableStates
+        ) else { return }
+        cancelGlance(returnToRest: false)
+        scratchBehavior?.cancel(returnToIdle: false)
+        petMode.yieldToHigherPriorityDriver()
+        isDirectCycling = true
+        animator.play(next)
+        isDirectCycling = false
+    }
+
     func setDebugState(_ state: AnimationState) {
         guard animator.availableStates.contains(state) else { return }
         cancelGlance(returnToRest: false)
@@ -310,6 +337,7 @@ final class PetInstance {
         scratchBehavior?.teardown()
         scratchMover.cancel()
         panel.petWasClicked = nil
+        panel.petActionCycleRequested = nil
         animator.stateDidChange = nil
         bubbleController.dismissHandler = nil
         petMode.teardown()
