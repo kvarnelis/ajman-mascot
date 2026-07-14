@@ -1,20 +1,65 @@
 import AppKit
 
 final class PetView: NSView {
+    static let sleepBreathingScale = 1.02
+    static let sleepBreathingHalfPeriod: TimeInterval = 5
+    static let sleepBreathingAnchorPoint = CGPoint(x: 0.5, y: 0)
+
+    private static let breathingAnimationKey = "sleep-breathing"
+    private let imageLayer = CALayer()
+
+    var isBreathing: Bool { imageLayer.animation(forKey: Self.breathingAnimationKey) != nil }
+
     var image: CGImage? {
-        didSet { layer?.contents = image }
+        didSet { setImage(image) }
     }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
-        layer?.contentsGravity = .resizeAspect
-        layer?.magnificationFilter = .nearest
-        layer?.minificationFilter = .trilinear
+        imageLayer.contentsGravity = .resizeAspect
+        imageLayer.magnificationFilter = .nearest
+        imageLayer.minificationFilter = .trilinear
+        imageLayer.anchorPoint = Self.sleepBreathingAnchorPoint
+        layer?.addSublayer(imageLayer)
     }
 
     required init?(coder: NSCoder) { nil }
+
+    override func layout() {
+        super.layout()
+        imageLayer.bounds = bounds
+        imageLayer.position = CGPoint(x: bounds.midX, y: bounds.minY)
+    }
+
+    func setImage(_ image: CGImage?, crossfadeDuration: TimeInterval = 0) {
+        if crossfadeDuration > 0, imageLayer.contents != nil {
+            let transition = CATransition()
+            transition.type = .fade
+            transition.duration = crossfadeDuration
+            transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            imageLayer.add(transition, forKey: "sleep-pose-crossfade")
+        }
+        imageLayer.contents = image
+    }
+
+    func setBreathingEnabled(_ enabled: Bool) {
+        guard enabled else {
+            imageLayer.removeAnimation(forKey: Self.breathingAnimationKey)
+            return
+        }
+        guard !isBreathing else { return }
+
+        let breathing = CABasicAnimation(keyPath: "transform.scale.y")
+        breathing.fromValue = 1.0
+        breathing.toValue = Self.sleepBreathingScale
+        breathing.duration = Self.sleepBreathingHalfPeriod
+        breathing.autoreverses = true
+        breathing.repeatCount = .infinity
+        breathing.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        imageLayer.add(breathing, forKey: Self.breathingAnimationKey)
+    }
 
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()

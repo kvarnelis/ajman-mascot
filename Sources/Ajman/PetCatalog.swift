@@ -152,7 +152,12 @@ struct PetCatalog {
             liveRoot.appendingPathComponent(id, isDirectory: true).appendingPathComponent("sleep.webp"),
         ].compactMap { $0 }
         for url in candidates where fileManager.isReadableFile(atPath: url.path) {
-            do { return try SleepAnimation.load(from: url) }
+            // Ajman's seventh authored pose is the belly-up roly-poly: keep it
+            // as an occasional treat while every other drowsy pose stays even.
+            let poseWeights: [Double]? = id == "ajman"
+                ? [1, 1, 1, 1, 1, 1, 0.3, 1]
+                : nil
+            do { return try SleepAnimation.load(from: url, poseWeights: poseWeights) }
             catch { log("pet '\(id)' sleep animation failed from \(url.path): \(error.localizedDescription)") }
         }
         return nil

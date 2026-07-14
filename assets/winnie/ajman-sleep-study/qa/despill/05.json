@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "input": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman-sleep-study/frames/idle/05.png",
+  "output": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman-sleep-study/frames/idle/05.png",
+  "chroma_key": "#FF00FF",
+  "algorithm": "edge-local-chroma-spill-suppression",
+  "strength": 1,
+  "edge_radius": 5,
+  "spill_tolerance": 0.15,
+  "minimum_saturation": 0.1,
+  "changed_pixels": 1445,
+  "decontaminated_pixels": 1146,
+  "spill_suppressed_pixels": 1445,
+  "rejected_pixels": 0,
+  "changed_by_cell": {
+    "r0c0": 1445
+  },
+  "alpha_preserved": true
+}

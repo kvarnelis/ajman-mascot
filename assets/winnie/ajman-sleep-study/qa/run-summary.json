@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "installed_pet_modified": false,
+  "frame_count": 6,
+  "source_strip": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman-sleep-study/decoded/sleeping.png",
+  "transparent_frames": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman-sleep-study/frames/idle",
+  "gif_preview": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman-sleep-study/ajman-sleep-loop.gif",
+  "animated_webp": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman-sleep-study/ajman-sleep-loop.webp",
+  "frame_review": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman-sleep-study/qa/review.json",
+  "despill_reports": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman-sleep-study/qa/despill",
+  "visual_qa": "pass",
+  "visual_qa_note": "Ajman identity, closed eyes, image-right physical-left TNR ear, compact sleeping pose, transparent edges, and subtle stable motion all pass."
+}

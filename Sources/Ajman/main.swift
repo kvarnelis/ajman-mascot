@@ -276,14 +276,17 @@ private func runSelfTest() -> Int32 {
             bundledRoot: bundledPets
         )
         let sleepingWinnie = try sleepCatalog.load(id: "winnie")
-        let wakefulAjman = try sleepCatalog.load(id: "ajman")
+        let sleepingAjman = try sleepCatalog.load(id: "ajman")
         guard sleepingWinnie.sleepAnimation?.frameCount == 6 else {
             throw SelfTestError("Winnie's bundled sleep strip did not load six ordered frames")
         }
-        guard wakefulAjman.sleepAnimation == nil else {
-            throw SelfTestError("Ajman unexpectedly reported a sleep animation")
+        guard let ajmanSleep = sleepingAjman.sleepAnimation,
+              ajmanSleep.frameCount == 8,
+              ajmanSleep.poseWeights.count == 8,
+              ajmanSleep.poseWeights[6] < ajmanSleep.poseWeights[0] else {
+            throw SelfTestError("Ajman's bundled sleep strip did not load eight poses with a lower roly-poly weight")
         }
-        print("Sleep assets: Winnie bundled strip loads 6 frames; Ajman reports none")
+        print("Sleep assets: Winnie bundled strip loads 6 poses; Ajman loads 8 with a lower roly-poly weight")
 
         let sleepSuiteName = "AjmanSelfTest.Sleep.\(UUID().uuidString)"
         guard let sleepDefaults = UserDefaults(suiteName: sleepSuiteName) else {
@@ -293,10 +296,14 @@ private func runSelfTest() -> Int32 {
         sleepDefaults.set(true, forKey: PetMode.defaultsKey)
 
         let sleepLiveState = AnimationState.idle
-        let sleepAnimator = Animator(sheet: sleepingWinnie.sheet, view: nil)
+        let sleepAnimator = Animator(
+            sheet: sleepingAjman.sheet,
+            view: nil,
+            sleepHoldRange: 0.03...0.03
+        )
         let shortDoze = PetMode(
             animator: sleepAnimator,
-            sleepAnimation: sleepingWinnie.sleepAnimation,
+            sleepAnimation: ajmanSleep,
             currentLiveState: { sleepLiveState },
             isManualMode: { false },
             dozeInterval: 0.05,
@@ -304,13 +311,25 @@ private func runSelfTest() -> Int32 {
         )
         shortDoze.resumeAtRest()
         guard pump(until: { shortDoze.isSleeping && sleepAnimator.isPlayingSleep }) else {
-            throw SelfTestError("short calm interval did not transition Winnie to sleep")
+            throw SelfTestError("short calm interval did not transition Ajman to sleep")
+        }
+        guard PetView.sleepBreathingScale == 1.02,
+              PetView.sleepBreathingHalfPeriod == 5,
+              PetView.sleepBreathingAnchorPoint == CGPoint(x: 0.5, y: 0) else {
+            throw SelfTestError("Ajman's sleep breathing geometry was not subtle and bottom-anchored")
+        }
+        let firstSleepPose = sleepAnimator.currentSleepPoseIndex
+        guard pump(until: {
+            sleepAnimator.currentSleepPoseIndex != nil
+                && sleepAnimator.currentSleepPoseIndex != firstSleepPose
+        }) else {
+            throw SelfTestError("Ajman's held sleep pose did not rotate to a different pose")
         }
         shortDoze.stir()
         guard !shortDoze.isSleeping, !sleepAnimator.isPlayingSleep else {
-            throw SelfTestError("simulated bound-agent stir did not wake Winnie")
+            throw SelfTestError("simulated bound-agent stir did not fully wake Ajman")
         }
-        guard shortDoze.forceSleep() else { throw SelfTestError("manual sleep could not restart Winnie") }
+        guard shortDoze.forceSleep() else { throw SelfTestError("manual sleep could not restart Ajman") }
         shortDoze.wake()
         guard !shortDoze.isSleeping, !sleepAnimator.isPlayingSleep else {
             throw SelfTestError("simulated click/wake did not wake Winnie")
@@ -318,7 +337,7 @@ private func runSelfTest() -> Int32 {
         shortDoze.teardown()
         sleepAnimator.stop()
 
-        let noSleepAnimator = Animator(sheet: wakefulAjman.sheet, view: nil)
+        let noSleepAnimator = Animator(sheet: sleepingAjman.sheet, view: nil)
         let noSleepMode = PetMode(
             animator: noSleepAnimator,
             sleepAnimation: nil,
@@ -334,7 +353,7 @@ private func runSelfTest() -> Int32 {
         }
         noSleepMode.teardown()
         noSleepAnimator.stop()
-        print("Sleep behavior: short calm dozes; agent stir and click wake; no-asset pet stays idle")
+        print("Sleep behavior: held pose rotates with bottom-anchored breathing; agent stir and click wake; no-asset pet stays idle")
 
         let normalizationPetIDs = ["ajman", "winnie"].filter { id in
             catalog.discover().contains { $0.id == id }

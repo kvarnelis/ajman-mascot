@@ -19,14 +19,13 @@ enum SleepAnimationError: LocalizedError {
 }
 
 struct SleepAnimation {
-    static let frameDuration: TimeInterval = 0.45
-
     let frames: [CGImage]
+    let poseWeights: [Double]
     let sourceURL: URL
 
     var frameCount: Int { frames.count }
 
-    static func load(from url: URL) throws -> SleepAnimation {
+    static func load(from url: URL, poseWeights: [Double]? = nil) throws -> SleepAnimation {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw SleepAnimationError.unreadable(url)
@@ -50,6 +49,8 @@ struct SleepAnimation {
             }
             return frame
         }
-        return SleepAnimation(frames: frames, sourceURL: url)
+        let resolvedWeights = poseWeights.flatMap { $0.count == frameCount ? $0 : nil }
+            ?? Array(repeating: 1, count: frameCount)
+        return SleepAnimation(frames: frames, poseWeights: resolvedWeights, sourceURL: url)
     }
 }
