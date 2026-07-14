@@ -292,7 +292,75 @@ private func runSelfTest() -> Int32 {
         guard let ajmanWake = sleepingAjman.wakeAnimation, ajmanWake.frameCount == 5 else {
             throw SelfTestError("Ajman's bundled stretch/yawn strip did not load five ordered poses")
         }
-        print("Calm assets: Winnie sleep loads 6; Ajman loaf/sleep/wake load 8/8/5")
+        guard let ajmanScratch = sleepingAjman.scratchAnimation,
+              ajmanScratch.frameCount == 2,
+              ScratchSide.right.poseIndex == 0,
+              ScratchSide.left.poseIndex == 1 else {
+            throw SelfTestError("Ajman's bundled scratch strip did not load right and left orientations")
+        }
+        print("Calm assets: Winnie sleep loads 6; Ajman loaf/sleep/wake/scratch load 8/8/5/2")
+
+        var scratchEligibility = ScratchEligibility(
+            hasAsset: true,
+            isShown: true,
+            liveState: .running,
+            displayedState: .idle,
+            isManual: false,
+            isPlayfulIdleEnabled: true,
+            isCalmPose: false,
+            isGlancing: false
+        )
+        var scratchEvents: [String] = []
+        let scratchBehavior = ScratchBehavior(
+            animation: ajmanScratch,
+            eligibility: { scratchEligibility },
+            willStart: { scratchEvents.append("start") },
+            moveToEdge: { side, completion in
+                scratchEvents.append(side == .left ? "move-left" : "move-right")
+                completion()
+            },
+            showPose: { side in
+                scratchEvents.append(side == .left ? "pose-left" : "pose-right")
+                return true
+            },
+            setRaking: { scratchEvents.append($0 ? "rake-on" : "rake-off") },
+            showIdle: { scratchEvents.append("idle") },
+            didFinish: { scratchEvents.append("finish") },
+            scheduler: { _, action in action() }
+        )
+        guard !scratchBehavior.startIfEligible(side: .left) else {
+            throw SelfTestError("scratch started while the live state was active")
+        }
+        scratchEligibility = ScratchEligibility(
+            hasAsset: true,
+            isShown: true,
+            liveState: .idle,
+            displayedState: .idle,
+            isManual: false,
+            isPlayfulIdleEnabled: true,
+            isCalmPose: true,
+            isGlancing: false
+        )
+        guard !scratchBehavior.startIfEligible(side: .left) else {
+            throw SelfTestError("scratch started during loaf or sleep")
+        }
+        scratchEligibility = ScratchEligibility(
+            hasAsset: true,
+            isShown: true,
+            liveState: .idle,
+            displayedState: .idle,
+            isManual: false,
+            isPlayfulIdleEnabled: true,
+            isCalmPose: false,
+            isGlancing: false
+        )
+        guard scratchBehavior.startIfEligible(side: .left),
+              !scratchBehavior.isPerforming,
+              scratchEvents == ["start", "move-left", "pose-left", "rake-on", "rake-off", "idle", "finish"] else {
+            throw SelfTestError("idle scratch did not approach, rake, and return to idle: \(scratchEvents)")
+        }
+        scratchBehavior.teardown()
+        print("Scratch behavior: two orientations load; active/sleep gates reject; idle approaches, rakes, and returns")
 
         let sleepSuiteName = "AjmanSelfTest.Sleep.\(UUID().uuidString)"
         guard let sleepDefaults = UserDefaults(suiteName: sleepSuiteName) else {

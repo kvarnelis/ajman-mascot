@@ -13,6 +13,7 @@ struct LoadedPet {
     let loafAnimation: SleepAnimation?
     let sleepAnimation: SleepAnimation?
     let wakeAnimation: SleepAnimation?
+    let scratchAnimation: SleepAnimation?
 }
 
 struct PetCatalog {
@@ -90,7 +91,8 @@ struct PetCatalog {
                     sheet: try SpriteSheet.load(directory: descriptor.directory, steadySize: steadySize ?? SteadySize.load(from: defaults)),
                     loafAnimation: loadPoseStrip(named: "loaf", for: id),
                     sleepAnimation: loadSleepAnimation(for: id),
-                    wakeAnimation: loadPoseStrip(named: "stretch", for: id)
+                    wakeAnimation: loadPoseStrip(named: "stretch", for: id),
+                    scratchAnimation: loadPoseStrip(named: "scratch", for: id)
                 )
             }
             catch {
@@ -115,7 +117,8 @@ struct PetCatalog {
                     sheet: try SpriteSheet.load(directory: ajman, steadySize: SteadySize.load(from: defaults)),
                     loafAnimation: loadPoseStrip(named: "loaf", for: Self.defaultPetID),
                     sleepAnimation: loadSleepAnimation(for: Self.defaultPetID),
-                    wakeAnimation: loadPoseStrip(named: "stretch", for: Self.defaultPetID)
+                    wakeAnimation: loadPoseStrip(named: "stretch", for: Self.defaultPetID),
+                    scratchAnimation: loadPoseStrip(named: "scratch", for: Self.defaultPetID)
                 )
             } catch { log("bundled ajman fallback failed: \(error.localizedDescription)") }
         }

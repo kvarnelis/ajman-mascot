@@ -6,9 +6,11 @@ final class PetView: NSView {
     static let sleepBreathingAnchorPoint = CGPoint(x: 0.5, y: 0)
 
     private static let breathingAnimationKey = "sleep-breathing"
+    private static let scratchRakeAnimationKey = "scratch-rake"
     private let imageLayer = CALayer()
 
     var isBreathing: Bool { imageLayer.animation(forKey: Self.breathingAnimationKey) != nil }
+    var isScratchRaking: Bool { imageLayer.animation(forKey: Self.scratchRakeAnimationKey) != nil }
 
     var image: CGImage? {
         didSet { setImage(image) }
@@ -59,6 +61,20 @@ final class PetView: NSView {
         breathing.repeatCount = .infinity
         breathing.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         imageLayer.add(breathing, forKey: Self.breathingAnimationKey)
+    }
+
+    func setScratchRaking(_ enabled: Bool) {
+        imageLayer.removeAnimation(forKey: Self.scratchRakeAnimationKey)
+        guard enabled else { return }
+
+        let rake = CABasicAnimation(keyPath: "transform.translation.y")
+        rake.fromValue = -ScratchBehavior.rakeAmplitude
+        rake.toValue = ScratchBehavior.rakeAmplitude
+        rake.duration = ScratchBehavior.rakeDuration / (Double(ScratchBehavior.rakeCycles) * 2)
+        rake.autoreverses = true
+        rake.repeatCount = Float(ScratchBehavior.rakeCycles)
+        rake.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        imageLayer.add(rake, forKey: Self.scratchRakeAnimationKey)
     }
 
     override func viewDidChangeBackingProperties() {

@@ -52,6 +52,7 @@ final class Animator {
         calmPoseMode = nil
         currentCalmPoseIndex = nil
         view?.setBreathingEnabled(false)
+        view?.setScratchRaking(false)
         currentState = state
         play(sheet.animationTable.definition(for: state) == nil ? .idle : state, force: true)
     }
@@ -68,6 +69,7 @@ final class Animator {
         calmPoseMode = nil
         currentCalmPoseIndex = nil
         view?.setBreathingEnabled(false)
+        view?.setScratchRaking(false)
         currentState = state
         frames = sheet.frames(for: definition)
         frameDurations = definition.durations
@@ -94,6 +96,7 @@ final class Animator {
         calmPoseWeights = animation.poseWeights
         currentCalmPoseIndex = chooseCalmPose(excluding: nil)
         view?.setBreathingEnabled(false)
+        view?.setScratchRaking(false)
         if let poseIndex = currentCalmPoseIndex, frames.indices.contains(poseIndex) {
             view?.setImage(frames[poseIndex], crossfadeDuration: 0.45)
         }
@@ -110,6 +113,7 @@ final class Animator {
         calmPoseMode = nil
         currentCalmPoseIndex = nil
         view?.setBreathingEnabled(false)
+        view?.setScratchRaking(false)
         currentState = state
         frames = [stateFrames[frameIndex]]
         frameDurations = []
@@ -117,6 +121,26 @@ final class Animator {
         stateDidChange?(state)
         view?.image = frames[0]
         return true
+    }
+
+    @discardableResult
+    func playHeldPose(_ animation: SleepAnimation, frameIndex: Int) -> Bool {
+        guard animation.frames.indices.contains(frameIndex) else { return false }
+        timer?.cancel()
+        timer = nil
+        calmPoseMode = nil
+        currentCalmPoseIndex = nil
+        view?.setBreathingEnabled(false)
+        view?.setScratchRaking(false)
+        frames = [animation.frames[frameIndex]]
+        frameDurations = []
+        self.frameIndex = 0
+        view?.image = frames[0]
+        return true
+    }
+
+    func setScratchRaking(_ enabled: Bool) {
+        view?.setScratchRaking(enabled)
     }
 
     func duration(of state: AnimationState) -> TimeInterval? {
@@ -131,6 +155,7 @@ final class Animator {
         calmPoseMode = nil
         currentCalmPoseIndex = nil
         view?.setBreathingEnabled(false)
+        view?.setScratchRaking(false)
         view?.image = nil
     }
 
@@ -148,6 +173,7 @@ final class Animator {
         calmPoseWeights = animation.poseWeights
         currentCalmPoseIndex = chooseCalmPose(excluding: nil)
         view?.setBreathingEnabled(true)
+        view?.setScratchRaking(false)
         showCalmPoseAndScheduleNext(crossfadeDuration: initialCrossfade)
     }
 

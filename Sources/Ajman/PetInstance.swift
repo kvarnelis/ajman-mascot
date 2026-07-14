@@ -27,7 +27,8 @@ final class PetInstance {
             liveState: liveState.value,
             displayedState: animator.currentState,
             isManual: isManualMode(),
-            isSleeping: petMode.isLoafing || petMode.isSleeping || petMode.isWaking || animator.isPlayingCalmPose,
+            isSleeping: petMode.isLoafing || petMode.isSleeping || petMode.isWaking
+                || animator.isPlayingCalmPose || scratchBehavior?.isPerforming == true,
             isAlreadyGlancing: isGlancing
         )
     }
@@ -37,6 +38,7 @@ final class PetInstance {
     private let isManualMode: () -> Bool
     private let liveState = LiveStateBox()
     private var glanceTimer: Timer?
+    private var scratchBehavior: ScratchBehavior?
     private(set) var isGlancing = false
     private var tornDown = false
 
@@ -90,24 +92,71 @@ final class PetInstance {
             guard state.isLively, let self, self.panel.isVisible else { return }
             livelyAnimationBegan(self.petID, self.screenCenter)
         }
+
+        let scratchAnimation = loadedPet.scratchAnimation
+        scratchBehavior = ScratchBehavior(
+            animation: scratchAnimation,
+            eligibility: { [weak self] in
+                guard let self else {
+                    return ScratchEligibility(
+                        hasAsset: false, isShown: false, liveState: .idle,
+                        displayedState: .idle, isManual: true, isPlayfulIdleEnabled: false,
+                        isCalmPose: false, isGlancing: false
+                    )
+                }
+                return ScratchEligibility(
+                    hasAsset: scratchAnimation != nil,
+                    isShown: self.panel.isVisible,
+                    liveState: self.liveState.value,
+                    displayedState: self.animator.currentState,
+                    isManual: self.isManualMode(),
+                    isPlayfulIdleEnabled: self.petMode.isEnabled,
+                    isCalmPose: self.petMode.isLoafing || self.petMode.isSleeping
+                        || self.petMode.isWaking || self.animator.isPlayingCalmPose,
+                    isGlancing: self.isGlancing
+                )
+            },
+            willStart: { [weak self] in
+                self?.cancelGlance(returnToRest: false)
+                self?.petMode.yieldToHigherPriorityDriver()
+            },
+            moveToEdge: { [weak self] side, completion in
+                self?.moveToScratchEdge(side: side, completion: completion)
+            },
+            showPose: { [weak self] side in
+                guard let self, let scratchAnimation else { return false }
+                return self.animator.playHeldPose(scratchAnimation, frameIndex: side.poseIndex)
+            },
+            setRaking: { [weak self] enabled in self?.animator.setScratchRaking(enabled) },
+            showIdle: { [weak self] in self?.animator.play(.idle) },
+            didFinish: { [weak self] in
+                guard let self, self.liveState.value == .idle, !self.isManualMode() else { return }
+                self.petMode.resumeAtRest()
+            }
+        )
     }
 
     func show(useLegacyPositionFallback: Bool) {
         panel.restorePositionOrUseDefault(useLegacyFallback: useLegacyPositionFallback)
         panel.orderFrontRegardless()
         resumeLiveReactions()
+        scratchBehavior?.resumeScheduling()
     }
 
     func applyState(_ state: AnimationState) {
-        if state != .idle { cancelGlance(returnToRest: false) }
+        if state != .idle {
+            cancelGlance(returnToRest: false)
+            scratchBehavior?.cancel(returnToIdle: false)
+        }
         liveState.value = state
         guard !isManualMode() else { return }
         // A rest wake-up owns the image for one brief held pose. The new live
         // state is retained above and PetMode hands off to it when the hold ends.
         guard !petMode.isWaking else { return }
         if state == .idle {
-            guard !isGlancing else { return }
+            guard !isGlancing, scratchBehavior?.isPerforming != true else { return }
             petMode.resumeAtRest()
+            scratchBehavior?.resumeScheduling()
         } else {
             petMode.yieldToHigherPriorityDriver()
             animator.play(state)
@@ -117,28 +166,33 @@ final class PetInstance {
     func resumeAtRest() {
         liveState.value = .idle
         guard !isManualMode() else { return }
-        guard !isGlancing else { return }
+        guard !isGlancing, scratchBehavior?.isPerforming != true else { return }
         petMode.resumeAtRest()
+        scratchBehavior?.resumeScheduling()
     }
 
     func resumeLiveReactions() {
         cancelGlance(returnToRest: false)
+        scratchBehavior?.cancel(returnToIdle: false)
         petMode.stir()
         applyState(liveState.value)
     }
 
     func wake() {
         cancelGlance(returnToRest: true)
+        scratchBehavior?.cancel(returnToIdle: true)
         petMode.wake()
     }
 
     func handleAgentActivity() {
         cancelGlance(returnToRest: true)
+        scratchBehavior?.cancel(returnToIdle: true)
         petMode.stir()
     }
 
     func handlePetSwitch() {
         cancelGlance(returnToRest: true)
+        scratchBehavior?.cancel(returnToIdle: true)
         petMode.stir()
     }
 
@@ -150,6 +204,7 @@ final class PetInstance {
     func setBinding(_ binding: AgentEvent.Provider?) {
         guard self.binding != binding else { return }
         cancelGlance(returnToRest: true)
+        scratchBehavior?.cancel(returnToIdle: true)
         self.binding = binding
         bubbleController.removeAll()
         petMode.stir()
@@ -165,6 +220,7 @@ final class PetInstance {
 
     func setSteadySize(_ enabled: Bool) throws {
         cancelGlance(returnToRest: true)
+        scratchBehavior?.cancel(returnToIdle: true)
         let state = animator.currentState
         loadedPet = try catalog.load(id: petID, steadySize: enabled)
         petMode.replaceCalmAnimations(
@@ -177,18 +233,22 @@ final class PetInstance {
 
     func setPlayfulIdle(_ enabled: Bool) {
         cancelGlance(returnToRest: true)
+        scratchBehavior?.cancel(returnToIdle: true)
         petMode.setEnabled(enabled, defaults: defaults)
+        if enabled { scratchBehavior?.resumeScheduling() }
     }
 
     func setDebugState(_ state: AnimationState) {
         guard animator.availableStates.contains(state) else { return }
         cancelGlance(returnToRest: false)
+        scratchBehavior?.cancel(returnToIdle: false)
         petMode.yieldToHigherPriorityDriver()
         animator.play(state)
     }
 
     func setDebugSleep() {
         cancelGlance(returnToRest: false)
+        scratchBehavior?.cancel(returnToIdle: false)
         _ = petMode.forceSleep()
     }
 
@@ -226,6 +286,7 @@ final class PetInstance {
         guard !tornDown else { return }
         tornDown = true
         cancelGlance(returnToRest: false)
+        scratchBehavior?.teardown()
         panel.petWasClicked = nil
         animator.stateDidChange = nil
         bubbleController.dismissHandler = nil
@@ -256,6 +317,44 @@ final class PetInstance {
         isGlancing = false
         if returnToRest, liveState.value == .idle, !isManualMode() {
             petMode.resumeAtRest()
+        }
+    }
+
+    private func moveToScratchEdge(
+        side: ScratchSide,
+        completion: @escaping @MainActor () -> Void
+    ) {
+        guard let screen = panel.screen
+            ?? NSScreen.screens.first(where: { $0.frame.contains(screenCenter) })
+            ?? NSScreen.main
+            ?? NSScreen.screens.first else {
+            completion()
+            return
+        }
+
+        animator.play(side.approachState)
+        let visible = screen.visibleFrame
+        let scale = panel.frame.width / CGFloat(SpriteSheet.cellWidth)
+        let edgeX: CGFloat
+        switch side {
+        case .left:
+            edgeX = visible.minX - 42 * scale
+        case .right:
+            edgeX = visible.maxX - 150 * scale
+        }
+        let target = NSPoint(
+            x: edgeX,
+            y: min(max(panel.frame.minY, visible.minY), visible.maxY - panel.frame.height)
+        )
+        let distance = hypot(target.x - panel.frame.minX, target.y - panel.frame.minY)
+        let duration = min(max(TimeInterval(distance / 110), 0.8), 4.0)
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrameOrigin(target)
+        } completionHandler: {
+            Task { @MainActor in completion() }
         }
     }
 }
