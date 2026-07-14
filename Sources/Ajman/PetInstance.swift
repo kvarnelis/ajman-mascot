@@ -255,7 +255,19 @@ final class PetInstance {
     func setDebugScratch() {
         cancelGlance(returnToRest: false)
         scratchBehavior?.cancel(returnToIdle: false)
-        _ = scratchBehavior?.forceStart(side: .left)
+        let side: ScratchSide
+        if let screen = panel.screen
+            ?? NSScreen.screens.first(where: { $0.frame.contains(screenCenter) })
+            ?? NSScreen.main
+            ?? NSScreen.screens.first {
+            let visible = screen.visibleFrame
+            let distanceToLeft = screenCenter.x - visible.minX
+            let distanceToRight = visible.maxX - screenCenter.x
+            side = distanceToRight >= distanceToLeft ? .right : .left
+        } else {
+            side = .right
+        }
+        _ = scratchBehavior?.forceStart(side: side)
     }
 
     @discardableResult
@@ -344,9 +356,9 @@ final class PetInstance {
         let edgeX: CGFloat
         switch side {
         case .left:
-            edgeX = visible.minX - 42 * scale
+            edgeX = visible.minX - 37 * scale
         case .right:
-            edgeX = visible.maxX - 150 * scale
+            edgeX = visible.maxX - 155 * scale
         }
         let target = NSPoint(
             x: edgeX,
