@@ -277,8 +277,11 @@ private func runSelfTest() -> Int32 {
         )
         let sleepingWinnie = try sleepCatalog.load(id: "winnie")
         let sleepingAjman = try sleepCatalog.load(id: "ajman")
-        guard sleepingWinnie.sleepAnimation?.frameCount == 6 else {
-            throw SelfTestError("Winnie's bundled sleep strip did not load six ordered frames")
+        guard let winnieSleep = sleepingWinnie.sleepAnimation,
+              winnieSleep.frameCount == 8,
+              winnieSleep.poseWeights.count == 8,
+              winnieSleep.poseWeights[6] < winnieSleep.poseWeights[0] else {
+            throw SelfTestError("Winnie's bundled sleep strip did not load eight poses with a lower roly-poly weight")
         }
         guard let ajmanSleep = sleepingAjman.sleepAnimation,
               ajmanSleep.frameCount == 8,
@@ -298,7 +301,22 @@ private func runSelfTest() -> Int32 {
               ScratchSide.left.poseIndex == 1 else {
             throw SelfTestError("Ajman's bundled scratch strip did not load right and left orientations")
         }
-        print("Calm assets: Winnie sleep loads 6; Ajman loaf/sleep/wake/scratch load 8/8/5/2")
+        let winnieSleepAnimator = Animator(
+            sheet: sleepingWinnie.sheet,
+            view: nil,
+            sleepHoldRange: 0.03...0.03
+        )
+        winnieSleepAnimator.playSleep(winnieSleep)
+        let firstWinnieSleepPose = winnieSleepAnimator.currentSleepPoseIndex
+        guard firstWinnieSleepPose != nil,
+              pump(until: {
+                  winnieSleepAnimator.currentSleepPoseIndex != nil
+                      && winnieSleepAnimator.currentSleepPoseIndex != firstWinnieSleepPose
+              }) else {
+            throw SelfTestError("Winnie's held sleep pose did not rotate to a different pose")
+        }
+        winnieSleepAnimator.stop()
+        print("Calm assets: Winnie sleep loads and rotates 8 weighted poses; Ajman loaf/sleep/wake/scratch load 8/8/5/2")
 
         var scratchEligibility = ScratchEligibility(
             hasAsset: true,

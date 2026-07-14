@@ -156,9 +156,9 @@ struct PetCatalog {
     }
 
     private func loadSleepAnimation(for id: String) -> SleepAnimation? {
-        // Ajman's seventh authored pose is the belly-up roly-poly: keep it
-        // as an occasional treat while every other drowsy pose stays even.
-        let poseWeights: [Double]? = id == "ajman"
+        // Both authored eight-pose strips reserve the seventh pose for the
+        // belly-up roly-poly: keep it occasional while the others stay even.
+        let poseWeights: [Double]? = ["ajman", "winnie"].contains(id)
             ? [1, 1, 1, 1, 1, 1, 0.3, 1]
             : nil
         return loadPoseStrip(named: "sleep", for: id, poseWeights: poseWeights)
