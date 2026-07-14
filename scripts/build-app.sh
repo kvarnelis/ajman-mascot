@@ -46,11 +46,11 @@ for pet_id in ajman winnie; do
   fi
 done
 
-for sleep_asset in "$REPO_ROOT"/assets/pets/*/sleep.webp; do
-  [[ -f "$sleep_asset" ]] || continue
-  pet_id="$(basename "$(dirname "$sleep_asset")")"
+for pose_asset in "$REPO_ROOT"/assets/pets/*/{sleep,loaf,stretch}.webp; do
+  [[ -f "$pose_asset" ]] || continue
+  pet_id="$(basename "$(dirname "$pose_asset")")"
   mkdir -p "$CONTENTS/Resources/pets/$pet_id"
-  cp "$sleep_asset" "$CONTENTS/Resources/pets/$pet_id/sleep.webp"
+  cp "$pose_asset" "$CONTENTS/Resources/pets/$pet_id/$(basename "$pose_asset")"
 done
 
 ln -sfn "build/Ajman.app" "$REPO_ROOT/Ajman.app"

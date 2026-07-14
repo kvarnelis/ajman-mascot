@@ -10,7 +10,9 @@ struct PetDescriptor: Equatable {
 struct LoadedPet {
     let descriptor: PetDescriptor
     let sheet: SpriteSheet
+    let loafAnimation: SleepAnimation?
     let sleepAnimation: SleepAnimation?
+    let wakeAnimation: SleepAnimation?
 }
 
 struct PetCatalog {
@@ -86,7 +88,9 @@ struct PetCatalog {
                 return LoadedPet(
                     descriptor: descriptor,
                     sheet: try SpriteSheet.load(directory: descriptor.directory, steadySize: steadySize ?? SteadySize.load(from: defaults)),
-                    sleepAnimation: loadSleepAnimation(for: id)
+                    loafAnimation: loadPoseStrip(named: "loaf", for: id),
+                    sleepAnimation: loadSleepAnimation(for: id),
+                    wakeAnimation: loadPoseStrip(named: "stretch", for: id)
                 )
             }
             catch {
@@ -109,7 +113,9 @@ struct PetCatalog {
                 return LoadedPet(
                     descriptor: descriptor,
                     sheet: try SpriteSheet.load(directory: ajman, steadySize: SteadySize.load(from: defaults)),
-                    sleepAnimation: loadSleepAnimation(for: Self.defaultPetID)
+                    loafAnimation: loadPoseStrip(named: "loaf", for: Self.defaultPetID),
+                    sleepAnimation: loadSleepAnimation(for: Self.defaultPetID),
+                    wakeAnimation: loadPoseStrip(named: "stretch", for: Self.defaultPetID)
                 )
             } catch { log("bundled ajman fallback failed: \(error.localizedDescription)") }
         }
@@ -147,18 +153,26 @@ struct PetCatalog {
     }
 
     private func loadSleepAnimation(for id: String) -> SleepAnimation? {
+        // Ajman's seventh authored pose is the belly-up roly-poly: keep it
+        // as an occasional treat while every other drowsy pose stays even.
+        let poseWeights: [Double]? = id == "ajman"
+            ? [1, 1, 1, 1, 1, 1, 0.3, 1]
+            : nil
+        return loadPoseStrip(named: "sleep", for: id, poseWeights: poseWeights)
+    }
+
+    private func loadPoseStrip(
+        named name: String,
+        for id: String,
+        poseWeights: [Double]? = nil
+    ) -> SleepAnimation? {
         let candidates = [
-            bundledRoot?.appendingPathComponent(id, isDirectory: true).appendingPathComponent("sleep.webp"),
-            liveRoot.appendingPathComponent(id, isDirectory: true).appendingPathComponent("sleep.webp"),
+            bundledRoot?.appendingPathComponent(id, isDirectory: true).appendingPathComponent("\(name).webp"),
+            liveRoot.appendingPathComponent(id, isDirectory: true).appendingPathComponent("\(name).webp"),
         ].compactMap { $0 }
         for url in candidates where fileManager.isReadableFile(atPath: url.path) {
-            // Ajman's seventh authored pose is the belly-up roly-poly: keep it
-            // as an occasional treat while every other drowsy pose stays even.
-            let poseWeights: [Double]? = id == "ajman"
-                ? [1, 1, 1, 1, 1, 1, 0.3, 1]
-                : nil
             do { return try SleepAnimation.load(from: url, poseWeights: poseWeights) }
-            catch { log("pet '\(id)' sleep animation failed from \(url.path): \(error.localizedDescription)") }
+            catch { log("pet '\(id)' \(name) pose strip failed from \(url.path): \(error.localizedDescription)") }
         }
         return nil
     }

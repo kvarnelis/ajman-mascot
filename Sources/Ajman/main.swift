@@ -265,7 +265,7 @@ private func runSelfTest() -> Int32 {
         print("Inter-cat glances: lively set exact; calm faces right/left; busy/sleep/manual excluded; forced 60% gate and 8s cooldown pass")
 
         guard let bundledPets = Bundle.main.resourceURL?.appendingPathComponent("pets", isDirectory: true) else {
-            throw SelfTestError("bundle resource root was unavailable for sleep tests")
+            throw SelfTestError("bundle resource root was unavailable for calm-behavior tests")
         }
         let noLivePets = fileManager.temporaryDirectory.appendingPathComponent(
             "ajman-selftest-no-live-\(UUID().uuidString)", isDirectory: true
@@ -286,7 +286,13 @@ private func runSelfTest() -> Int32 {
               ajmanSleep.poseWeights[6] < ajmanSleep.poseWeights[0] else {
             throw SelfTestError("Ajman's bundled sleep strip did not load eight poses with a lower roly-poly weight")
         }
-        print("Sleep assets: Winnie bundled strip loads 6 poses; Ajman loads 8 with a lower roly-poly weight")
+        guard let ajmanLoaf = sleepingAjman.loafAnimation, ajmanLoaf.frameCount == 8 else {
+            throw SelfTestError("Ajman's bundled loaf strip did not load eight ordered poses")
+        }
+        guard let ajmanWake = sleepingAjman.wakeAnimation, ajmanWake.frameCount == 5 else {
+            throw SelfTestError("Ajman's bundled stretch/yawn strip did not load five ordered poses")
+        }
+        print("Calm assets: Winnie sleep loads 6; Ajman loaf/sleep/wake load 8/8/5")
 
         let sleepSuiteName = "AjmanSelfTest.Sleep.\(UUID().uuidString)"
         guard let sleepDefaults = UserDefaults(suiteName: sleepSuiteName) else {
@@ -295,7 +301,7 @@ private func runSelfTest() -> Int32 {
         defer { sleepDefaults.removePersistentDomain(forName: sleepSuiteName) }
         sleepDefaults.set(true, forKey: PetMode.defaultsKey)
 
-        let sleepLiveState = AnimationState.idle
+        var sleepLiveState = AnimationState.idle
         let sleepAnimator = Animator(
             sheet: sleepingAjman.sheet,
             view: nil,
@@ -303,36 +309,66 @@ private func runSelfTest() -> Int32 {
         )
         let shortDoze = PetMode(
             animator: sleepAnimator,
+            loafAnimation: ajmanLoaf,
             sleepAnimation: ajmanSleep,
+            wakeAnimation: ajmanWake,
             currentLiveState: { sleepLiveState },
             isManualMode: { false },
-            dozeInterval: 0.05,
+            loafInterval: 0.04,
+            dozeInterval: 0.14,
+            wakeHoldRange: 0.05...0.05,
             defaults: sleepDefaults
         )
         shortDoze.resumeAtRest()
-        guard pump(until: { shortDoze.isSleeping && sleepAnimator.isPlayingSleep }) else {
-            throw SelfTestError("short calm interval did not transition Ajman to sleep")
+        guard pump(until: { shortDoze.isLoafing && sleepAnimator.isPlayingLoaf }) else {
+            throw SelfTestError("moderate calm interval did not transition Ajman to loaf")
         }
         guard PetView.sleepBreathingScale == 1.02,
               PetView.sleepBreathingHalfPeriod == 5,
               PetView.sleepBreathingAnchorPoint == CGPoint(x: 0.5, y: 0) else {
-            throw SelfTestError("Ajman's sleep breathing geometry was not subtle and bottom-anchored")
+            throw SelfTestError("Ajman's calm breathing geometry was not subtle and bottom-anchored")
         }
-        let firstSleepPose = sleepAnimator.currentSleepPoseIndex
+        let firstLoafPose = sleepAnimator.currentLoafPoseIndex
         guard pump(until: {
-            sleepAnimator.currentSleepPoseIndex != nil
-                && sleepAnimator.currentSleepPoseIndex != firstSleepPose
+            sleepAnimator.currentLoafPoseIndex != nil
+                && sleepAnimator.currentLoafPoseIndex != firstLoafPose
         }) else {
-            throw SelfTestError("Ajman's held sleep pose did not rotate to a different pose")
+            throw SelfTestError("Ajman's held loaf pose did not rotate to a different pose")
         }
+        guard pump(until: { shortDoze.isSleeping && sleepAnimator.isPlayingSleep }),
+              !shortDoze.isLoafing, !sleepAnimator.isPlayingLoaf else {
+            throw SelfTestError("longer calm interval did not progress loaf to sleep")
+        }
+
         shortDoze.stir()
-        guard !shortDoze.isSleeping, !sleepAnimator.isPlayingSleep else {
-            throw SelfTestError("simulated bound-agent stir did not fully wake Ajman")
+        guard shortDoze.isWaking, sleepAnimator.isPlayingWake,
+              sleepAnimator.currentWakePoseIndex != nil else {
+            throw SelfTestError("simulated bound-agent stir did not start a held stretch/yawn")
         }
-        guard shortDoze.forceSleep() else { throw SelfTestError("manual sleep could not restart Ajman") }
+        sleepLiveState = .running
+        guard pump(until: { !shortDoze.isWaking && sleepAnimator.currentState == .running }),
+              !sleepAnimator.isPlayingWake else {
+            throw SelfTestError("agent wake did not finish its held pose before handing off to running")
+        }
+
+        sleepLiveState = .idle
+        shortDoze.resumeAtRest()
+        guard pump(until: { shortDoze.isLoafing && sleepAnimator.isPlayingLoaf }) else {
+            throw SelfTestError("Ajman did not return to loaf for the click-wake test")
+        }
         shortDoze.wake()
-        guard !shortDoze.isSleeping, !sleepAnimator.isPlayingSleep else {
-            throw SelfTestError("simulated click/wake did not wake Winnie")
+        let heldWakePose = sleepAnimator.currentWakePoseIndex
+        guard shortDoze.isWaking, sleepAnimator.isPlayingWake, heldWakePose != nil else {
+            throw SelfTestError("simulated click did not interrupt loaf with a stretch/yawn")
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+        guard sleepAnimator.currentWakePoseIndex == heldWakePose else {
+            throw SelfTestError("stretch/yawn changed frames during its static hold")
+        }
+        guard pump(until: {
+            !shortDoze.isWaking && sleepAnimator.currentState == .idle && !sleepAnimator.isPlayingCalmPose
+        }) else {
+            throw SelfTestError("click wake did not return to idle after the held stretch/yawn")
         }
         shortDoze.teardown()
         sleepAnimator.stop()
@@ -340,20 +376,24 @@ private func runSelfTest() -> Int32 {
         let noSleepAnimator = Animator(sheet: sleepingAjman.sheet, view: nil)
         let noSleepMode = PetMode(
             animator: noSleepAnimator,
+            loafAnimation: nil,
             sleepAnimation: nil,
+            wakeAnimation: nil,
             currentLiveState: { sleepLiveState },
             isManualMode: { false },
+            loafInterval: 0.03,
             dozeInterval: 0.05,
             defaults: sleepDefaults
         )
         noSleepMode.resumeAtRest()
         RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        guard !noSleepMode.isSleeping, !noSleepAnimator.isPlayingSleep else {
-            throw SelfTestError("a pet without sleep art entered sleep")
+        guard !noSleepMode.isLoafing, !noSleepMode.isSleeping,
+              !noSleepAnimator.isPlayingLoaf, !noSleepAnimator.isPlayingSleep else {
+            throw SelfTestError("a pet without calm art entered loaf or sleep")
         }
         noSleepMode.teardown()
         noSleepAnimator.stop()
-        print("Sleep behavior: held pose rotates with bottom-anchored breathing; agent stir and click wake; no-asset pet stays idle")
+        print("Calm behavior: idle -> rotating loaf -> sleep; activity/click hold one wake pose then active/idle; no-asset pet stays idle")
 
         let normalizationPetIDs = ["ajman", "winnie"].filter { id in
             catalog.discover().contains { $0.id == id }

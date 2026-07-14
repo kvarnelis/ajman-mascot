@@ -4,36 +4,54 @@ import Foundation
 final class PetMode {
     static let defaultsKey = "AjmanPetModeEnabled"
     static let randomIntervalRange: ClosedRange<TimeInterval> = 20...70
+    nonisolated static let wakeHoldRange: ClosedRange<TimeInterval> = 0.8...1.2
+    nonisolated static let defaultLoafInterval: TimeInterval = 45
     nonisolated static let defaultDozeInterval: TimeInterval = 120
 
     private weak var animator: Animator?
+    private var loafAnimation: SleepAnimation?
     private var sleepAnimation: SleepAnimation?
+    private var wakeAnimation: SleepAnimation?
+    private let loafInterval: TimeInterval
     private let dozeInterval: TimeInterval
+    private let wakeHoldDurationRange: ClosedRange<TimeInterval>
     private let currentLiveState: () -> AnimationState
     private let isManualMode: () -> Bool
     private var idleTimer: Timer?
     private var beatTimer: Timer?
+    private var loafTimer: Timer?
     private var dozeTimer: Timer?
+    private var wakeTimer: Timer?
     private var wakeUntil: Date?
     private var lastFunState: AnimationState?
     private var ownsRestingAnimation = false
 
     private(set) var isEnabled: Bool
+    private(set) var isLoafing = false
     private(set) var isSleeping = false
+    private(set) var isWaking = false
 
     init(
         animator: Animator,
+        loafAnimation: SleepAnimation?,
         sleepAnimation: SleepAnimation?,
+        wakeAnimation: SleepAnimation?,
         currentLiveState: @escaping () -> AnimationState,
         isManualMode: @escaping () -> Bool,
+        loafInterval: TimeInterval = PetMode.defaultLoafInterval,
         dozeInterval: TimeInterval = PetMode.defaultDozeInterval,
+        wakeHoldRange: ClosedRange<TimeInterval> = PetMode.wakeHoldRange,
         defaults: UserDefaults = .standard
     ) {
         self.animator = animator
+        self.loafAnimation = loafAnimation
         self.sleepAnimation = sleepAnimation
+        self.wakeAnimation = wakeAnimation
         self.currentLiveState = currentLiveState
         self.isManualMode = isManualMode
+        self.loafInterval = loafInterval
         self.dozeInterval = dozeInterval
+        wakeHoldDurationRange = wakeHoldRange
         isEnabled = defaults.object(forKey: Self.defaultsKey) as? Bool ?? true
     }
 
@@ -41,7 +59,7 @@ final class PetMode {
         isEnabled = enabled
         defaults.set(enabled, forKey: Self.defaultsKey)
         wakeUntil = nil
-        isSleeping = false
+        clearCalmState()
         cancelTimers()
         guard priorityAllowsPetMode else { return }
         ownsRestingAnimation = true
@@ -56,7 +74,7 @@ final class PetMode {
         ownsRestingAnimation = true
         cancelTimers()
         wakeUntil = nil
-        isSleeping = false
+        clearCalmState()
         animator?.play(.idle)
         if isEnabled { scheduleRestTimers() }
     }
@@ -64,25 +82,36 @@ final class PetMode {
     func yieldToHigherPriorityDriver() {
         ownsRestingAnimation = false
         wakeUntil = nil
-        isSleeping = false
+        clearCalmState()
         cancelTimers()
     }
 
     /// Any agent event or explicit mode change restarts the calm-at-rest clock.
     func stir() {
-        let wasSleeping = isSleeping
-        isSleeping = false
+        if isWaking { return }
+        let wasResting = isLoafing || isSleeping
+        loafTimer?.invalidate()
+        loafTimer = nil
         dozeTimer?.invalidate()
         dozeTimer = nil
-        if wasSleeping { animator?.play(.idle) }
+        if wasResting {
+            beginWakeTransition()
+            return
+        }
         guard priorityAllowsPetMode else { return }
-        if isEnabled { scheduleDoze() }
+        if isEnabled { scheduleRestTimers() }
     }
 
     func wake() {
         guard isEnabled, priorityAllowsPetMode else { return }
+        if isWaking { return }
+        if isLoafing || isSleeping {
+            beginWakeTransition()
+            return
+        }
+
         cancelTimers()
-        isSleeping = false
+        clearCalmState()
         animator?.play(.idle)
 
         let extensionLength = TimeInterval.random(in: 10...15)
@@ -95,6 +124,8 @@ final class PetMode {
         cancelTimers()
         wakeUntil = nil
         ownsRestingAnimation = true
+        isLoafing = false
+        isWaking = false
         guard let sleepAnimation else {
             isSleeping = false
             animator?.play(.idle)
@@ -105,12 +136,17 @@ final class PetMode {
         return true
     }
 
-    func replaceSleepAnimation(_ animation: SleepAnimation?) {
-        sleepAnimation = animation
-        if animation == nil, isSleeping {
-            isSleeping = false
-            animator?.play(.idle)
-        }
+    func replaceCalmAnimations(
+        loaf: SleepAnimation?,
+        sleep: SleepAnimation?,
+        wake: SleepAnimation?
+    ) {
+        loafAnimation = loaf
+        sleepAnimation = sleep
+        wakeAnimation = wake
+        if loaf == nil, isLoafing { returnToCalmIfAllowed() }
+        if sleep == nil, isSleeping { returnToCalmIfAllowed() }
+        if wake == nil, isWaking { finishWakeTransition() }
     }
 
     private var priorityAllowsPetMode: Bool {
@@ -127,14 +163,36 @@ final class PetMode {
 
     private func scheduleRestTimers() {
         scheduleOccasionalBeat()
+        scheduleLoaf()
         scheduleDoze()
     }
 
+    private func scheduleLoaf() {
+        guard isEnabled, priorityAllowsPetMode, loafAnimation != nil,
+              !isLoafing, !isSleeping, !isWaking, loafTimer == nil else { return }
+        loafTimer = Timer.scheduledTimer(withTimeInterval: loafInterval, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.loafIfStillCalm() }
+        }
+    }
+
     private func scheduleDoze() {
-        guard isEnabled, priorityAllowsPetMode, sleepAnimation != nil, dozeTimer == nil else { return }
+        guard isEnabled, priorityAllowsPetMode, sleepAnimation != nil,
+              !isSleeping, !isWaking, dozeTimer == nil else { return }
         dozeTimer = Timer.scheduledTimer(withTimeInterval: dozeInterval, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.dozeIfStillCalm() }
         }
+    }
+
+    private func loafIfStillCalm() {
+        loafTimer = nil
+        guard isEnabled, priorityAllowsPetMode, ownsRestingAnimation,
+              !isSleeping, let loafAnimation else { return }
+        idleTimer?.invalidate()
+        idleTimer = nil
+        beatTimer?.invalidate()
+        beatTimer = nil
+        isLoafing = true
+        animator?.playLoaf(loafAnimation)
     }
 
     private func dozeIfStillCalm() {
@@ -143,8 +201,50 @@ final class PetMode {
         _ = forceSleep()
     }
 
+    private func beginWakeTransition() {
+        cancelTimers()
+        wakeUntil = nil
+        ownsRestingAnimation = true
+        isLoafing = false
+        isSleeping = false
+        guard let wakeAnimation else {
+            isWaking = false
+            animator?.play(.idle)
+            finishWakeTransition()
+            return
+        }
+
+        isWaking = true
+        animator?.playWake(wakeAnimation)
+        let hold = TimeInterval.random(in: wakeHoldDurationRange)
+        wakeTimer = Timer.scheduledTimer(withTimeInterval: hold, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.finishWakeTransition() }
+        }
+    }
+
+    private func finishWakeTransition() {
+        wakeTimer?.invalidate()
+        wakeTimer = nil
+        isWaking = false
+        guard !isManualMode() else {
+            ownsRestingAnimation = false
+            return
+        }
+
+        let liveState = currentLiveState()
+        if liveState == .idle {
+            ownsRestingAnimation = true
+            animator?.play(.idle)
+            if isEnabled { scheduleRestTimers() }
+        } else {
+            ownsRestingAnimation = false
+            animator?.play(liveState)
+        }
+    }
+
     private func scheduleOccasionalBeat() {
-        guard isEnabled, priorityAllowsPetMode, !isSleeping else { return }
+        guard isEnabled, priorityAllowsPetMode, !isLoafing, !isSleeping, !isWaking,
+              idleTimer == nil, beatTimer == nil else { return }
         let delay = TimeInterval.random(in: Self.randomIntervalRange)
         idleTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.playOccasionalBeat() }
@@ -192,10 +292,16 @@ final class PetMode {
         beatTimer?.invalidate()
         beatTimer = nil
         wakeUntil = nil
-        isSleeping = false
+        clearCalmState()
         guard priorityAllowsPetMode else { return }
         animator?.play(.idle)
         if isEnabled { scheduleRestTimers() }
+    }
+
+    private func clearCalmState() {
+        isLoafing = false
+        isSleeping = false
+        isWaking = false
     }
 
     private func scheduleBeatTimer(after delay: TimeInterval, action: @escaping @MainActor () -> Void) {
@@ -207,22 +313,28 @@ final class PetMode {
     private func cancelTimers() {
         idleTimer?.invalidate()
         beatTimer?.invalidate()
+        loafTimer?.invalidate()
         dozeTimer?.invalidate()
+        wakeTimer?.invalidate()
         idleTimer = nil
         beatTimer = nil
+        loafTimer = nil
         dozeTimer = nil
+        wakeTimer = nil
     }
 
     func teardown() {
         ownsRestingAnimation = false
         wakeUntil = nil
-        isSleeping = false
+        clearCalmState()
         cancelTimers()
     }
 
     deinit {
         idleTimer?.invalidate()
         beatTimer?.invalidate()
+        loafTimer?.invalidate()
         dozeTimer?.invalidate()
+        wakeTimer?.invalidate()
     }
 }

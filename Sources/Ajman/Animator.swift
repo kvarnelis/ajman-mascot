@@ -3,18 +3,31 @@ import AppKit
 final class Animator {
     static let sleepPoseHoldRange: ClosedRange<TimeInterval> = 20...45
 
+    private enum CalmPoseMode {
+        case loaf
+        case sleep
+        case wake
+    }
+
     private var sheet: SpriteSheet
     private weak var view: PetView?
     private let sleepHoldRange: ClosedRange<TimeInterval>
     private var timer: DispatchSourceTimer?
     private var frames: [CGImage] = []
     private var frameDurations: [TimeInterval] = []
-    private var sleepPoseWeights: [Double] = []
+    private var calmPoseWeights: [Double] = []
+    private var calmPoseMode: CalmPoseMode?
+    private var currentCalmPoseIndex: Int?
     private var frameIndex = 0
 
     private(set) var currentState: AnimationState = .idle
-    private(set) var isPlayingSleep = false
-    private(set) var currentSleepPoseIndex: Int?
+    var isPlayingLoaf: Bool { calmPoseMode == .loaf }
+    var isPlayingSleep: Bool { calmPoseMode == .sleep }
+    var isPlayingWake: Bool { calmPoseMode == .wake }
+    var isPlayingCalmPose: Bool { calmPoseMode != nil }
+    var currentLoafPoseIndex: Int? { isPlayingLoaf ? currentCalmPoseIndex : nil }
+    var currentSleepPoseIndex: Int? { isPlayingSleep ? currentCalmPoseIndex : nil }
+    var currentWakePoseIndex: Int? { isPlayingWake ? currentCalmPoseIndex : nil }
     var stateDidChange: ((AnimationState) -> Void)?
     var availableStates: [AnimationState] { sheet.animationTable.states }
 
@@ -33,11 +46,11 @@ final class Animator {
         timer = nil
         frames = []
         frameDurations = []
-        sleepPoseWeights = []
+        calmPoseWeights = []
         frameIndex = 0
         self.sheet = sheet
-        isPlayingSleep = false
-        currentSleepPoseIndex = nil
+        calmPoseMode = nil
+        currentCalmPoseIndex = nil
         view?.setBreathingEnabled(false)
         currentState = state
         play(sheet.animationTable.definition(for: state) == nil ? .idle : state, force: true)
@@ -48,12 +61,12 @@ final class Animator {
     }
 
     private func play(_ state: AnimationState, force: Bool) {
-        guard force || isPlayingSleep || state != currentState || timer == nil else { return }
+        guard force || isPlayingCalmPose || state != currentState || timer == nil else { return }
         guard let definition = sheet.animationTable.definition(for: state) else { return }
         timer?.cancel()
         timer = nil
-        isPlayingSleep = false
-        currentSleepPoseIndex = nil
+        calmPoseMode = nil
+        currentCalmPoseIndex = nil
         view?.setBreathingEnabled(false)
         currentState = state
         frames = sheet.frames(for: definition)
@@ -63,17 +76,27 @@ final class Animator {
         showCurrentFrameAndScheduleNext()
     }
 
+    func playLoaf(_ animation: SleepAnimation) {
+        playRotatingPoses(animation, mode: .loaf, initialCrossfade: 0.8)
+    }
+
     func playSleep(_ animation: SleepAnimation) {
-        guard !animation.frames.isEmpty, !isPlayingSleep || timer == nil else { return }
+        playRotatingPoses(animation, mode: .sleep, initialCrossfade: isPlayingLoaf ? 1.2 : 0)
+    }
+
+    func playWake(_ animation: SleepAnimation) {
+        guard !animation.frames.isEmpty else { return }
         timer?.cancel()
         timer = nil
-        isPlayingSleep = true
+        calmPoseMode = .wake
         frames = animation.frames
         frameDurations = []
-        sleepPoseWeights = animation.poseWeights
-        currentSleepPoseIndex = chooseSleepPose(excluding: nil)
-        view?.setBreathingEnabled(true)
-        showSleepPoseAndScheduleNext(crossfade: false)
+        calmPoseWeights = animation.poseWeights
+        currentCalmPoseIndex = chooseCalmPose(excluding: nil)
+        view?.setBreathingEnabled(false)
+        if let poseIndex = currentCalmPoseIndex, frames.indices.contains(poseIndex) {
+            view?.setImage(frames[poseIndex], crossfadeDuration: 0.45)
+        }
     }
 
     @discardableResult
@@ -84,8 +107,8 @@ final class Animator {
 
         timer?.cancel()
         timer = nil
-        isPlayingSleep = false
-        currentSleepPoseIndex = nil
+        calmPoseMode = nil
+        currentCalmPoseIndex = nil
         view?.setBreathingEnabled(false)
         currentState = state
         frames = [stateFrames[frameIndex]]
@@ -105,42 +128,59 @@ final class Animator {
         timer = nil
         frames = []
         frameDurations = []
-        isPlayingSleep = false
-        currentSleepPoseIndex = nil
+        calmPoseMode = nil
+        currentCalmPoseIndex = nil
         view?.setBreathingEnabled(false)
         view?.image = nil
     }
 
-    private func showSleepPoseAndScheduleNext(crossfade: Bool) {
-        guard isPlayingSleep,
-              let poseIndex = currentSleepPoseIndex,
+    private func playRotatingPoses(
+        _ animation: SleepAnimation,
+        mode: CalmPoseMode,
+        initialCrossfade: TimeInterval
+    ) {
+        guard !animation.frames.isEmpty, calmPoseMode != mode || timer == nil else { return }
+        timer?.cancel()
+        timer = nil
+        calmPoseMode = mode
+        frames = animation.frames
+        frameDurations = []
+        calmPoseWeights = animation.poseWeights
+        currentCalmPoseIndex = chooseCalmPose(excluding: nil)
+        view?.setBreathingEnabled(true)
+        showCalmPoseAndScheduleNext(crossfadeDuration: initialCrossfade)
+    }
+
+    private func showCalmPoseAndScheduleNext(crossfadeDuration: TimeInterval) {
+        guard calmPoseMode == .loaf || calmPoseMode == .sleep,
+              let poseIndex = currentCalmPoseIndex,
               frames.indices.contains(poseIndex) else { return }
-        view?.setImage(frames[poseIndex], crossfadeDuration: crossfade ? 1.2 : 0)
+        view?.setImage(frames[poseIndex], crossfadeDuration: crossfadeDuration)
 
         let delay = TimeInterval.random(in: sleepHoldRange)
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now() + delay)
         timer.setEventHandler { [weak self] in
-            guard let self, self.isPlayingSleep else { return }
+            guard let self, self.calmPoseMode == .loaf || self.calmPoseMode == .sleep else { return }
             self.timer?.cancel()
             self.timer = nil
-            self.currentSleepPoseIndex = self.chooseSleepPose(excluding: poseIndex)
-            self.showSleepPoseAndScheduleNext(crossfade: true)
+            self.currentCalmPoseIndex = self.chooseCalmPose(excluding: poseIndex)
+            self.showCalmPoseAndScheduleNext(crossfadeDuration: 1.2)
         }
         self.timer = timer
         timer.resume()
     }
 
-    private func chooseSleepPose(excluding excludedIndex: Int?) -> Int? {
+    private func chooseCalmPose(excluding excludedIndex: Int?) -> Int? {
         let candidates = frames.indices.filter { $0 != excludedIndex }
         guard !candidates.isEmpty else { return frames.indices.first }
         let total = candidates.reduce(0.0) { partial, index in
-            partial + max(sleepPoseWeights.indices.contains(index) ? sleepPoseWeights[index] : 1, 0)
+            partial + max(calmPoseWeights.indices.contains(index) ? calmPoseWeights[index] : 1, 0)
         }
         guard total > 0 else { return candidates.randomElement() }
         var draw = Double.random(in: 0..<total)
         for index in candidates {
-            draw -= max(sleepPoseWeights.indices.contains(index) ? sleepPoseWeights[index] : 1, 0)
+            draw -= max(calmPoseWeights.indices.contains(index) ? calmPoseWeights[index] : 1, 0)
             if draw < 0 { return index }
         }
         return candidates.last

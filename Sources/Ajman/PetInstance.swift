@@ -27,7 +27,7 @@ final class PetInstance {
             liveState: liveState.value,
             displayedState: animator.currentState,
             isManual: isManualMode(),
-            isSleeping: petMode.isSleeping || animator.isPlayingSleep,
+            isSleeping: petMode.isLoafing || petMode.isSleeping || petMode.isWaking || animator.isPlayingCalmPose,
             isAlreadyGlancing: isGlancing
         )
     }
@@ -76,7 +76,9 @@ final class PetInstance {
         animator = Animator(sheet: loadedPet.sheet, view: view)
         petMode = PetMode(
             animator: animator,
+            loafAnimation: loadedPet.loafAnimation,
             sleepAnimation: loadedPet.sleepAnimation,
+            wakeAnimation: loadedPet.wakeAnimation,
             currentLiveState: { [liveState] in liveState.value },
             isManualMode: isManualMode,
             defaults: defaults
@@ -100,6 +102,9 @@ final class PetInstance {
         if state != .idle { cancelGlance(returnToRest: false) }
         liveState.value = state
         guard !isManualMode() else { return }
+        // A rest wake-up owns the image for one brief held pose. The new live
+        // state is retained above and PetMode hands off to it when the hold ends.
+        guard !petMode.isWaking else { return }
         if state == .idle {
             guard !isGlancing else { return }
             petMode.resumeAtRest()
@@ -162,7 +167,11 @@ final class PetInstance {
         cancelGlance(returnToRest: true)
         let state = animator.currentState
         loadedPet = try catalog.load(id: petID, steadySize: enabled)
-        petMode.replaceSleepAnimation(loadedPet.sleepAnimation)
+        petMode.replaceCalmAnimations(
+            loaf: loadedPet.loafAnimation,
+            sleep: loadedPet.sleepAnimation,
+            wake: loadedPet.wakeAnimation
+        )
         animator.replaceSheet(loadedPet.sheet, playing: state)
     }
 

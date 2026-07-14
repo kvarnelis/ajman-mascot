@@ -9,11 +9,11 @@ enum SleepAnimationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unreadable(let url):
-            "The sleep animation could not be decoded: \(url.path)"
+            "The pose strip could not be decoded: \(url.path)"
         case let .wrongSize(url, width, height):
-            "The sleep animation at \(url.path) is \(width)×\(height); it must be a horizontal strip of 192×208 cells."
+            "The pose strip at \(url.path) is \(width)×\(height); it must be a horizontal strip of 192×208 cells."
         case let .cropFailed(url, column):
-            "Could not slice sleep frame \(column) from \(url.path)."
+            "Could not slice pose \(column) from \(url.path)."
         }
     }
 }
