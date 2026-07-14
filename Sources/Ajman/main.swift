@@ -301,6 +301,40 @@ private func runSelfTest() -> Int32 {
               ScratchSide.left.poseIndex == 1 else {
             throw SelfTestError("Ajman's bundled scratch strip did not load right and left orientations")
         }
+        guard ScratchEdgeGeometry.leftPawX == 37,
+              ScratchEdgeGeometry.rightPawX == 155,
+              ScratchEdgeGeometry.targetOriginX(
+                  side: .left, visibleMinX: 0, visibleMaxX: 1_000, scale: 0.75
+              ) == -27.75,
+              ScratchEdgeGeometry.targetOriginX(
+                  side: .right, visibleMinX: 0, visibleMaxX: 1_000, scale: 0.75
+              ) == 883.75,
+              ScratchEdgeGeometry.farSide(
+                  currentOriginX: 850, visibleMinX: 0, visibleMaxX: 1_000, scale: 0.75
+              ) == .left else {
+            throw SelfTestError("scratch edge geometry did not align measured paws or choose the far edge")
+        }
+        var movementOrigin: NSPoint? = NSPoint(x: 100, y: 100)
+        let movementMover = ScratchPanelMover(
+            currentOrigin: { movementOrigin },
+            setOrigin: { movementOrigin = $0 }
+        )
+        let movementTarget = NSPoint(x: 500, y: 100)
+        var movementCompleted = false
+        movementMover.move(to: movementTarget, duration: 0.12) {
+            movementCompleted = true
+        }
+        guard pump(until: {
+            guard let x = movementOrigin?.x else { return false }
+            return x > 100 && x < movementTarget.x
+        }), !movementCompleted else {
+            throw SelfTestError("scratch panel did not translate toward its edge before showing the pose")
+        }
+        guard pump(until: { movementCompleted }),
+              abs((movementOrigin?.x ?? -.infinity) - movementTarget.x) < 0.5 else {
+            throw SelfTestError("scratch panel did not reach its edge before completing")
+        }
+        movementMover.cancel()
         let winnieSleepAnimator = Animator(
             sheet: sleepingWinnie.sheet,
             view: nil,
@@ -316,7 +350,7 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("Winnie's held sleep pose did not rotate to a different pose")
         }
         winnieSleepAnimator.stop()
-        print("Calm assets: Winnie sleep loads and rotates 8 weighted poses; Ajman loaf/sleep/wake/scratch load 8/8/5/2")
+        print("Calm assets: Winnie sleep loads and rotates 8 weighted poses; Ajman loaf/sleep/wake/scratch load 8/8/5/2; scratch panel moves before pose")
 
         var scratchEligibility = ScratchEligibility(
             hasAsset: true,

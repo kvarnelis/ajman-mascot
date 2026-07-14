@@ -14,6 +14,7 @@ final class PetInstance {
     let animator: Animator
     let petMode: PetMode
     let bubbleController: BubbleController
+    private let scratchMover: ScratchPanelMover
 
     var availableStates: [AnimationState] { animator.availableStates }
     var hasSleepAnimation: Bool { loadedPet.sleepAnimation != nil }
@@ -76,6 +77,7 @@ final class PetInstance {
             defaults: defaults
         )
         animator = Animator(sheet: loadedPet.sheet, view: view)
+        scratchMover = ScratchPanelMover(panel: panel)
         petMode = PetMode(
             animator: animator,
             loafAnimation: loadedPet.loafAnimation,
@@ -132,7 +134,8 @@ final class PetInstance {
             didFinish: { [weak self] in
                 guard let self, self.liveState.value == .idle, !self.isManualMode() else { return }
                 self.petMode.resumeAtRest()
-            }
+            },
+            chooseSide: { [weak self] in self?.farScratchSide() }
         )
     }
 
@@ -146,7 +149,9 @@ final class PetInstance {
     func applyState(_ state: AnimationState) {
         if state != .idle {
             cancelGlance(returnToRest: false)
-            scratchBehavior?.cancel(returnToIdle: false)
+            if !isManualMode() {
+                scratchBehavior?.cancel(returnToIdle: false)
+            }
         }
         liveState.value = state
         guard !isManualMode() else { return }
@@ -186,7 +191,9 @@ final class PetInstance {
 
     func handleAgentActivity() {
         cancelGlance(returnToRest: true)
-        scratchBehavior?.cancel(returnToIdle: true)
+        if !isManualMode() {
+            scratchBehavior?.cancel(returnToIdle: true)
+        }
         petMode.stir()
     }
 
@@ -255,18 +262,7 @@ final class PetInstance {
     func setDebugScratch() {
         cancelGlance(returnToRest: false)
         scratchBehavior?.cancel(returnToIdle: false)
-        let side: ScratchSide
-        if let screen = panel.screen
-            ?? NSScreen.screens.first(where: { $0.frame.contains(screenCenter) })
-            ?? NSScreen.main
-            ?? NSScreen.screens.first {
-            let visible = screen.visibleFrame
-            let distanceToLeft = screenCenter.x - visible.minX
-            let distanceToRight = visible.maxX - screenCenter.x
-            side = distanceToRight >= distanceToLeft ? .right : .left
-        } else {
-            side = .right
-        }
+        guard let side = farScratchSide() else { return }
         _ = scratchBehavior?.forceStart(side: side)
     }
 
@@ -305,6 +301,7 @@ final class PetInstance {
         tornDown = true
         cancelGlance(returnToRest: false)
         scratchBehavior?.teardown()
+        scratchMover.cancel()
         panel.petWasClicked = nil
         animator.stateDidChange = nil
         bubbleController.dismissHandler = nil
@@ -342,24 +339,14 @@ final class PetInstance {
         side: ScratchSide,
         completion: @escaping @MainActor () -> Void
     ) {
-        guard let screen = panel.screen
-            ?? NSScreen.screens.first(where: { $0.frame.contains(screenCenter) })
-            ?? NSScreen.main
-            ?? NSScreen.screens.first else {
-            completion()
-            return
-        }
+        guard let screen = scratchScreen() else { return }
 
         animator.play(side.approachState)
         let visible = screen.visibleFrame
         let scale = panel.frame.width / CGFloat(SpriteSheet.cellWidth)
-        let edgeX: CGFloat
-        switch side {
-        case .left:
-            edgeX = visible.minX - 37 * scale
-        case .right:
-            edgeX = visible.maxX - 155 * scale
-        }
+        let edgeX = ScratchEdgeGeometry.targetOriginX(
+            side: side, visibleMinX: visible.minX, visibleMaxX: visible.maxX, scale: scale
+        )
         let target = NSPoint(
             x: edgeX,
             y: min(max(panel.frame.minY, visible.minY), visible.maxY - panel.frame.height)
@@ -367,12 +354,34 @@ final class PetInstance {
         let distance = hypot(target.x - panel.frame.minX, target.y - panel.frame.minY)
         let duration = min(max(TimeInterval(distance / 110), 0.8), 4.0)
 
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = duration
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            panel.animator().setFrameOrigin(target)
-        } completionHandler: {
-            Task { @MainActor in completion() }
+        scratchMover.move(
+            to: target,
+            duration: duration,
+            shouldContinue: { [weak self] in self?.scratchBehavior?.isPerforming == true },
+            completion: completion
+        )
+    }
+
+    private func farScratchSide() -> ScratchSide? {
+        guard let screen = scratchScreen() else { return nil }
+        let visible = screen.visibleFrame
+        let scale = panel.frame.width / CGFloat(SpriteSheet.cellWidth)
+        return ScratchEdgeGeometry.farSide(
+            currentOriginX: panel.frame.minX,
+            visibleMinX: visible.minX,
+            visibleMaxX: visible.maxX,
+            scale: scale
+        )
+    }
+
+    private func scratchScreen() -> NSScreen? {
+        if let screen = panel.screen { return screen }
+        if let containing = NSScreen.screens.first(where: { $0.frame.contains(screenCenter) }) {
+            return containing
+        }
+        return NSScreen.screens.max { left, right in
+            left.visibleFrame.intersection(panel.frame).width * left.visibleFrame.intersection(panel.frame).height
+                < right.visibleFrame.intersection(panel.frame).width * right.visibleFrame.intersection(panel.frame).height
         }
     }
 }

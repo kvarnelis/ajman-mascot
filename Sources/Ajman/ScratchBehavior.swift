@@ -19,6 +19,110 @@ enum ScratchSide: CaseIterable {
     }
 }
 
+enum ScratchEdgeGeometry {
+    // Measured from the authored 192 px reach-up frames. The right paw's
+    // outermost opaque pixel is x=155; the left paw's is x=37.
+    nonisolated static let leftPawX: CGFloat = 37
+    nonisolated static let rightPawX: CGFloat = 155
+
+    nonisolated static func targetOriginX(
+        side: ScratchSide,
+        visibleMinX: CGFloat,
+        visibleMaxX: CGFloat,
+        scale: CGFloat
+    ) -> CGFloat {
+        switch side {
+        case .left: visibleMinX - leftPawX * scale
+        case .right: visibleMaxX - rightPawX * scale
+        }
+    }
+
+    nonisolated static func farSide(
+        currentOriginX: CGFloat,
+        visibleMinX: CGFloat,
+        visibleMaxX: CGFloat,
+        scale: CGFloat
+    ) -> ScratchSide {
+        let leftX = targetOriginX(
+            side: .left, visibleMinX: visibleMinX, visibleMaxX: visibleMaxX, scale: scale
+        )
+        let rightX = targetOriginX(
+            side: .right, visibleMinX: visibleMinX, visibleMaxX: visibleMaxX, scale: scale
+        )
+        return abs(leftX - currentOriginX) >= abs(rightX - currentOriginX) ? .left : .right
+    }
+}
+
+/// `NSWindow` does not animate `frameOrigin` through its animator proxy. Move
+/// the real panel explicitly so completion cannot run until the window reaches
+/// its destination.
+@MainActor
+final class ScratchPanelMover {
+    private let currentOrigin: () -> NSPoint?
+    private let setOrigin: (NSPoint) -> Void
+    private var timer: Timer?
+    private var movementID = 0
+
+    init(panel: NSWindow) {
+        currentOrigin = { [weak panel] in panel?.frame.origin }
+        setOrigin = { [weak panel] origin in panel?.setFrameOrigin(origin) }
+    }
+
+    init(
+        currentOrigin: @escaping () -> NSPoint?,
+        setOrigin: @escaping (NSPoint) -> Void
+    ) {
+        self.currentOrigin = currentOrigin
+        self.setOrigin = setOrigin
+    }
+
+    func move(
+        to target: NSPoint,
+        duration: TimeInterval,
+        shouldContinue: @escaping @MainActor () -> Bool = { true },
+        completion: @escaping @MainActor () -> Void
+    ) {
+        cancel()
+        guard let start = currentOrigin() else { return }
+        guard duration > 0, hypot(target.x - start.x, target.y - start.y) > 0.5 else {
+            setOrigin(target)
+            completion()
+            return
+        }
+
+        movementID += 1
+        let id = movementID
+        let startTime = ProcessInfo.processInfo.systemUptime
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
+            Task { @MainActor in
+                guard let self, self.movementID == id, shouldContinue(), self.currentOrigin() != nil else {
+                    timer.invalidate()
+                    return
+                }
+                let elapsed = ProcessInfo.processInfo.systemUptime - startTime
+                let progress = min(max(elapsed / duration, 0), 1)
+                let eased = progress * progress * (3 - 2 * progress)
+                self.setOrigin(NSPoint(
+                    x: start.x + (target.x - start.x) * eased,
+                    y: start.y + (target.y - start.y) * eased
+                ))
+                guard progress >= 1 else { return }
+                timer.invalidate()
+                self.timer = nil
+                completion()
+            }
+        }
+        self.timer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    func cancel() {
+        movementID += 1
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
 struct ScratchEligibility {
     let hasAsset: Bool
     let isShown: Bool
@@ -64,7 +168,7 @@ final class ScratchBehavior {
     private let didFinish: () -> Void
     private let scheduler: Scheduler
     private let randomUnit: () -> Double
-    private let chooseSide: () -> ScratchSide
+    private let chooseSide: () -> ScratchSide?
     private let now: () -> Date
 
     private var whimTimer: Timer?
@@ -85,7 +189,7 @@ final class ScratchBehavior {
         didFinish: @escaping () -> Void,
         scheduler: Scheduler? = nil,
         randomUnit: @escaping () -> Double = { Double.random(in: 0..<1) },
-        chooseSide: @escaping () -> ScratchSide = { ScratchSide.allCases.randomElement() ?? .left },
+        chooseSide: @escaping () -> ScratchSide? = { ScratchSide.allCases.randomElement() },
         now: @escaping () -> Date = Date.init
     ) {
         self.animation = animation
@@ -126,8 +230,9 @@ final class ScratchBehavior {
 
     @discardableResult
     func startIfEligible(side: ScratchSide? = nil) -> Bool {
-        guard !isPerforming, animation != nil, eligibility().canStart else { return false }
-        begin(side: side ?? chooseSide(), recordsSpacing: true)
+        guard !isPerforming, animation != nil, eligibility().canStart,
+              let side = side ?? chooseSide() else { return false }
+        begin(side: side, recordsSpacing: true)
         return true
     }
 
