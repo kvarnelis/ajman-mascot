@@ -49,7 +49,7 @@ final class PetView: NSView {
         imageLayer.contents = image
     }
 
-    func setBreathingEnabled(_ enabled: Bool) {
+    func setBreathingEnabled(_ enabled: Bool, temperament: Temperament = .normal) {
         guard enabled else {
             imageLayer.removeAnimation(forKey: Self.breathingAnimationKey)
             return
@@ -58,21 +58,21 @@ final class PetView: NSView {
 
         let breathing = CABasicAnimation(keyPath: "transform.scale.y")
         breathing.fromValue = 1.0
-        breathing.toValue = Self.sleepBreathingScale
-        breathing.duration = Self.sleepBreathingHalfPeriod
+        breathing.toValue = temperament.scaledBreathingScale(Self.sleepBreathingScale)
+        breathing.duration = temperament.scaledCalmPose(interval: Self.sleepBreathingHalfPeriod)
         breathing.autoreverses = true
         breathing.repeatCount = .infinity
         breathing.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         imageLayer.add(breathing, forKey: Self.breathingAnimationKey)
     }
 
-    func setScratchRaking(_ enabled: Bool) {
+    func setScratchRaking(_ enabled: Bool, amplitude: CGFloat = ScratchBehavior.rakeAmplitude) {
         imageLayer.removeAnimation(forKey: Self.scratchRakeAnimationKey)
         guard enabled else { return }
 
         let rake = CABasicAnimation(keyPath: "transform.translation.y")
-        rake.fromValue = -ScratchBehavior.rakeAmplitude
-        rake.toValue = ScratchBehavior.rakeAmplitude
+        rake.fromValue = -amplitude
+        rake.toValue = amplitude
         rake.duration = ScratchBehavior.rakeDuration / (Double(ScratchBehavior.rakeCycles) * 2)
         rake.autoreverses = true
         rake.repeatCount = Float(ScratchBehavior.rakeCycles)

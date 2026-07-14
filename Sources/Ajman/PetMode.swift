@@ -258,7 +258,7 @@ final class PetMode {
     private func scheduleOccasionalBeat() {
         guard isEnabled, priorityAllowsPetMode, !isLoafing, !isSleeping, !isWaking,
               idleTimer == nil, beatTimer == nil else { return }
-        let delay = TimeInterval.random(in: temperament.scaled(range: Self.randomIntervalRange))
+        let delay = TimeInterval.random(in: temperament.scaledFidget(range: Self.randomIntervalRange))
         idleTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.playOccasionalBeat() }
         }
@@ -266,12 +266,34 @@ final class PetMode {
 
     private func playOccasionalBeat() {
         idleTimer = nil
-        guard isEnabled, priorityAllowsPetMode, let state = chooseFunState() else {
+        guard isEnabled, priorityAllowsPetMode else {
             returnToCalmIfAllowed()
             return
         }
-        animator?.play(state)
-        scheduleBeatTimer(after: animator?.duration(of: state) ?? 1) { [weak self] in
+
+        let amplitude = temperament.playfulIdleFidgetAmplitudeMultiplier
+        guard amplitude >= 0.05 else {
+            // Catatonic is intentionally too still for an authored full-body beat.
+            returnToCalmIfAllowed()
+            return
+        }
+
+        let duration: TimeInterval
+        if amplitude < 1,
+           animator?.availableStates.contains(.lookDirectionsA) == true,
+           animator?.playSingleFrame(.lookDirectionsA, frameIndex: Int.random(in: 0...1)) == true {
+            // Calm gets a brief head-only look instead of a jump, wave, or
+            // other full-body action. This is the visible amplitude reduction.
+            duration = 0.6 + amplitude
+        } else if let state = chooseFunState() {
+            animator?.play(state)
+            duration = animator?.duration(of: state) ?? 1
+        } else {
+            returnToCalmIfAllowed()
+            return
+        }
+
+        scheduleBeatTimer(after: duration) { [weak self] in
             self?.returnToCalmIfAllowed()
         }
     }

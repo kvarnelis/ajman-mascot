@@ -139,7 +139,9 @@ final class PetInstance {
                 guard let self, let scratchAnimation else { return false }
                 return self.animator.playHeldPose(scratchAnimation, frameIndex: side.poseIndex)
             },
-            setRaking: { [weak self] enabled in self?.animator.setScratchRaking(enabled) },
+            setRaking: { [weak self] enabled, amplitude in
+                self?.animator.setScratchRaking(enabled, amplitude: amplitude)
+            },
             showIdle: { [weak self] in self?.animator.play(.idle) },
             didFinish: { [weak self] in
                 guard let self else { return }

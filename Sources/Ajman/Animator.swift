@@ -47,6 +47,14 @@ final class Animator {
     func setTemperament(_ temperament: Temperament) {
         guard self.temperament != temperament else { return }
         self.temperament = temperament
+        if isPlayingLoaf || isPlayingSleep {
+            timer?.cancel()
+            timer = nil
+            view?.setBreathingEnabled(false)
+            view?.setBreathingEnabled(true, temperament: temperament)
+            showCalmPoseAndScheduleNext(crossfadeDuration: 0)
+            return
+        }
         // Restart only the passive idle loop so the new visible-energy setting
         // takes effect now without disturbing agent, debug, or calm-pose states.
         if currentState == .idle, !isPlayingCalmPose {
@@ -152,8 +160,8 @@ final class Animator {
         return true
     }
 
-    func setScratchRaking(_ enabled: Bool) {
-        view?.setScratchRaking(enabled)
+    func setScratchRaking(_ enabled: Bool, amplitude: CGFloat = ScratchBehavior.rakeAmplitude) {
+        view?.setScratchRaking(enabled, amplitude: amplitude)
     }
 
     func duration(of state: AnimationState) -> TimeInterval? {
@@ -189,7 +197,7 @@ final class Animator {
         frameDurations = []
         calmPoseWeights = animation.poseWeights
         currentCalmPoseIndex = chooseCalmPose(excluding: nil)
-        view?.setBreathingEnabled(true)
+        view?.setBreathingEnabled(true, temperament: temperament)
         view?.setScratchRaking(false)
         showCalmPoseAndScheduleNext(crossfadeDuration: initialCrossfade)
     }
@@ -200,7 +208,7 @@ final class Animator {
               frames.indices.contains(poseIndex) else { return }
         view?.setImage(frames[poseIndex], crossfadeDuration: crossfadeDuration)
 
-        let delay = TimeInterval.random(in: sleepHoldRange)
+        let delay = TimeInterval.random(in: temperament.scaledCalmPose(range: sleepHoldRange))
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now() + delay)
         timer.setEventHandler { [weak self] in

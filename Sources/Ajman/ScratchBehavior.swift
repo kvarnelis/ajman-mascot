@@ -207,7 +207,7 @@ final class ScratchBehavior {
     private let moveToEdge: (ScratchSide, @escaping @MainActor () -> Void) -> Void
     private let moveBackToStart: (@escaping @MainActor () -> Void) -> Void
     private let showPose: (ScratchSide) -> Bool
-    private let setRaking: (Bool) -> Void
+    private let setRaking: (Bool, CGFloat) -> Void
     private let showIdle: () -> Void
     private let didFinish: () -> Void
     private let scheduler: Scheduler
@@ -230,7 +230,7 @@ final class ScratchBehavior {
         moveToEdge: @escaping (ScratchSide, @escaping @MainActor () -> Void) -> Void,
         moveBackToStart: @escaping (@escaping @MainActor () -> Void) -> Void,
         showPose: @escaping (ScratchSide) -> Bool,
-        setRaking: @escaping (Bool) -> Void,
+        setRaking: @escaping (Bool, CGFloat) -> Void,
         showIdle: @escaping () -> Void,
         didFinish: @escaping () -> Void,
         scheduler: Scheduler? = nil,
@@ -261,7 +261,7 @@ final class ScratchBehavior {
 
     func resumeScheduling() {
         guard animation != nil, !isPerforming, whimTimer == nil else { return }
-        let delay = TimeInterval.random(in: temperament().scaled(range: Self.scheduleRange))
+        let delay = TimeInterval.random(in: temperament().scaledFidget(range: Self.scheduleRange))
         whimTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.considerWhim() }
         }
@@ -307,9 +307,9 @@ final class ScratchBehavior {
         whimTimer?.invalidate()
         whimTimer = nil
         let temperament = temperament()
-        guard randomUnit() < temperament.scaled(probability: Self.triggerProbability) else { return }
+        guard randomUnit() < temperament.scaledFidget(probability: Self.triggerProbability) else { return }
         if let lastScratchAt,
-           now().timeIntervalSince(lastScratchAt) < temperament.scaled(interval: Self.minimumSpacing) {
+           now().timeIntervalSince(lastScratchAt) < temperament.scaledFidget(interval: Self.minimumSpacing) {
             return
         }
         _ = startIfEligible()
@@ -365,6 +365,7 @@ final class ScratchBehavior {
     private func updateRaking(_ enabled: Bool) {
         guard isRaking != enabled else { return }
         isRaking = enabled
-        setRaking(enabled)
+        let amplitude = Self.rakeAmplitude * temperament().playfulIdleFidgetAmplitudeMultiplier
+        setRaking(enabled, amplitude)
     }
 }

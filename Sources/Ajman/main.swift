@@ -241,20 +241,36 @@ private func runSelfTest() -> Int32 {
             }
         }
         let frequencies = Temperament.allCases.map(\.frequencyMultiplier)
-        let fidgetWaits = Temperament.allCases.map { $0.scaled(interval: PetMode.randomIntervalRange.lowerBound) }
-        let scratchProbabilities = Temperament.allCases.map { $0.scaled(probability: ScratchBehavior.triggerProbability) }
-        let scratchSpacing = Temperament.allCases.map { $0.scaled(interval: ScratchBehavior.minimumSpacing) }
+        let fidgetFrequencies = Temperament.allCases.map(\.playfulIdleFidgetFrequencyMultiplier)
+        let fidgetAmplitudes = Temperament.allCases.map(\.playfulIdleFidgetAmplitudeMultiplier)
+        let fidgetWaits = Temperament.allCases.map { $0.scaledFidget(interval: PetMode.randomIntervalRange.lowerBound) }
+        let scratchProbabilities = Temperament.allCases.map { $0.scaledFidget(probability: ScratchBehavior.triggerProbability) }
+        let scratchSpacing = Temperament.allCases.map { $0.scaledFidget(interval: ScratchBehavior.minimumSpacing) }
         let idleLiveliness = Temperament.allCases.map(\.idleLivelinessMultiplier)
         let idleFrameWaits = Temperament.allCases.map { $0.scaledIdleFrameDuration(1) }
+        let calmPoseWaits = Temperament.allCases.map { $0.scaledCalmPose(interval: Animator.sleepPoseHoldRange.lowerBound) }
+        let breathingScales = Temperament.allCases.map { $0.scaledBreathingScale(PetView.sleepBreathingScale) }
         guard zip(frequencies, frequencies.dropFirst()).allSatisfy({ $0 < $1 }),
+              zip(fidgetFrequencies, fidgetFrequencies.dropFirst()).allSatisfy({ $0 < $1 }),
+              zip(fidgetAmplitudes, fidgetAmplitudes.dropFirst()).allSatisfy({ $0 <= $1 }),
               zip(fidgetWaits, fidgetWaits.dropFirst()).allSatisfy({ $0 > $1 }),
               zip(scratchProbabilities, scratchProbabilities.dropFirst()).allSatisfy({ $0 < $1 }),
               zip(scratchSpacing, scratchSpacing.dropFirst()).allSatisfy({ $0 > $1 }),
               zip(idleLiveliness, idleLiveliness.dropFirst()).allSatisfy({ $0 < $1 }),
-              zip(idleFrameWaits, idleFrameWaits.dropFirst()).allSatisfy({ $0 > $1 }) else {
-            throw SelfTestError("higher temperament did not monotonically increase whims and visible idle liveliness")
+              zip(idleFrameWaits, idleFrameWaits.dropFirst()).allSatisfy({ $0 > $1 }),
+              calmPoseWaits[0] > calmPoseWaits[1], calmPoseWaits[1] > calmPoseWaits[2],
+              calmPoseWaits[2] == calmPoseWaits[3], calmPoseWaits[3] == calmPoseWaits[4],
+              breathingScales[0] < breathingScales[1], breathingScales[1] < breathingScales[2],
+              breathingScales[2] == breathingScales[3], breathingScales[3] == breathingScales[4],
+              idleLiveliness == [0.05, 0.3, 1, 2, 4],
+              fidgetFrequencies == [0.01, 0.15, 1, 2, 4],
+              fidgetAmplitudes == [0.02, 0.25, 1, 1, 1],
+              fidgetAmplitudes[0] < 0.05,
+              fidgetAmplitudes[1] >= 0.05 && fidgetAmplitudes[1] < 1,
+              fidgetAmplitudes[2...].allSatisfy({ $0 == 1 }) else {
+            throw SelfTestError("temperament did not monotonically govern idle cadence, fidget rate/amplitude, calm poses, and breathing")
         }
-        print("Temperament: per-pet Ajman/Winnie identity isolated; 0.15/0.5/1/2/4x whims and visible idle cadence are monotonic")
+        print("Temperament: idle 0.05/0.3/1/2/4x; fidget rate 0.01/0.15/1/2/4x; Catatonic suppresses beats, Calm uses head-only 0.25x beats/rakes; breathing/calm poses low-end scaled")
 
         let expectedLivelyStates: Set<AnimationState> = [
             .jumping, .waving, .runningRight, .runningLeft, .running,
@@ -553,7 +569,9 @@ private func runSelfTest() -> Int32 {
                 scratchEvents.append(side == .left ? "pose-left" : "pose-right")
                 return true
             },
-            setRaking: { scratchEvents.append($0 ? "rake-on" : "rake-off") },
+            setRaking: { enabled, amplitude in
+                scratchEvents.append(enabled ? "rake-on-\(amplitude)" : "rake-off-\(amplitude)")
+            },
             showIdle: { scratchEvents.append("idle") },
             didFinish: { scratchEvents.append("finish") },
             scheduler: { _, action in action() }
@@ -563,7 +581,7 @@ private func runSelfTest() -> Int32 {
         }
         guard scratchBehavior.forceStart(side: .right),
               !scratchBehavior.isPerforming,
-              scratchEvents == ["start", "move-right", "pose-right", "rake-on", "rake-off", "move-home", "idle", "finish"] else {
+              scratchEvents == ["start", "move-right", "pose-right", "rake-on-5.0", "rake-off-5.0", "move-home", "idle", "finish"] else {
             throw SelfTestError("debug scratch did not bypass eligibility and finish: \(scratchEvents)")
         }
         scratchEvents.removeAll()
@@ -592,7 +610,7 @@ private func runSelfTest() -> Int32 {
         )
         guard scratchBehavior.startIfEligible(side: .left),
               !scratchBehavior.isPerforming,
-              scratchEvents == ["start", "move-left", "pose-left", "rake-on", "rake-off", "move-home", "idle", "finish"] else {
+              scratchEvents == ["start", "move-left", "pose-left", "rake-on-5.0", "rake-off-5.0", "move-home", "idle", "finish"] else {
             throw SelfTestError("idle scratch did not approach, rake, and return to idle: \(scratchEvents)")
         }
         scratchBehavior.teardown()
