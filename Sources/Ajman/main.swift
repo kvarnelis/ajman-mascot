@@ -378,6 +378,33 @@ private func runSelfTest() -> Int32 {
               ) == .left else {
             throw SelfTestError("scratch edge geometry did not align measured paws or choose the far edge")
         }
+        var liveScratchOriginX: CGFloat = 850
+        guard ScratchEdgeGeometry.autonomousSide(
+            currentOriginX: liveScratchOriginX,
+            visibleMinX: 0,
+            visibleMaxX: 1_000,
+            scale: 0.75,
+            randomUnit: 0.99
+        ) == .right else {
+            throw SelfTestError("autonomous scratch did not choose the nearest edge from a live right-side position")
+        }
+        liveScratchOriginX = 100
+        guard ScratchEdgeGeometry.autonomousSide(
+            currentOriginX: liveScratchOriginX,
+            visibleMinX: 0,
+            visibleMaxX: 1_000,
+            scale: 0.75,
+            randomUnit: 0.99
+        ) == .left,
+              ScratchEdgeGeometry.autonomousSide(
+                  currentOriginX: liveScratchOriginX,
+                  visibleMinX: 0,
+                  visibleMaxX: 1_000,
+                  scale: 0.75,
+                  randomUnit: 0
+              ) == .right else {
+            throw SelfTestError("autonomous scratch did not follow the live position or deterministically exercise the far-edge branch")
+        }
         var movementOrigin: NSPoint? = NSPoint(x: 100, y: 100)
         let movementMover = ScratchPanelMover(
             currentOrigin: { movementOrigin },
@@ -429,7 +456,7 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("Winnie's held sleep pose did not rotate to a different pose")
         }
         winnieSleepAnimator.stop()
-        print("Calm assets: Winnie sleep loads and rotates 8 weighted poses; Ajman loaf/sleep/wake/scratch load 8/8/5/2; scratch panel reaches the edge and returns to its recorded start")
+        print("Calm assets: Winnie sleep loads and rotates 8 weighted poses; Ajman loaf/sleep/wake/scratch load 8/8/5/2; autonomous scratch follows live position with a 27% far-edge branch; scratch panel reaches the edge and returns to its recorded start")
 
         var scratchEligibility = ScratchEligibility(
             hasAsset: true,

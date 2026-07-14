@@ -24,6 +24,7 @@ enum ScratchEdgeGeometry {
     // outermost opaque pixel is x=155; the left paw's is x=37.
     nonisolated static let leftPawX: CGFloat = 37
     nonisolated static let rightPawX: CGFloat = 155
+    nonisolated static let autonomousFarProbability = 0.27
 
     nonisolated static func targetOriginX(
         side: ScratchSide,
@@ -50,6 +51,44 @@ enum ScratchEdgeGeometry {
             side: .right, visibleMinX: visibleMinX, visibleMaxX: visibleMaxX, scale: scale
         )
         return abs(leftX - currentOriginX) >= abs(rightX - currentOriginX) ? .left : .right
+    }
+
+    nonisolated static func nearestSide(
+        currentOriginX: CGFloat,
+        visibleMinX: CGFloat,
+        visibleMaxX: CGFloat,
+        scale: CGFloat
+    ) -> ScratchSide {
+        let leftX = targetOriginX(
+            side: .left, visibleMinX: visibleMinX, visibleMaxX: visibleMaxX, scale: scale
+        )
+        let rightX = targetOriginX(
+            side: .right, visibleMinX: visibleMinX, visibleMaxX: visibleMaxX, scale: scale
+        )
+        return abs(leftX - currentOriginX) <= abs(rightX - currentOriginX) ? .left : .right
+    }
+
+    nonisolated static func autonomousSide(
+        currentOriginX: CGFloat,
+        visibleMinX: CGFloat,
+        visibleMaxX: CGFloat,
+        scale: CGFloat,
+        randomUnit: Double
+    ) -> ScratchSide {
+        if randomUnit < autonomousFarProbability {
+            return farSide(
+                currentOriginX: currentOriginX,
+                visibleMinX: visibleMinX,
+                visibleMaxX: visibleMaxX,
+                scale: scale
+            )
+        }
+        return nearestSide(
+            currentOriginX: currentOriginX,
+            visibleMinX: visibleMinX,
+            visibleMaxX: visibleMaxX,
+            scale: scale
+        )
     }
 
     nonisolated static func travelState(fromOriginX: CGFloat, toOriginX: CGFloat) -> AnimationState {

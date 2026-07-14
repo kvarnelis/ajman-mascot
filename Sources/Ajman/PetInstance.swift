@@ -147,7 +147,7 @@ final class PetInstance {
                 guard self.liveState.value == .idle, !self.isManualMode() else { return }
                 self.petMode.resumeAtRest()
             },
-            chooseSide: { [weak self] in self?.farScratchSide() },
+            chooseSide: { [weak self] in self?.autonomousScratchSide() },
             temperament: { [weak self] in self?.temperament ?? .normal }
         )
     }
@@ -406,6 +406,20 @@ final class PetInstance {
             visibleMinX: visible.minX,
             visibleMaxX: visible.maxX,
             scale: scale
+        )
+    }
+
+    private func autonomousScratchSide() -> ScratchSide? {
+        guard let screen = scratchScreen() else { return nil }
+        let visible = screen.visibleFrame
+        let liveFrame = panel.frame
+        let scale = liveFrame.width / CGFloat(SpriteSheet.cellWidth)
+        return ScratchEdgeGeometry.autonomousSide(
+            currentOriginX: liveFrame.minX,
+            visibleMinX: visible.minX,
+            visibleMaxX: visible.maxX,
+            scale: scale,
+            randomUnit: Double.random(in: 0..<1)
         )
     }
 
