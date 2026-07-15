@@ -189,27 +189,69 @@ private func runSelfTest() -> Int32 {
               PetClickDisposition.classify(buttonNumber: 1, modifiers: []) == .advanceAction else {
             throw SelfTestError("pet click classification or shared action-cycle order was incorrect")
         }
-        var perPetActions: [String: AnimationState] = ["ajman": .idle, "winnie": .idle]
-        func simulateActionClick(petID: String, buttonNumber: Int, modifiers: NSEvent.ModifierFlags) {
-            guard PetClickDisposition.classify(buttonNumber: buttonNumber, modifiers: modifiers) == .advanceAction,
-                  let current = perPetActions[petID],
-                  let next = PetActionCycle.next(after: current, availableStates: cycleOrder) else { return }
-            perPetActions[petID] = next
+        let fullActionCycle = PetActionCycle.availableActions(
+            availableStates: cycleOrder,
+            hasLoaf: true,
+            hasSleep: true,
+            hasScratch: true
+        )
+        let expectedAfterIdle: [PetCycleAction] = [
+            .animation(.runningRight), .animation(.runningLeft), .animation(.waving),
+            .animation(.jumping), .animation(.failed), .animation(.waiting),
+            .animation(.running), .animation(.review), .animation(.lookDirectionsA),
+            .animation(.lookDirectionsB), .loaf, .sleep, .scratch, .animation(.idle),
+        ]
+        guard fullActionCycle == PetActionCycle.directOrder,
+              fullActionCycle.suffix(3) == [.loaf, .sleep, .scratch] else {
+            throw SelfTestError("per-pet action cycle did not include loaf, sleep, and scratch")
         }
-        simulateActionClick(petID: "ajman", buttonNumber: 0, modifiers: [.control])
-        guard perPetActions["ajman"] == .runningRight, perPetActions["winnie"] == .idle else {
-            throw SelfTestError("control-click advanced more than the clicked pet")
+
+        var ajmanCursor = PetActionCycle.Cursor()
+        var observed: [PetCycleAction] = []
+        for _ in expectedAfterIdle.indices {
+            // Simulate one-shot animations having reverted to idle before every click.
+            if let action = ajmanCursor.next(
+                availableActions: fullActionCycle,
+                startingAfter: .animation(.idle)
+            ) {
+                observed.append(action)
+            }
         }
-        simulateActionClick(petID: "ajman", buttonNumber: 1, modifiers: [])
-        guard perPetActions["ajman"] == .runningLeft, perPetActions["winnie"] == .idle else {
-            throw SelfTestError("right-click did not advance only the clicked pet")
+        guard observed == expectedAfterIdle,
+              ajmanCursor.next(
+                  availableActions: fullActionCycle,
+                  startingAfter: .animation(.idle)
+              ) == .animation(.runningRight) else {
+            throw SelfTestError("repeated control-click did not traverse the full cycle in order and wrap")
         }
-        simulateActionClick(petID: "winnie", buttonNumber: 1, modifiers: [])
-        guard perPetActions["ajman"] == .runningLeft, perPetActions["winnie"] == .runningRight,
+
+        let ajmanPositionAfterWrap = ajmanCursor.position
+        var winnieCursor = PetActionCycle.Cursor()
+        guard winnieCursor.position == nil,
+              winnieCursor.next(
+                  availableActions: fullActionCycle,
+                  startingAfter: .animation(.idle)
+              ) == .animation(.runningRight),
+              winnieCursor.position == 1,
+              ajmanCursor.position == ajmanPositionAfterWrap else {
+            throw SelfTestError("per-pet action-cycle positions were not isolated")
+        }
+        let noScratchCycle = PetActionCycle.availableActions(
+            availableStates: cycleOrder,
+            hasLoaf: true,
+            hasSleep: true,
+            hasScratch: false
+        )
+        var resyncCursor = PetActionCycle.Cursor()
+        for _ in 0..<fullActionCycle.count {
+            _ = resyncCursor.next(availableActions: fullActionCycle)
+        }
+        guard !noScratchCycle.contains(.scratch), noScratchCycle.suffix(2) == [.loaf, .sleep],
+              resyncCursor.next(availableActions: noScratchCycle) == .animation(.idle),
               PetActionCycle.next(after: .lookDirectionsB, availableStates: cycleOrder) == .idle else {
-            throw SelfTestError("per-pet action cycle did not remain isolated or wrap")
+            throw SelfTestError("per-pet action cycle did not skip unavailable behavior assets")
         }
-        print("Pet action clicks: control/right advance only the clicked pet; shared 11-state order wraps")
+        print("Pet action clicks: per-pet cursor traverses 11 states plus loaf/sleep/scratch despite idle resets; unavailable actions skip; order wraps")
 
         let temperamentSuiteName = "AjmanSelfTest.Temperament.\(UUID().uuidString)"
         guard let temperamentDefaults = UserDefaults(suiteName: temperamentSuiteName) else {
@@ -654,6 +696,11 @@ private func runSelfTest() -> Int32 {
             wakeHoldRange: 0.05...0.05,
             defaults: sleepDefaults
         )
+        guard shortDoze.forceLoaf(), shortDoze.isLoafing, sleepAnimator.isPlayingLoaf,
+              shortDoze.forceSleep(), shortDoze.isSleeping, sleepAnimator.isPlayingSleep else {
+            throw SelfTestError("forced per-pet loaf/sleep paths did not select their pose strips")
+        }
+        shortDoze.yieldToHigherPriorityDriver()
         shortDoze.resumeAtRest()
         guard pump(until: { shortDoze.isLoafing && sleepAnimator.isPlayingLoaf }) else {
             throw SelfTestError("moderate calm interval did not transition Ajman to loaf")

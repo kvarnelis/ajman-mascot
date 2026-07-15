@@ -143,6 +143,23 @@ final class PetMode {
     }
 
     @discardableResult
+    func forceLoaf() -> Bool {
+        cancelTimers()
+        wakeUntil = nil
+        ownsRestingAnimation = true
+        isSleeping = false
+        isWaking = false
+        guard let loafAnimation else {
+            isLoafing = false
+            animator?.play(.idle)
+            return false
+        }
+        isLoafing = true
+        animator?.playLoaf(loafAnimation)
+        return true
+    }
+
+    @discardableResult
     func forceSleep() -> Bool {
         cancelTimers()
         wakeUntil = nil

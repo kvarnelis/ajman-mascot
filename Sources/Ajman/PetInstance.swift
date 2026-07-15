@@ -18,7 +18,9 @@ final class PetInstance {
 
     var availableStates: [AnimationState] { animator.availableStates }
     private(set) var temperament: Temperament
+    var hasLoafAnimation: Bool { loadedPet.loafAnimation != nil }
     var hasSleepAnimation: Bool { loadedPet.sleepAnimation != nil }
+    var hasScratchAnimation: Bool { loadedPet.scratchAnimation != nil }
     var positionPersistenceKey: String { panel.positionPersistenceKey }
     var screenCenter: NSPoint { NSPoint(x: panel.frame.midX, y: panel.frame.midY) }
     var glanceEligibility: InterCatGlanceEligibility {
@@ -44,6 +46,7 @@ final class PetInstance {
     private var scratchStartingOrigin: NSPoint?
     private(set) var isGlancing = false
     private var isDirectCycling = false
+    private var actionCycleCursor = PetActionCycle.Cursor()
     private var tornDown = false
 
     init(
@@ -270,16 +273,32 @@ final class PetInstance {
     }
 
     func cycleToNextAction() {
-        guard let next = PetActionCycle.next(
-            after: animator.currentState,
-            availableStates: animator.availableStates
+        let availableActions = PetActionCycle.availableActions(
+            availableStates: animator.availableStates,
+            hasLoaf: hasLoafAnimation,
+            hasSleep: hasSleepAnimation,
+            hasScratch: hasScratchAnimation
+        )
+        guard let next = actionCycleCursor.next(
+            availableActions: availableActions,
+            startingAfter: .animation(animator.currentState)
         ) else { return }
         cancelGlance(returnToRest: false)
         scratchBehavior?.cancel(returnToIdle: false)
-        petMode.yieldToHigherPriorityDriver()
-        isDirectCycling = true
-        animator.play(next)
-        isDirectCycling = false
+        switch next {
+        case let .animation(state):
+            petMode.yieldToHigherPriorityDriver()
+            isDirectCycling = true
+            animator.play(state)
+            isDirectCycling = false
+        case .loaf:
+            _ = petMode.forceLoaf()
+        case .sleep:
+            _ = petMode.forceSleep()
+        case .scratch:
+            guard let side = farScratchSide() else { return }
+            _ = scratchBehavior?.forceStart(side: side)
+        }
     }
 
     func setDebugState(_ state: AnimationState) {
