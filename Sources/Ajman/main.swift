@@ -34,6 +34,50 @@ private func runSelfTest() -> Int32 {
     }
 
     do {
+        let launchPromptSuiteName = "AjmanSelfTest.FirstRunLaunchPrompt.\(UUID().uuidString)"
+        guard let launchPromptDefaults = UserDefaults(suiteName: launchPromptSuiteName) else {
+            throw SelfTestError("could not create first-run launch prompt defaults")
+        }
+        defer { launchPromptDefaults.removePersistentDomain(forName: launchPromptSuiteName) }
+        var promptCount = 0
+        var enableCount = 0
+        let firstRunPrompt = FirstRunLaunchPrompt(defaults: launchPromptDefaults)
+        let firstPromptShown = try firstRunPrompt.performIfNeeded(
+            prompt: {
+                promptCount += 1
+                return true
+            },
+            enableLaunchAtLogin: { enableCount += 1 }
+        )
+        let repeatedPromptShown = try FirstRunLaunchPrompt(defaults: launchPromptDefaults).performIfNeeded(
+            prompt: {
+                promptCount += 1
+                return true
+            },
+            enableLaunchAtLogin: { enableCount += 1 }
+        )
+        guard firstPromptShown, !repeatedPromptShown,
+              promptCount == 1, enableCount == 1,
+              launchPromptDefaults.bool(forKey: FirstRunLaunchPrompt.didAskKey) else {
+            throw SelfTestError("first-run launch prompt did not show once and enable Launch at Login on Yes")
+        }
+
+        let notNowSuiteName = "AjmanSelfTest.FirstRunLaunchPrompt.NotNow.\(UUID().uuidString)"
+        guard let notNowDefaults = UserDefaults(suiteName: notNowSuiteName) else {
+            throw SelfTestError("could not create Not now launch prompt defaults")
+        }
+        defer { notNowDefaults.removePersistentDomain(forName: notNowSuiteName) }
+        var notNowEnableCount = 0
+        _ = try FirstRunLaunchPrompt(defaults: notNowDefaults).performIfNeeded(
+            prompt: { false },
+            enableLaunchAtLogin: { notNowEnableCount += 1 }
+        )
+        guard notNowEnableCount == 0,
+              notNowDefaults.bool(forKey: FirstRunLaunchPrompt.didAskKey) else {
+            throw SelfTestError("Not now did not persist the one-time prompt without enabling Launch at Login")
+        }
+        print("First-run launch prompt: shows once; Yes enables; Not now stays off; both persist \(FirstRunLaunchPrompt.didAskKey)")
+
         guard AjmanApp.version == AppVersion("v0.1.0"),
               AppVersion("1.2.4")! > AppVersion("1.2.3")!,
               AppVersion("1.2")! == AppVersion("1.2.0")!,

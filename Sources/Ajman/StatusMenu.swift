@@ -466,6 +466,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         updateChecksItem.state = enabled ? .on : .off
     }
 
+    func refreshLaunchAtLoginState() {
+        launchAtLoginItem.state = launchAtLogin.isEnabled ? .on : .off
+    }
+
     @objc private func previewUpdateBubble() { previewUpdateHandler?() }
 
     @objc private func toggleUpdateChecks(_ sender: NSMenuItem) {

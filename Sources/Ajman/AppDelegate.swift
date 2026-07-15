@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             statusMenu = menu
             wireMenu(menu)
+            showFirstRunLaunchPromptIfNeeded(menu: menu)
 
             let updateManager = UpdateManager { [weak self] in self?.updateAnchorWindow() }
             self.updateManager = updateManager
@@ -157,6 +158,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.previewUpdateHandler = { [weak self] in self?.updateManager?.preview() }
         menu.updateChecksHandler = { [weak self] enabled in self?.updateManager?.setPromptsEnabled(enabled) }
+    }
+
+    private func showFirstRunLaunchPromptIfNeeded(menu: StatusMenu) {
+        let launchAtLogin = LaunchAtLogin()
+        do {
+            try FirstRunLaunchPrompt().performIfNeeded(
+                prompt: {
+                    let alert = NSAlert()
+                    alert.messageText = "Keep Ajman around?"
+                    alert.informativeText = "Would you like Ajman to launch at startup? You can change this any time from the menu-bar icon."
+                    alert.alertStyle = .informational
+                    alert.addButton(withTitle: "Yes")
+                    alert.addButton(withTitle: "Not now")
+                    return alert.runModal() == .alertFirstButtonReturn
+                },
+                enableLaunchAtLogin: { try launchAtLogin.setEnabled(true) }
+            )
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Ajman could not launch at startup."
+            alert.informativeText = "You can try again later from the Launch at Login menu item.\n\n\(error.localizedDescription)"
+            alert.alertStyle = .warning
+            alert.runModal()
+        }
+        menu.refreshLaunchAtLoginState()
     }
 
     private func setPet(id: String, shown: Bool) {
