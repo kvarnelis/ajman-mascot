@@ -177,6 +177,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         activityItem.title = "Agents: \(state.title) — \(sessionCount) session\(sessionCount == 1 ? "" : "s")"
     }
 
+    /// Opens the existing status-item menu for Finder/Dock reopen requests.
+    func presentForApplicationReopen() {
+        statusItem.button?.performClick(nil)
+    }
+
     private func rebuildPetMenu(
         pets: [PetDescriptor],
         shownPetIDs: Set<String>,

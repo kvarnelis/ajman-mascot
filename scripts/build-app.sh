@@ -10,6 +10,8 @@ cd "$REPO_ROOT"
 # so this is safe and keeps agent builds deterministic.
 swift build -c release --disable-sandbox
 
+"$REPO_ROOT/scripts/build-icon.sh" "$REPO_ROOT/build/icon"
+
 APP="$REPO_ROOT/build/Ajman.app"
 CONTENTS="$APP/Contents"
 rm -rf "$APP"
@@ -26,6 +28,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Ajman</string>
   <key>CFBundleExecutable</key><string>Ajman</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>Ajman.icns</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>LSUIElement</key><true/>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
@@ -33,6 +36,8 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+
+cp "$REPO_ROOT/build/icon/Ajman.icns" "$CONTENTS/Resources/Ajman.icns"
 
 mkdir -p "$CONTENTS/Resources/pets"
 for pet_id in ajman winnie; do

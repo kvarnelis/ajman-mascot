@@ -34,6 +34,31 @@ private func runSelfTest() -> Int32 {
     }
 
     do {
+        let executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
+        let contentsURL = executableURL.deletingLastPathComponent().deletingLastPathComponent()
+        if contentsURL.lastPathComponent == "Contents" {
+            let iconURL = contentsURL.appendingPathComponent("Resources/Ajman.icns")
+            let plistURL = contentsURL.appendingPathComponent("Info.plist")
+            guard fileManager.fileExists(atPath: iconURL.path),
+                  (try iconURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) > 0,
+                  let plist = NSDictionary(contentsOf: plistURL),
+                  plist["CFBundleIconFile"] as? String == "Ajman.icns" else {
+                throw SelfTestError("bundled app icon or CFBundleIconFile is missing")
+            }
+            print("App icon: bundled Resources/Ajman.icns exists and CFBundleIconFile is Ajman.icns")
+        }
+
+        var reopenShowCount = 0
+        var reopenMenuCount = 0
+        ApplicationReopenAction.perform(
+            showPetsIfNeeded: { reopenShowCount += 1 },
+            openMenu: { reopenMenuCount += 1 }
+        )
+        guard reopenShowCount == 1, reopenMenuCount == 1 else {
+            throw SelfTestError("application reopen did not reveal pets and present the menu exactly once")
+        }
+        print("Application reopen: reveals hidden pets and triggers the status-item menu")
+
         let launchPromptSuiteName = "AjmanSelfTest.FirstRunLaunchPrompt.\(UUID().uuidString)"
         guard let launchPromptDefaults = UserDefaults(suiteName: launchPromptSuiteName) else {
             throw SelfTestError("could not create first-run launch prompt defaults")

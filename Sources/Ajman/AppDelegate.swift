@@ -103,6 +103,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pets.removeAll()
     }
 
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication,
+        hasVisibleWindows flag: Bool
+    ) -> Bool {
+        ApplicationReopenAction.perform(
+            showPetsIfNeeded: { [weak self] in self?.showPetsForApplicationReopen() },
+            openMenu: { [weak self] in self?.statusMenu?.presentForApplicationReopen() }
+        )
+        return true
+    }
+
+    private func showPetsForApplicationReopen() {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+
+        if pets.isEmpty,
+           let petID = discoveredPets.first(where: { $0.id == "ajman" })?.id
+                ?? discoveredPets.first?.id {
+            setPet(id: petID, shown: true)
+            return
+        }
+
+        let useLegacyFallback = pets.count == 1
+        for pet in pets where !pet.panel.isVisible {
+            pet.show(useLegacyPositionFallback: useLegacyFallback)
+        }
+    }
+
     private func wireMenu(_ menu: StatusMenu) {
         menu.showPetHandler = { [weak self] id, shown in self?.setPet(id: id, shown: shown) }
         menu.bindingHandler = { [weak self] id, provider in self?.setBinding(provider, for: id) }
@@ -360,5 +387,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private enum StartupError: LocalizedError {
         case notReady
         var errorDescription: String? { "The menagerie was not ready to build a pet." }
+    }
+}
+
+/// Shared by the AppKit delegate callback and the self-test so the behavioral
+/// contract cannot drift away from the production reopen path.
+@MainActor
+enum ApplicationReopenAction {
+    static func perform(showPetsIfNeeded: () -> Void, openMenu: () -> Void) {
+        showPetsIfNeeded()
+        openMenu()
     }
 }
