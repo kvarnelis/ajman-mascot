@@ -116,17 +116,34 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
 
     func resetPosition() {
         guard let visibleFrame = NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame else { return }
-        setFrameOrigin(NSPoint(
-            x: max(
-                visibleFrame.minX,
-                visibleFrame.maxX - frame.width - 24 - CGFloat(defaultPositionIndex) * frame.width * 1.5
-            ),
-            y: min(
-                visibleFrame.maxY - frame.height,
-                visibleFrame.minY + 24 + CGFloat(defaultPositionIndex) * frame.height * 0.35
-            )
+        setFrameOrigin(Self.defaultOrigin(
+            visibleFrame: visibleFrame,
+            displaySize: frame.size,
+            defaultPositionIndex: defaultPositionIndex
         ))
         savePosition()
+    }
+
+    static func defaultOrigin(
+        visibleFrame: NSRect,
+        displaySize: NSSize,
+        defaultPositionIndex: Int
+    ) -> NSPoint {
+        let groundLine = visibleFrame.minY + 24
+        let scaledGroundMargin = CGFloat(SpriteSheet.contentMargin)
+            * displaySize.height / CGFloat(SpriteSheet.cellHeight)
+        return NSPoint(
+            x: max(
+                visibleFrame.minX,
+                visibleFrame.maxX - displaySize.width - 24
+                    - CGFloat(defaultPositionIndex) * displaySize.width * 1.5
+            ),
+            y: min(visibleFrame.maxY - displaySize.height, groundLine - scaledGroundMargin)
+        )
+    }
+
+    static func renderedGroundLine(originY: CGFloat, displayHeight: CGFloat) -> CGFloat {
+        originY + CGFloat(SpriteSheet.contentMargin) * displayHeight / CGFloat(SpriteSheet.cellHeight)
     }
 
     func setDefaultPositionIndex(_ index: Int) {

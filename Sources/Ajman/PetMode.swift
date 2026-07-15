@@ -2,7 +2,6 @@ import Foundation
 
 @MainActor
 final class PetMode {
-    static let defaultsKey = "AjmanPetModeEnabled"
     static let randomIntervalRange: ClosedRange<TimeInterval> = 20...70
     nonisolated static let wakeHoldRange: ClosedRange<TimeInterval> = 0.8...1.2
     nonisolated static let defaultLoafInterval: TimeInterval = 45
@@ -27,7 +26,6 @@ final class PetMode {
     private var temperament: Temperament
     private var ownsRestingAnimation = false
 
-    private(set) var isEnabled: Bool
     private(set) var isLoafing = false
     private(set) var isSleeping = false
     private(set) var isWaking = false
@@ -42,8 +40,7 @@ final class PetMode {
         loafInterval: TimeInterval = PetMode.defaultLoafInterval,
         dozeInterval: TimeInterval = PetMode.defaultDozeInterval,
         wakeHoldRange: ClosedRange<TimeInterval> = PetMode.wakeHoldRange,
-        temperament: Temperament = .normal,
-        defaults: UserDefaults = .standard
+        temperament: Temperament = .normal
     ) {
         self.animator = animator
         self.loafAnimation = loafAnimation
@@ -55,25 +52,12 @@ final class PetMode {
         self.dozeInterval = dozeInterval
         wakeHoldDurationRange = wakeHoldRange
         self.temperament = temperament
-        isEnabled = defaults.object(forKey: Self.defaultsKey) as? Bool ?? true
-    }
-
-    func setEnabled(_ enabled: Bool, defaults: UserDefaults = .standard) {
-        isEnabled = enabled
-        defaults.set(enabled, forKey: Self.defaultsKey)
-        wakeUntil = nil
-        clearCalmState()
-        cancelTimers()
-        guard priorityAllowsPetMode else { return }
-        ownsRestingAnimation = true
-        animator?.play(.idle)
-        if enabled { scheduleRestTimers() }
     }
 
     func setTemperament(_ temperament: Temperament) {
         guard self.temperament != temperament else { return }
         self.temperament = temperament
-        guard isEnabled, priorityAllowsPetMode, ownsRestingAnimation else { return }
+        guard priorityAllowsPetMode, ownsRestingAnimation else { return }
         if temperament == .insane, isLoafing || isSleeping {
             beginWakeTransition()
             return
@@ -99,7 +83,7 @@ final class PetMode {
         wakeUntil = nil
         clearCalmState()
         animator?.play(.idle)
-        if isEnabled { scheduleRestTimers() }
+        scheduleRestTimers()
     }
 
     func yieldToHigherPriorityDriver() {
@@ -122,11 +106,11 @@ final class PetMode {
             return
         }
         guard priorityAllowsPetMode else { return }
-        if isEnabled { scheduleRestTimers() }
+        scheduleRestTimers()
     }
 
     func wake() {
-        guard isEnabled, priorityAllowsPetMode else { return }
+        guard priorityAllowsPetMode else { return }
         if isWaking { return }
         if isLoafing || isSleeping {
             beginWakeTransition()
@@ -208,7 +192,7 @@ final class PetMode {
     }
 
     private func scheduleLoaf() {
-        guard isEnabled, priorityAllowsPetMode, loafAnimation != nil,
+        guard priorityAllowsPetMode, loafAnimation != nil,
               !isLoafing, !isSleeping, !isWaking, loafTimer == nil,
               temperament.allowsAutomaticRest else { return }
         let interval = temperament.scaledAutomaticRest(interval: loafInterval)
@@ -218,7 +202,7 @@ final class PetMode {
     }
 
     private func scheduleDoze() {
-        guard isEnabled, priorityAllowsPetMode, sleepAnimation != nil,
+        guard priorityAllowsPetMode, sleepAnimation != nil,
               !isSleeping, !isWaking, dozeTimer == nil,
               temperament.allowsAutomaticRest else { return }
         let interval = temperament.scaledAutomaticRest(interval: dozeInterval)
@@ -229,7 +213,7 @@ final class PetMode {
 
     private func loafIfStillCalm() {
         loafTimer = nil
-        guard isEnabled, priorityAllowsPetMode, ownsRestingAnimation,
+        guard priorityAllowsPetMode, ownsRestingAnimation,
               !isSleeping, let loafAnimation else { return }
         idleTimer?.invalidate()
         idleTimer = nil
@@ -241,7 +225,7 @@ final class PetMode {
 
     private func dozeIfStillCalm() {
         dozeTimer = nil
-        guard isEnabled, priorityAllowsPetMode, ownsRestingAnimation else { return }
+        guard priorityAllowsPetMode, ownsRestingAnimation else { return }
         _ = forceSleep()
     }
 
@@ -279,7 +263,7 @@ final class PetMode {
         if liveState == .idle {
             ownsRestingAnimation = true
             animator?.play(.idle)
-            if isEnabled { scheduleRestTimers() }
+            scheduleRestTimers()
         } else {
             ownsRestingAnimation = false
             animator?.play(liveState)
@@ -287,7 +271,7 @@ final class PetMode {
     }
 
     private func scheduleOccasionalBeat() {
-        guard isEnabled, priorityAllowsPetMode, !isLoafing, !isSleeping, !isWaking,
+        guard priorityAllowsPetMode, !isLoafing, !isSleeping, !isWaking,
               idleTimer == nil, beatTimer == nil else { return }
         let delay = TimeInterval.random(in: temperament.scaledFidget(range: Self.randomIntervalRange))
         idleTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
@@ -297,12 +281,12 @@ final class PetMode {
 
     private func playOccasionalBeat() {
         idleTimer = nil
-        guard isEnabled, priorityAllowsPetMode else {
+        guard priorityAllowsPetMode else {
             returnToCalmIfAllowed()
             return
         }
 
-        let amplitude = temperament.playfulIdleFidgetAmplitudeMultiplier
+        let amplitude = temperament.idleFidgetAmplitudeMultiplier
         guard amplitude >= 0.05 else {
             // Catatonic is intentionally too still for an authored full-body beat.
             returnToCalmIfAllowed()
@@ -332,7 +316,7 @@ final class PetMode {
     private func playAwakeBeat() {
         beatTimer?.invalidate()
         beatTimer = nil
-        guard isEnabled, priorityAllowsPetMode,
+        guard priorityAllowsPetMode,
               let wakeUntil, wakeUntil > Date(),
               let state = chooseFunState() else {
             returnToCalmIfAllowed()
@@ -361,7 +345,7 @@ final class PetMode {
         clearCalmState()
         guard priorityAllowsPetMode else { return }
         animator?.play(.idle)
-        if isEnabled { scheduleRestTimers() }
+        scheduleRestTimers()
     }
 
     private func clearCalmState() {

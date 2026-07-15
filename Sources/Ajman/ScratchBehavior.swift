@@ -172,7 +172,6 @@ struct ScratchEligibility {
     let liveState: AnimationState
     let displayedState: AnimationState
     let isManual: Bool
-    let isPlayfulIdleEnabled: Bool
     let isCalmPose: Bool
     let isGlancing: Bool
 
@@ -182,7 +181,6 @@ struct ScratchEligibility {
             && liveState == .idle
             && displayedState == .idle
             && !isManual
-            && isPlayfulIdleEnabled
             && !isCalmPose
             && !isGlancing
     }
@@ -365,7 +363,7 @@ final class ScratchBehavior {
     private func updateRaking(_ enabled: Bool) {
         guard isRaking != enabled else { return }
         isRaking = enabled
-        let amplitude = Self.rakeAmplitude * temperament().playfulIdleFidgetAmplitudeMultiplier
+        let amplitude = Self.rakeAmplitude * temperament().idleFidgetAmplitudeMultiplier
         setRaking(enabled, amplitude)
     }
 }

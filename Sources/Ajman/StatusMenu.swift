@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-final class StatusMenu: NSObject {
+final class StatusMenu: NSObject, NSMenuDelegate {
     private let registry: SessionRegistry
     private let statusItem: NSStatusItem
     private let launchAtLogin = LaunchAtLogin()
@@ -9,8 +9,13 @@ final class StatusMenu: NSObject {
     private let cycleItem = NSMenuItem(title: "Cycle All States", action: #selector(toggleCycle(_:)), keyEquivalent: "")
     private let sleepItem = NSMenuItem(title: "Sleep", action: #selector(selectSleep(_:)), keyEquivalent: "")
     private let scratchItem = NSMenuItem(title: "Scratch", action: #selector(selectScratch(_:)), keyEquivalent: "")
-    private let playfulIdleItem = NSMenuItem(title: "Playful Idle", action: #selector(togglePlayfulIdle(_:)), keyEquivalent: "")
     private let steadySizeItem = NSMenuItem(title: "Steady Size", action: #selector(toggleSteadySize(_:)), keyEquivalent: "")
+    private let agentNotificationsItem = NSMenuItem(
+        title: "Show agent notifications", action: #selector(toggleAgentNotifications(_:)), keyEquivalent: ""
+    )
+    private let claudeConnectionItem = NSMenuItem(
+        title: "Connect to Claude Code", action: #selector(toggleClaudeConnection(_:)), keyEquivalent: ""
+    )
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
     private let updateChecksItem = NSMenuItem(title: "Check for updates", action: #selector(toggleUpdateChecks(_:)), keyEquivalent: "")
     private let petMenu = NSMenu(title: "Pets")
@@ -25,7 +30,7 @@ final class StatusMenu: NSObject {
     private var sleepAvailable: Bool
     private var cycleTimer: Timer?
     private var cycleState: AnimationState?
-    private var playfulIdleEnabled: Bool
+    private let claudeSettingsPath: URL
 
     private(set) var manualMode = false
     private(set) var manualSleep = false
@@ -38,7 +43,7 @@ final class StatusMenu: NSObject {
     var relativeScaleHandler: ((String, Double) -> Void)?
     var temperamentHandler: ((String, Temperament) -> Void)?
     var steadySizeHandler: ((Bool) -> Void)?
-    var playfulIdleHandler: ((Bool) -> Void)?
+    var agentNotificationsHandler: ((Bool) -> Void)?
     var debugStateHandler: ((AnimationState) -> Void)?
     var debugSleepHandler: (() -> Void)?
     var debugScratchHandler: (() -> Void)?
@@ -56,19 +61,22 @@ final class StatusMenu: NSObject {
         temperaments: [String: Temperament],
         debugStates: [AnimationState],
         sleepAvailable: Bool,
-        playfulIdleEnabled: Bool
+        agentNotificationsEnabled: Bool,
+        claudeSettingsPath: URL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/settings.json")
     ) {
         self.registry = registry
         self.pets = pets
         self.temperaments = temperaments
         self.debugStates = debugStates
         self.sleepAvailable = sleepAvailable
-        self.playfulIdleEnabled = playfulIdleEnabled
+        self.claudeSettingsPath = claudeSettingsPath
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
         statusItem.button?.title = "🐈‍⬛"
         let menu = NSMenu()
+        menu.delegate = self
         activityItem.isEnabled = false
         menu.addItem(activityItem)
 
@@ -82,20 +90,17 @@ final class StatusMenu: NSObject {
         petsItem.submenu = petMenu
         menu.addItem(petsItem)
 
-        playfulIdleItem.target = self
-        playfulIdleItem.state = playfulIdleEnabled ? .on : .off
-        menu.addItem(playfulIdleItem)
         steadySizeItem.target = self
         steadySizeItem.state = SteadySize.load() ? .on : .off
         menu.addItem(steadySizeItem)
+        agentNotificationsItem.target = self
+        agentNotificationsItem.state = agentNotificationsEnabled ? .on : .off
+        menu.addItem(agentNotificationsItem)
         menu.addItem(.separator())
 
-        let connect = NSMenuItem(title: "Connect to Claude Code", action: #selector(connectToClaude), keyEquivalent: "")
-        connect.target = self
-        menu.addItem(connect)
-        let disconnect = NSMenuItem(title: "Disconnect from Claude Code", action: #selector(disconnectFromClaude), keyEquivalent: "")
-        disconnect.target = self
-        menu.addItem(disconnect)
+        claudeConnectionItem.target = self
+        updateClaudeConnectionCheck()
+        menu.addItem(claudeConnectionItem)
         menu.addItem(.separator())
 
         let sizeMenu = NSMenu(title: "Overall Size")
@@ -335,11 +340,10 @@ final class StatusMenu: NSObject {
         steadySizeHandler?(enabled)
     }
 
-    @objc private func togglePlayfulIdle(_ sender: NSMenuItem) {
-        playfulIdleEnabled.toggle()
-        UserDefaults.standard.set(playfulIdleEnabled, forKey: PetMode.defaultsKey)
-        sender.state = playfulIdleEnabled ? .on : .off
-        playfulIdleHandler?(playfulIdleEnabled)
+    @objc private func toggleAgentNotifications(_ sender: NSMenuItem) {
+        let enabled = sender.state != .on
+        sender.state = enabled ? .on : .off
+        agentNotificationsHandler?(enabled)
     }
 
     @objc private func selectState(_ sender: NSMenuItem) {
@@ -479,19 +483,26 @@ final class StatusMenu: NSObject {
         sender.state = launchAtLogin.isEnabled ? .on : .off
     }
 
-    @objc private func connectToClaude() {
+    @objc private func toggleClaudeConnection(_ sender: NSMenuItem) {
+        if ClaudeHookInstaller.isInstalled(settingsPath: claudeSettingsPath) {
+            disconnectFromClaude()
+        } else {
+            connectToClaude()
+        }
+        updateClaudeConnectionCheck()
+    }
+
+    private func connectToClaude() {
         do {
             let binary = try ClaudeHookInstaller.installHookBinary()
-            let settings = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
-            let summary = try ClaudeHookInstaller.install(settingsPath: settings, hookBinaryPath: binary.path)
+            let summary = try ClaudeHookInstaller.install(settingsPath: claudeSettingsPath, hookBinaryPath: binary.path)
             showAlert(title: "Claude Code connected", text: "Added \(summary.eventsAdded.count) event hooks.\nBackup: \(summary.backupPath ?? "new settings file; no original to back up")")
         } catch { showAlert(title: "Could not connect", text: error.localizedDescription) }
     }
 
-    @objc private func disconnectFromClaude() {
+    private func disconnectFromClaude() {
         do {
-            let settings = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
-            let summary = try ClaudeHookInstaller.uninstall(settingsPath: settings)
+            let summary = try ClaudeHookInstaller.uninstall(settingsPath: claudeSettingsPath)
             showAlert(title: "Claude Code disconnected", text: "Removed \(summary.commandsRemoved) Ajman hook commands.\nBackup: \(summary.backupPath)")
         } catch { showAlert(title: "Could not disconnect", text: error.localizedDescription) }
     }
@@ -504,6 +515,19 @@ final class StatusMenu: NSObject {
     }
 
     @objc private func quit() { NSApplication.shared.terminate(nil) }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        updateClaudeConnectionCheck()
+    }
+
+    private func updateClaudeConnectionCheck() {
+        claudeConnectionItem.state = ClaudeHookInstaller.isInstalled(settingsPath: claudeSettingsPath) ? .on : .off
+    }
+
+    var topLevelMenuTitlesForTesting: [String] { statusItem.menu?.items.map(\.title) ?? [] }
+    var claudeConnectionStateForTesting: NSControl.StateValue { claudeConnectionItem.state }
+    var agentNotificationsStateForTesting: NSControl.StateValue { agentNotificationsItem.state }
+    func refreshClaudeConnectionStateForTesting() { updateClaudeConnectionCheck() }
 
     deinit { cycleTimer?.invalidate() }
 }

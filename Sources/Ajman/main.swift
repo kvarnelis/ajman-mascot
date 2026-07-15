@@ -93,6 +93,25 @@ private func runSelfTest() -> Int32 {
         guard SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size did not persist on") }
         print("Steady size: default off; off/on round-trip")
 
+        let notificationSuiteName = "AjmanSelfTest.AgentNotifications.\(UUID().uuidString)"
+        guard let notificationDefaults = UserDefaults(suiteName: notificationSuiteName) else {
+            throw SelfTestError("could not create agent-notification defaults")
+        }
+        defer { notificationDefaults.removePersistentDomain(forName: notificationSuiteName) }
+        let notificationPreferences = AgentNotificationPreferences(defaults: notificationDefaults)
+        guard !notificationPreferences.isEnabled else {
+            throw SelfTestError("agent notifications were not off by default")
+        }
+        notificationPreferences.isEnabled = true
+        guard notificationPreferences.isEnabled else {
+            throw SelfTestError("agent notifications did not persist on")
+        }
+        notificationPreferences.isEnabled = false
+        guard !notificationPreferences.isEnabled else {
+            throw SelfTestError("agent notifications did not persist off")
+        }
+        print("Agent notifications: default off; shared Claude/Codex preference round-trips")
+
         let selectionSuiteName = "AjmanSelfTest.PetSelection.\(UUID().uuidString)"
         guard let selectionDefaults = UserDefaults(suiteName: selectionSuiteName) else { throw SelfTestError("could not create selection defaults") }
         defer { selectionDefaults.removePersistentDomain(forName: selectionSuiteName) }
@@ -104,7 +123,13 @@ private func runSelfTest() -> Int32 {
         guard catalog.relativeScale(for: "ajman") == 1.0, catalog.relativeScale(for: "winnie") == 0.67 else {
             throw SelfTestError("built-in relative pet scales were incorrect")
         }
-        print("Pet catalog defaults: ajman 1.0; winnie 0.67")
+        let defaultAjmanEffectiveScale = PetScale.defaultValue.rawValue * catalog.relativeScale(for: "ajman")
+        let defaultWinnieEffectiveScale = PetScale.defaultValue.rawValue * catalog.relativeScale(for: "winnie")
+        guard abs(defaultAjmanEffectiveScale - 0.6667) < 0.000_001,
+              abs(defaultWinnieEffectiveScale - 0.446689) < 0.000_001 else {
+            throw SelfTestError("fresh-install overall/per-pet default sizes did not combine correctly")
+        }
+        print("Pet catalog defaults: overall 0.6667; ajman 1.0; winnie 0.67")
         catalog.saveRelativeScale(0.7, for: "winnie")
         guard catalog.relativeScale(for: "winnie") == 0.7 else { throw SelfTestError("relative pet scale override did not persist") }
         guard selectionDefaults.double(forKey: PetCatalog.relativeScaleKey(for: "winnie")) == 0.7 else {
@@ -177,7 +202,31 @@ private func runSelfTest() -> Int32 {
               ajmanPositionKey != winniePositionKey else {
             throw SelfTestError("pet instances did not have distinct position keys")
         }
-        print("Pet instances: both packages load; distinct per-pet position keys (headless)")
+        let testVisibleFrame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        let defaultAjmanSize = NSSize(
+            width: (CGFloat(SpriteSheet.cellWidth) * CGFloat(PetScale.defaultValue.rawValue)).rounded(),
+            height: (CGFloat(SpriteSheet.cellHeight) * CGFloat(PetScale.defaultValue.rawValue)).rounded()
+        )
+        let defaultWinnieSize = NSSize(
+            width: (CGFloat(SpriteSheet.cellWidth) * CGFloat(PetScale.defaultValue.rawValue) * 0.67).rounded(),
+            height: (CGFloat(SpriteSheet.cellHeight) * CGFloat(PetScale.defaultValue.rawValue) * 0.67).rounded()
+        )
+        let ajmanResetOrigin = OverlayPanel.defaultOrigin(
+            visibleFrame: testVisibleFrame, displaySize: defaultAjmanSize, defaultPositionIndex: 0
+        )
+        let winnieResetOrigin = OverlayPanel.defaultOrigin(
+            visibleFrame: testVisibleFrame, displaySize: defaultWinnieSize, defaultPositionIndex: 1
+        )
+        let ajmanGroundLine = OverlayPanel.renderedGroundLine(
+            originY: ajmanResetOrigin.y, displayHeight: defaultAjmanSize.height
+        )
+        let winnieGroundLine = OverlayPanel.renderedGroundLine(
+            originY: winnieResetOrigin.y, displayHeight: defaultWinnieSize.height
+        )
+        guard abs(ajmanGroundLine - winnieGroundLine) < 0.000_001 else {
+            throw SelfTestError("reset positions did not share a rendered ground line")
+        }
+        print("Pet instances: both packages load; distinct position keys; reset feet share one scaled ground line")
 
         let cycleOrder: [AnimationState] = [
             .idle, .runningRight, .runningLeft, .waving, .jumping, .failed,
@@ -283,8 +332,8 @@ private func runSelfTest() -> Int32 {
             }
         }
         let frequencies = Temperament.allCases.map(\.frequencyMultiplier)
-        let fidgetFrequencies = Temperament.allCases.map(\.playfulIdleFidgetFrequencyMultiplier)
-        let fidgetAmplitudes = Temperament.allCases.map(\.playfulIdleFidgetAmplitudeMultiplier)
+        let fidgetFrequencies = Temperament.allCases.map(\.idleFidgetFrequencyMultiplier)
+        let fidgetAmplitudes = Temperament.allCases.map(\.idleFidgetAmplitudeMultiplier)
         let fidgetWaits = Temperament.allCases.map { $0.scaledFidget(interval: PetMode.randomIntervalRange.lowerBound) }
         let scratchProbabilities = Temperament.allCases.map { $0.scaledFidget(probability: ScratchBehavior.triggerProbability) }
         let scratchSpacing = Temperament.allCases.map { $0.scaledFidget(interval: ScratchBehavior.minimumSpacing) }
@@ -603,7 +652,6 @@ private func runSelfTest() -> Int32 {
             liveState: .running,
             displayedState: .idle,
             isManual: false,
-            isPlayfulIdleEnabled: true,
             isCalmPose: false,
             isGlancing: false
         )
@@ -646,7 +694,6 @@ private func runSelfTest() -> Int32 {
             liveState: .idle,
             displayedState: .idle,
             isManual: false,
-            isPlayfulIdleEnabled: true,
             isCalmPose: true,
             isGlancing: false
         )
@@ -659,7 +706,6 @@ private func runSelfTest() -> Int32 {
             liveState: .idle,
             displayedState: .idle,
             isManual: false,
-            isPlayfulIdleEnabled: true,
             isCalmPose: false,
             isGlancing: false
         )
@@ -669,14 +715,7 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("idle scratch did not approach, rake, and return to idle: \(scratchEvents)")
         }
         scratchBehavior.teardown()
-        print("Scratch behavior: debug force bypasses eligibility; active/sleep gates reject; idle approaches, rakes, runs home, and returns")
-
-        let sleepSuiteName = "AjmanSelfTest.Sleep.\(UUID().uuidString)"
-        guard let sleepDefaults = UserDefaults(suiteName: sleepSuiteName) else {
-            throw SelfTestError("could not create sleep defaults")
-        }
-        defer { sleepDefaults.removePersistentDomain(forName: sleepSuiteName) }
-        sleepDefaults.set(true, forKey: PetMode.defaultsKey)
+        print("Scratch behavior: no enable-flag gate; debug force bypasses eligibility; active/sleep gates reject; idle approaches, rakes, runs home, and returns")
 
         var sleepLiveState = AnimationState.idle
         let sleepAnimator = Animator(
@@ -693,8 +732,7 @@ private func runSelfTest() -> Int32 {
             isManualMode: { false },
             loafInterval: 0.04,
             dozeInterval: 0.14,
-            wakeHoldRange: 0.05...0.05,
-            defaults: sleepDefaults
+            wakeHoldRange: 0.05...0.05
         )
         guard shortDoze.forceLoaf(), shortDoze.isLoafing, sleepAnimator.isPlayingLoaf,
               shortDoze.forceSleep(), shortDoze.isSleeping, sleepAnimator.isPlayingSleep else {
@@ -764,8 +802,7 @@ private func runSelfTest() -> Int32 {
             currentLiveState: { .idle },
             isManualMode: { false },
             loafInterval: 0.04,
-            dozeInterval: 0.14,
-            defaults: sleepDefaults
+            dozeInterval: 0.14
         )
         catatonicDoze.resumeAtRest()
         catatonicDoze.setTemperament(.catatonic)
@@ -784,8 +821,7 @@ private func runSelfTest() -> Int32 {
             currentLiveState: { .idle },
             isManualMode: { false },
             loafInterval: 0.03,
-            dozeInterval: 0.05,
-            defaults: sleepDefaults
+            dozeInterval: 0.05
         )
         insaneDoze.resumeAtRest()
         insaneDoze.setTemperament(.insane)
@@ -809,8 +845,7 @@ private func runSelfTest() -> Int32 {
             currentLiveState: { sleepLiveState },
             isManualMode: { false },
             loafInterval: 0.03,
-            dozeInterval: 0.05,
-            defaults: sleepDefaults
+            dozeInterval: 0.05
         )
         noSleepMode.resumeAtRest()
         RunLoop.current.run(until: Date().addingTimeInterval(0.1))
@@ -1052,15 +1087,37 @@ private func runSelfTest() -> Int32 {
         guard userSurvivedInstall, allEventsAdded, backupExists else {
             throw SelfTestError("installer fixture assertions failed (user=\(userSurvivedInstall), events=\(installed.eventsAdded.count), backup=\(backupExists))")
         }
-        print("Installer fixture: user hook preserved; \(ClaudeHookInstaller.events.count) Ajman event groups added; backup exists")
+        let connectionMenu = StatusMenu(
+            registry: registry,
+            pets: [],
+            shownPetIDs: [],
+            bindings: [:],
+            relativeScales: [:],
+            temperaments: [:],
+            debugStates: [],
+            sleepAvailable: false,
+            agentNotificationsEnabled: notificationPreferences.isEnabled,
+            claudeSettingsPath: settings
+        )
+        let menuTitles = connectionMenu.topLevelMenuTitlesForTesting
+        guard !menuTitles.contains("Playful Idle"),
+              menuTitles.filter({ $0 == "Connect to Claude Code" }).count == 1,
+              !menuTitles.contains("Disconnect from Claude Code"),
+              connectionMenu.claudeConnectionStateForTesting == .on,
+              connectionMenu.agentNotificationsStateForTesting == .off else {
+            throw SelfTestError("cleaned menu items or initial checkbox states were incorrect")
+        }
+        print("Menu fixture: Playful Idle absent; one Claude checkbox reflects installed hooks; notifications off")
         let uninstalled = try ClaudeHookInstaller.uninstall(settingsPath: settings)
+        connectionMenu.refreshClaudeConnectionStateForTesting()
         let afterUninstall = try JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as! [String: Any]
         guard containsCommand(afterUninstall, command: userCommand),
               !containsCommand(afterUninstall, command: hookPath),
-              uninstalled.commandsRemoved == ClaudeHookInstaller.events.count else {
+              uninstalled.commandsRemoved == ClaudeHookInstaller.events.count,
+              connectionMenu.claudeConnectionStateForTesting == .off else {
             throw SelfTestError("uninstaller fixture assertions failed")
         }
-        print("Uninstaller fixture: \(ClaudeHookInstaller.events.count) Ajman commands removed; user hook preserved")
+        print("Claude checkbox fixture: uninstall removes \(ClaudeHookInstaller.events.count) Ajman commands, preserves user hook, and clears checkmark")
         print("SELFTEST OK")
         return 0
     } catch {

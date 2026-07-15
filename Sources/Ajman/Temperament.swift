@@ -26,10 +26,10 @@ enum Temperament: String, CaseIterable {
     /// twitches, and body motion) is the main signal of a pet's energy.
     var idleLivelinessMultiplier: Double { frequencyMultiplier }
 
-    /// Autonomous playful-idle actions need a steeper low end than ordinary
+    /// Autonomous idle actions need a steeper low end than ordinary
     /// whims: Catatonic should effectively stop fidgeting and Calm should only
     /// fidget rarely. The established Normal/Frisky/Insane rates stay intact.
-    var playfulIdleFidgetFrequencyMultiplier: Double {
+    var idleFidgetFrequencyMultiplier: Double {
         switch self {
         case .catatonic: 0.01
         case .calm: 0.15
@@ -41,7 +41,7 @@ enum Temperament: String, CaseIterable {
 
     /// Scale layer-local fidget displacement without diminishing the lively
     /// end. Large authored actions remain full-size from Normal upward.
-    var playfulIdleFidgetAmplitudeMultiplier: Double {
+    var idleFidgetAmplitudeMultiplier: Double {
         switch self {
         case .catatonic: 0.02
         case .calm: 0.25
@@ -91,7 +91,7 @@ enum Temperament: String, CaseIterable {
     }
 
     func scaledFidget(interval: TimeInterval) -> TimeInterval {
-        interval / playfulIdleFidgetFrequencyMultiplier
+        interval / idleFidgetFrequencyMultiplier
     }
 
     func scaledFidget(range: ClosedRange<TimeInterval>) -> ClosedRange<TimeInterval> {
@@ -99,7 +99,7 @@ enum Temperament: String, CaseIterable {
     }
 
     func scaledFidget(probability: Double) -> Double {
-        min(max(probability * playfulIdleFidgetFrequencyMultiplier, 0), 1)
+        min(max(probability * idleFidgetFrequencyMultiplier, 0), 1)
     }
 
     func scaledCalmPose(interval: TimeInterval) -> TimeInterval {

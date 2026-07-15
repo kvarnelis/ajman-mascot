@@ -92,8 +92,7 @@ final class PetInstance {
             wakeAnimation: loadedPet.wakeAnimation,
             currentLiveState: { [liveState] in liveState.value },
             isManualMode: isManualMode,
-            temperament: temperament,
-            defaults: defaults
+            temperament: temperament
         )
         bubbleController = BubbleController(petPanel: panel)
         bubbleController.dismissHandler = dismissNotification
@@ -111,7 +110,7 @@ final class PetInstance {
                 guard let self else {
                     return ScratchEligibility(
                         hasAsset: false, isShown: false, liveState: .idle,
-                        displayedState: .idle, isManual: true, isPlayfulIdleEnabled: false,
+                        displayedState: .idle, isManual: true,
                         isCalmPose: false, isGlancing: false
                     )
                 }
@@ -121,7 +120,6 @@ final class PetInstance {
                     liveState: self.liveState.value,
                     displayedState: self.animator.currentState,
                     isManual: self.isManualMode(),
-                    isPlayfulIdleEnabled: self.petMode.isEnabled,
                     isCalmPose: self.petMode.isLoafing || self.petMode.isSleeping
                         || self.petMode.isWaking || self.animator.isPlayingCalmPose,
                     isGlancing: self.isGlancing
@@ -226,6 +224,10 @@ final class PetInstance {
         bubbleController.apply(notificationChange)
     }
 
+    func removeNotifications() {
+        bubbleController.removeAll()
+    }
+
     func setBinding(_ binding: AgentEvent.Provider?) {
         guard self.binding != binding else { return }
         cancelGlance(returnToRest: true)
@@ -254,13 +256,6 @@ final class PetInstance {
             wake: loadedPet.wakeAnimation
         )
         animator.replaceSheet(loadedPet.sheet, playing: state)
-    }
-
-    func setPlayfulIdle(_ enabled: Bool) {
-        cancelGlance(returnToRest: true)
-        scratchBehavior?.cancel(returnToIdle: true)
-        petMode.setEnabled(enabled, defaults: defaults)
-        if enabled { scratchBehavior?.resumeScheduling() }
     }
 
     func setTemperament(_ temperament: Temperament) {

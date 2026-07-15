@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 temperaments: temperamentMap(),
                 debugStates: commonDebugStates(),
                 sleepAvailable: pets.contains(where: \.hasSleepAnimation),
-                playfulIdleEnabled: UserDefaults.standard.object(forKey: PetMode.defaultsKey) as? Bool ?? true
+                agentNotificationsEnabled: AgentNotificationPreferences().isEnabled
             )
             statusMenu = menu
             wireMenu(menu)
@@ -71,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             registry.notificationDidChange = { [weak self] change in
+                guard AgentNotificationPreferences().isEnabled else { return }
                 self?.pets.forEach { $0.apply(notificationChange: change) }
             }
             server.eventHandler = { event in
@@ -122,8 +123,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 catch { self?.log("could not re-prepare pet '\(pet.petID)': \(error.localizedDescription)") }
             }
         }
-        menu.playfulIdleHandler = { [weak self] enabled in
-            self?.pets.forEach { $0.setPlayfulIdle(enabled) }
+        menu.agentNotificationsHandler = { [weak self] enabled in
+            let preferences = AgentNotificationPreferences()
+            preferences.isEnabled = enabled
+            guard let self else { return }
+            self.pets.forEach { $0.removeNotifications() }
+            if enabled, let registry = self.registry {
+                for pet in self.pets {
+                    for notification in registry.currentNotifications(for: pet.binding) {
+                        pet.apply(notificationChange: .upsert(notification))
+                    }
+                }
+            }
         }
         menu.debugStateHandler = { [weak self] state in
             self?.pets.forEach { $0.setDebugState(state) }
@@ -223,6 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applyCurrentStateAndNotifications(to pet: PetInstance) {
         guard let registry else { return }
         pet.applyState(registry.currentState(for: pet.binding))
+        guard AgentNotificationPreferences().isEnabled else { return }
         for notification in registry.currentNotifications(for: pet.binding) {
             pet.apply(notificationChange: .upsert(notification))
         }

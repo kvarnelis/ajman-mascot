@@ -57,6 +57,19 @@ enum ClaudeHookInstaller {
         return InstallSummary(eventsAdded: added, backupPath: backup?.path)
     }
 
+    static func isInstalled(settingsPath: URL) -> Bool {
+        guard let root = try? readRoot(at: settingsPath, missingAllowed: false),
+              let hooks = root["hooks"] as? [String: Any] else { return false }
+        return events.allSatisfy { event in
+            guard let groups = hooks[event] as? [[String: Any]] else { return false }
+            return groups.contains { group in
+                (group["hooks"] as? [[String: Any]] ?? []).contains { hook in
+                    (hook["command"] as? String)?.contains("/ajman-hook") == true
+                }
+            }
+        }
+    }
+
     static func uninstall(settingsPath: URL) throws -> UninstallSummary {
         var root = try readRoot(at: settingsPath, missingAllowed: false)
         let backup = try backupFile(settingsPath)
