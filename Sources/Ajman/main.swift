@@ -439,14 +439,14 @@ private func runSelfTest() -> Int32 {
         guard let winnieSleep = sleepingWinnie.sleepAnimation,
               winnieSleep.frameCount == 8,
               winnieSleep.poseWeights.count == 8,
-              winnieSleep.poseWeights[6] < winnieSleep.poseWeights[0] else {
-            throw SelfTestError("Winnie's bundled sleep strip did not load eight poses with a lower roly-poly weight")
+              winnieSleep.poseWeights[6] == winnieSleep.poseWeights[0] else {
+            throw SelfTestError("Winnie's bundled sleep strip did not load eight poses with an equal roly-poly weight")
         }
         guard let ajmanSleep = sleepingAjman.sleepAnimation,
               ajmanSleep.frameCount == 8,
               ajmanSleep.poseWeights.count == 8,
-              ajmanSleep.poseWeights[6] < ajmanSleep.poseWeights[0] else {
-            throw SelfTestError("Ajman's bundled sleep strip did not load eight poses with a lower roly-poly weight")
+              ajmanSleep.poseWeights[6] == ajmanSleep.poseWeights[0] else {
+            throw SelfTestError("Ajman's bundled sleep strip did not load eight poses with an equal roly-poly weight")
         }
         guard let ajmanLoaf = sleepingAjman.loafAnimation, ajmanLoaf.frameCount == 8 else {
             throw SelfTestError("Ajman's bundled loaf strip did not load eight ordered poses")

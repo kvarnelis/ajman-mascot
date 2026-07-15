@@ -157,9 +157,9 @@ struct PetCatalog {
 
     private func loadSleepAnimation(for id: String) -> SleepAnimation? {
         // Both authored eight-pose strips reserve the seventh pose for the
-        // belly-up roly-poly: keep it occasional while the others stay even.
+        // belly-up roly-poly. Keep all eight poses equally likely.
         let poseWeights: [Double]? = ["ajman", "winnie"].contains(id)
-            ? [1, 1, 1, 1, 1, 1, 0.3, 1]
+            ? [1, 1, 1, 1, 1, 1, 1, 1]
             : nil
         return loadPoseStrip(named: "sleep", for: id, poseWeights: poseWeights)
     }
