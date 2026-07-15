@@ -25,6 +25,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>net.varnelis.Ajman</string>
   <key>CFBundleName</key><string>Ajman</string>
   <key>CFBundleExecutable</key><string>Ajman</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>LSUIElement</key><true/>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
@@ -57,22 +58,37 @@ ln -sfn "build/Ajman.app" "$REPO_ROOT/Ajman.app"
 
 SIGNING_IDENTITY="Developer ID Application: Kazys Varnelis (PHCL25Z99X)"
 SIGNING_SHA1="EECF633E96C251FCD3B4FD76BF9D62DE648826A7"
+SIGN_TARGETS=("$CONTENTS/MacOS/ajman-hook" "$APP")
+
+sign_targets() {
+  local target
+  for target in "${SIGN_TARGETS[@]}"; do
+    codesign --force "$@" --sign "$SIGNING_IDENTITY" "$target" || return 1
+  done
+}
+
+sign_targets_adhoc() {
+  local target
+  for target in "${SIGN_TARGETS[@]}"; do
+    codesign --force --sign - "$target" || return 1
+  done
+}
 
 if security find-identity -v -p codesigning | grep -Fq "$SIGNING_SHA1"; then
-  if codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP"; then
+  if sign_targets --options runtime --timestamp; then
     echo "Signed with Developer ID, hardened runtime, and secure timestamp: $APP"
-  elif codesign --force --options runtime --timestamp=none --sign "$SIGNING_IDENTITY" "$APP"; then
+  elif sign_targets --options runtime --timestamp=none; then
     echo "WARNING: timestamped signing failed; signed with Developer ID and hardened runtime without a timestamp: $APP" >&2
-  elif codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" "$APP"; then
+  elif sign_targets --timestamp=none; then
     echo "WARNING: hardened-runtime signing failed; signed with Developer ID without hardened runtime or timestamp: $APP" >&2
   else
     echo "WARNING: DEVELOPER ID SIGNING FAILED; FALLING BACK TO AD-HOC SIGNING. MACOS MAY TREAT EACH REBUILD AS A NEW APP IDENTITY." >&2
-    codesign --force --sign - "$APP"
+    sign_targets_adhoc
     echo "Signed ad-hoc: $APP"
   fi
 else
   echo "WARNING: DEVELOPER ID IDENTITY IS UNAVAILABLE; FALLING BACK TO AD-HOC SIGNING. MACOS MAY TREAT EACH REBUILD AS A NEW APP IDENTITY." >&2
-  codesign --force --sign - "$APP"
+  sign_targets_adhoc
   echo "Signed ad-hoc: $APP"
 fi
 

@@ -7,14 +7,47 @@ APP="$REPO_ROOT/build/Ajman.app"
 SIGNING_IDENTITY="Developer ID Application: Kazys Varnelis (PHCL25Z99X)"
 SIGNING_SHA1="EECF633E96C251FCD3B4FD76BF9D62DE648826A7"
 
+# Check the one machine-wide profile before replacing any existing artifact.
+xcrun notarytool history --keychain-profile notary >/dev/null
+
 "$SCRIPT_DIR/build-app.sh"
+
+if ! security find-identity -v -p codesigning | grep -Fq "$SIGNING_SHA1"; then
+  echo "Required Developer ID signing identity is unavailable: $SIGNING_IDENTITY" >&2
+  exit 1
+fi
+
+/usr/bin/codesign --verify --deep --strict --verbose=4 "$APP"
+APP_SIGNATURE="$(/usr/bin/codesign -d --verbose=4 "$APP" 2>&1)"
+HOOK="$APP/Contents/MacOS/ajman-hook"
+HOOK_SIGNATURE="$(/usr/bin/codesign -d --verbose=4 "$HOOK" 2>&1)"
+if ! grep -Fq "Authority=$SIGNING_IDENTITY" <<<"$APP_SIGNATURE"; then
+  echo "App is not signed with the required Developer ID identity." >&2
+  exit 1
+fi
+for SIGNED_COMPONENT in "$APP_SIGNATURE" "$HOOK_SIGNATURE"; do
+  if ! grep -Fq "Authority=$SIGNING_IDENTITY" <<<"$SIGNED_COMPONENT"; then
+    echo "An app executable is not signed with the required Developer ID identity." >&2
+    exit 1
+  fi
+  if ! grep -Eq 'flags=.*\(runtime\)' <<<"$SIGNED_COMPONENT"; then
+    echo "An app executable does not enable the hardened runtime." >&2
+    exit 1
+  fi
+  if ! grep -Eq '^Timestamp=' <<<"$SIGNED_COMPONENT"; then
+    echo "An app executable does not contain a secure timestamp." >&2
+    exit 1
+  fi
+done
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 VOLUME_NAME="Ajman $VERSION"
 OUTPUT="$REPO_ROOT/build/Ajman-$VERSION.dmg"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ajman-dmg.XXXXXX")"
+APP_ZIP="$WORK_DIR/Ajman.zip"
 STAGING="$WORK_DIR/staging"
 RW_DMG="$WORK_DIR/Ajman-rw.dmg"
+FINAL_DMG="$WORK_DIR/Ajman-$VERSION.dmg"
 MOUNT_POINT=""
 
 cleanup() {
@@ -25,6 +58,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# Apple notarizes the ZIP submission, then the ticket is stapled to the app.
+ditto -c -k --keepParent "$APP" "$APP_ZIP"
+"$SCRIPT_DIR/notarize.sh" "$APP_ZIP" "$APP"
+
+# Only after the app has its ticket do we copy it into the disk image.
 mkdir -p "$STAGING/.background"
 ditto "$APP" "$STAGING/Ajman.app"
 ln -s /Applications "$STAGING/Applications"
@@ -85,19 +123,21 @@ sync
 hdiutil detach "$MOUNT_POINT" -quiet
 MOUNT_POINT=""
 
-rm -f "$OUTPUT"
-hdiutil convert -quiet "$RW_DMG" -format UDZO -imagekey zlib-level=9 -o "$OUTPUT"
+hdiutil convert -quiet "$RW_DMG" -format UDZO -imagekey zlib-level=9 -o "$FINAL_DMG"
 
-if security find-identity -v -p codesigning | grep -Fq "$SIGNING_SHA1"; then
-  if codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$OUTPUT"; then
-    echo "Signed DMG with Developer ID and secure timestamp."
-  elif codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" "$OUTPUT"; then
-    echo "WARNING: timestamped DMG signing failed; signed without a timestamp." >&2
-  else
-    echo "WARNING: DMG signing failed; leaving the disk image unsigned." >&2
-  fi
-else
-  echo "WARNING: Developer ID identity unavailable; leaving the disk image unsigned." >&2
-fi
+codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$FINAL_DMG"
+codesign --verify --strict --verbose=4 "$FINAL_DMG"
+echo "Signed DMG with Developer ID and secure timestamp."
+
+"$SCRIPT_DIR/notarize.sh" "$FINAL_DMG" "$FINAL_DMG"
+
+xcrun stapler validate "$APP"
+spctl -a -vv "$APP"
+spctl -a -vv -t install "$FINAL_DMG"
+
+# Publish only the fully signed, notarized, stapled, and Gatekeeper-accepted image.
+mv -f "$FINAL_DMG" "$OUTPUT"
+xcrun stapler validate "$OUTPUT"
+spctl -a -vv -t install "$OUTPUT"
 
 echo "Created: $OUTPUT"
