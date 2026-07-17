@@ -34,10 +34,16 @@ enum SpriteSheetError: LocalizedError {
 }
 
 private struct PetManifest: Decodable {
+    struct ContentFitReference: Decodable {
+        let width: Double
+        let height: Double
+    }
+
     let id: String?
     let displayName: String?
     let spriteVersionNumber: Int?
     let spritesheetPath: String?
+    let contentFitReference: ContentFitReference?
 }
 
 struct SpriteSheet {
@@ -118,14 +124,22 @@ struct SpriteSheet {
                 availableFrames: availableFrames
             )
         }
+        let fitReference = manifest.contentFitReference.map {
+            CGSize(width: $0.width, height: $0.height)
+        }
         if steadySize {
-            cells = normalized(cells: cells, table: table)
+            cells = normalized(cells: cells, table: table, minimumTargetBox: fitReference)
         } else {
             let manifestID = manifest.id?.trimmingCharacters(in: .whitespacesAndNewlines)
             let petID = (manifestID?.isEmpty == false ? manifestID : nil)
                 ?? manifestURL.deletingLastPathComponent().lastPathComponent
             if petID.caseInsensitiveCompare("winnie") == .orderedSame {
-                cells = normalized(cells: cells, table: table, states: [.failed])
+                cells = normalized(
+                    cells: cells,
+                    table: table,
+                    states: [.failed],
+                    minimumTargetBox: fitReference
+                )
             }
         }
         return SpriteSheet(animationTable: table, sourceURL: sheetURL, cells: cells)
@@ -151,7 +165,8 @@ struct SpriteSheet {
     private static func normalized(
         cells: [[CGImage]],
         table: AnimationTable,
-        states: Set<AnimationState>? = nil
+        states: Set<AnimationState>? = nil,
+        minimumTargetBox: CGSize? = nil
     ) -> [[CGImage]] {
         var result = cells
         let used = table.definitions.flatMap { definition in
@@ -171,11 +186,23 @@ struct SpriteSheet {
             (0..<definition.frameCount).compactMap { measured[FrameLocation(row: definition.row, column: $0)] }
         } ?? []
         let targetCandidates = idleBounds.isEmpty ? Array(measured.values) : idleBounds
-        guard let targetBox = SteadySize.targetBox(
+        guard var targetBox = SteadySize.targetBox(
             idleBounds: targetCandidates,
             cellWidth: cellWidth,
             cellHeight: cellHeight
         ) else { return result }
+        if let minimumTargetBox {
+            targetBox = CGSize(
+                width: min(
+                    max(targetBox.width, minimumTargetBox.width),
+                    CGFloat(cellWidth) - 2 * SteadySize.margin
+                ),
+                height: min(
+                    max(targetBox.height, minimumTargetBox.height),
+                    CGFloat(cellHeight) - SteadySize.margin - SteadySize.topSafety
+                )
+            )
+        }
 
         for location in selected {
             guard let bounds = measured[location],

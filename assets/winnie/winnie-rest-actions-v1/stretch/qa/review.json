@@ -1,0 +1,97 @@
+{
+  "ok": true,
+  "frames_root": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-rest-actions-v1/stretch/frames",
+  "states": [
+    "jumping"
+  ],
+  "errors": [],
+  "warnings": [],
+  "rows": [
+    {
+      "state": "jumping",
+      "expected_frames": 5,
+      "actual_frames": 5,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-rest-actions-v1/stretch/frames/jumping/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14988,
+          "bbox": [
+            5,
+            20,
+            187,
+            188
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 166
+        },
+        {
+          "index": 1,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-rest-actions-v1/stretch/frames/jumping/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13479,
+          "bbox": [
+            19,
+            5,
+            172,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 126
+        },
+        {
+          "index": 2,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-rest-actions-v1/stretch/frames/jumping/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13824,
+          "bbox": [
+            45,
+            5,
+            147,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 77
+        },
+        {
+          "index": 3,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-rest-actions-v1/stretch/frames/jumping/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 19735,
+          "bbox": [
+            20,
+            5,
+            172,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 231
+        },
+        {
+          "index": 4,
+          "file": "/Users/kazys/Developer/ajman mascot/assets/winnie/winnie-rest-actions-v1/stretch/frames/jumping/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14137,
+          "bbox": [
+            5,
+            20,
+            187,
+            187
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 113
+        }
+      ]
+    }
+  ]
+}

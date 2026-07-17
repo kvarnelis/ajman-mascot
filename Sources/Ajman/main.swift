@@ -1127,15 +1127,17 @@ private func runSelfTest() -> Int32 {
                 throw SelfTestError("Winnie idle/failed definitions could not be measured")
             }
             let failedBounds = winnieSheet.contentBounds(for: failed).compactMap { $0 }
-            guard failedBounds.count == failed.frameCount,
+            guard idle.frameCount == 6,
+                  failedBounds.count == failed.frameCount,
                   failedBounds.allSatisfy({
-                    $0.width <= idleTarget.width + 2
+                    $0.width <= 130
                         && $0.height <= idleTarget.height + 2
                         && abs($0.minY - CGFloat(SpriteSheet.contentMargin)) <= 1
-                  }) else {
-                throw SelfTestError("Winnie failed frames were not fitted to her idle size: \(failedBounds)")
+                  }),
+                  failedBounds.contains(where: { $0.width >= 126 }) else {
+                throw SelfTestError("Winnie idle was not six frames or failed frames lost their calibrated 128px fit: \(failedBounds)")
             }
-            print("Winnie failed scale: all \(failed.frameCount) frames fit her idle box with Steady Size off")
+            print("Winnie seated idle: 6 frames; failed row preserves its calibrated 128x198 fit with Steady Size off")
         }
         print("Sprite normalization (\(normalizationPetIDs.joined(separator: ", "))): idle heights within 2 px; no clipping")
 
