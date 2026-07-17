@@ -43,6 +43,7 @@ done
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
 VOLUME_NAME="Ajman $VERSION"
 OUTPUT="$REPO_ROOT/build/Ajman-$VERSION.dmg"
+ZIP_OUTPUT="$REPO_ROOT/build/Ajman-$VERSION.zip"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ajman-dmg.XXXXXX")"
 APP_ZIP="$WORK_DIR/Ajman.zip"
 STAGING="$WORK_DIR/staging"
@@ -200,4 +201,7 @@ mv -f "$FINAL_DMG" "$OUTPUT"
 xcrun stapler validate "$OUTPUT"
 spctl -a -vv -t install "$OUTPUT"
 
+ditto -c -k --keepParent "$APP" "$ZIP_OUTPUT"
+
 echo "Created: $OUTPUT"
+echo "Created: $ZIP_OUTPUT"

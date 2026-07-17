@@ -24,14 +24,28 @@ struct UpdatePreferences {
 }
 
 struct GitHubRelease: Decodable {
-    struct Asset: Decodable { let name: String }
+    struct Asset: Decodable {
+        let name: String
+        let browserDownloadURL: URL
+
+        private enum CodingKeys: String, CodingKey {
+            case name
+            case browserDownloadURL = "browser_download_url"
+        }
+    }
+
     let tagName: String
     let assets: [Asset]
 
-    var preferredAppAsset: String? {
-        assets.map(\.name).first {
-            $0.localizedCaseInsensitiveContains("ajman") && $0.lowercased().hasSuffix(".zip")
-        } ?? assets.map(\.name).first { $0.lowercased().hasSuffix(".zip") }
+    private enum CodingKeys: String, CodingKey {
+        case tagName = "tag_name"
+        case assets
+    }
+
+    var preferredAppAsset: Asset? {
+        assets.first {
+            $0.name.localizedCaseInsensitiveContains("ajman") && $0.name.lowercased().hasSuffix(".zip")
+        } ?? assets.first { $0.name.lowercased().hasSuffix(".zip") }
     }
 }
 
@@ -53,12 +67,22 @@ enum QuietProcess {
 }
 
 enum GitHubReleaseChecker {
-    static func latest() -> GitHubRelease? {
+    static func latestReleaseURL(repository: String = AjmanApp.repository) -> URL? {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "api.github.com"
+        components.path = "/repos/\(repository)/releases/latest"
+        return components.url
+    }
+
+    static func latest(session: URLSession = .shared) async -> GitHubRelease? {
+        guard let url = latestReleaseURL() else { return nil }
+        var request = URLRequest(url: url, timeoutInterval: 10)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         do {
-            let data = try QuietProcess.run(
-                URL(fileURLWithPath: "/usr/bin/env"),
-                arguments: ["gh", "release", "view", "--repo", AjmanApp.repository, "--json", "tagName,assets"]
-            )
+            let (data, response) = try await session.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
             return try JSONDecoder().decode(GitHubRelease.self, from: data)
         } catch {
             return nil
@@ -94,7 +118,7 @@ struct PreparedUpdate {
 }
 
 enum UpdateInstaller {
-    static func prepare(release: GitHubRelease) throws -> PreparedUpdate {
+    static func prepare(release: GitHubRelease, session: URLSession = .shared) async throws -> PreparedUpdate {
         guard let asset = release.preferredAppAsset else { throw UpdateError.noAppAsset }
         let fileManager = FileManager.default
         let work = fileManager.temporaryDirectory.appendingPathComponent("ajman-update-\(UUID().uuidString)", isDirectory: true)
@@ -103,14 +127,12 @@ enum UpdateInstaller {
         try fileManager.createDirectory(at: download, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: expanded, withIntermediateDirectories: true)
 
-        _ = try QuietProcess.run(
-            URL(fileURLWithPath: "/usr/bin/env"),
-            arguments: [
-                "gh", "release", "download", release.tagName,
-                "--repo", AjmanApp.repository, "--pattern", asset, "--dir", download.path,
-            ]
-        )
-        let archive = download.appendingPathComponent(asset)
+        var request = URLRequest(url: asset.browserDownloadURL, timeoutInterval: 60)
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+        let (temporaryArchive, response) = try await session.download(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw UpdateError.commandFailed }
+        let archive = download.appendingPathComponent(asset.name)
+        try fileManager.moveItem(at: temporaryArchive, to: archive)
         guard fileManager.fileExists(atPath: archive.path),
               (try archive.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) > 0 else {
             throw UpdateError.invalidArchive
@@ -275,7 +297,7 @@ final class UpdateManager {
         guard preferences.promptsEnabled, !isChecking else { return }
         isChecking = true
         Task { @MainActor [weak self] in
-            let release = await Task.detached { GitHubReleaseChecker.latest() }.value
+            let release = await Task.detached { await GitHubReleaseChecker.latest() }.value
             self?.finishedChecking(release)
         }
     }
@@ -295,7 +317,7 @@ final class UpdateManager {
         bubble.showProgress("Downloading and verifying…")
         Task { @MainActor [weak self] in
             let result = await Task.detached { () -> Result<PreparedUpdate, Error> in
-                do { return .success(try UpdateInstaller.prepare(release: release)) }
+                do { return .success(try await UpdateInstaller.prepare(release: release)) }
                 catch { return .failure(error) }
             }.value
             self?.finishPreparation(result)

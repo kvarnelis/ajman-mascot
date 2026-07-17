@@ -103,7 +103,7 @@ private func runSelfTest() -> Int32 {
         }
         print("First-run launch prompt: shows once; Yes enables; Not now stays off; both persist \(FirstRunLaunchPrompt.didAskKey)")
 
-        guard AjmanApp.version == AppVersion("v0.1.1"),
+        guard AjmanApp.version == AppVersion("v0.1.2"),
               AppVersion("1.2.4")! > AppVersion("1.2.3")!,
               AppVersion("1.2")! == AppVersion("1.2.0")!,
               AppVersion("1.2.3-beta.2")! < AppVersion("1.2.3")!,
@@ -111,6 +111,35 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("update version comparison failed for newer/older/equal tags")
         }
         print("Updates: semver-ish newer/older/equal comparison passes; running version \(AjmanApp.version)")
+
+        let releaseFixture = #"""
+        {
+          "tag_name": "v0.1.2",
+          "assets": [
+            {"name": "Ajman-0.1.2.dmg", "browser_download_url": "https://example.invalid/Ajman-0.1.2.dmg"},
+            {"name": "Ajman-0.1.2.zip", "browser_download_url": "https://example.invalid/Ajman-0.1.2.zip"},
+            {"name": "other.zip", "browser_download_url": "https://example.invalid/other.zip"}
+          ]
+        }
+        """#
+        let dmgOnlyFixture = #"""
+        {
+          "tag_name": "v0.1.1",
+          "assets": [
+            {"name": "Ajman-0.1.1.dmg", "browser_download_url": "https://example.invalid/Ajman-0.1.1.dmg"}
+          ]
+        }
+        """#
+        let fixtureRelease = try JSONDecoder().decode(GitHubRelease.self, from: Data(releaseFixture.utf8))
+        let dmgOnlyRelease = try JSONDecoder().decode(GitHubRelease.self, from: Data(dmgOnlyFixture.utf8))
+        guard fixtureRelease.tagName == "v0.1.2",
+              fixtureRelease.preferredAppAsset?.name == "Ajman-0.1.2.zip",
+              dmgOnlyRelease.preferredAppAsset?.name == nil,
+              GitHubReleaseChecker.latestReleaseURL()?.absoluteString
+                == "https://api.github.com/repos/kvarnelis/ajman-mascot/releases/latest" else {
+            throw SelfTestError("GitHub release fixture decoding, zip selection, or feed URL construction failed")
+        }
+        print("Updates: fixture tag=v0.1.2 asset=Ajman-0.1.2.zip; DMG-only asset=nil; feed URL=\(GitHubReleaseChecker.latestReleaseURL()!.absoluteString)")
 
         let bubbleVisibleFrame = NSRect(x: 0, y: 0, width: 1000, height: 800)
         let bubbleSize = NSSize(width: 310, height: 158)
@@ -172,7 +201,7 @@ private func runSelfTest() -> Int32 {
         }
         defer { updateDefaults.removePersistentDomain(forName: updateSuiteName) }
         let updatePreferences = UpdatePreferences(defaults: updateDefaults)
-        guard updatePreferences.shouldPrompt(for: "0.1.2") else {
+        guard updatePreferences.shouldPrompt(for: "0.1.3") else {
             throw SelfTestError("an enabled newer update did not prompt")
         }
         updatePreferences.promptsEnabled = false
@@ -1325,6 +1354,18 @@ private struct SelfTestError: LocalizedError {
 }
 
 if CommandLine.arguments.contains("--selftest") { exit(MainActor.assumeIsolated { runSelfTest() }) }
+
+if CommandLine.arguments.contains("--update-feed-smoke") {
+    Task {
+        if let release = await GitHubReleaseChecker.latest() {
+            print("UPDATE FEED tag=\(release.tagName) preferredAppAsset=\(release.preferredAppAsset?.name ?? "nil")")
+            exit(0)
+        }
+        print("UPDATE FEED nil")
+        exit(1)
+    }
+    dispatchMain()
+}
 
 if CommandLine.arguments.contains("--validate") {
     do {
