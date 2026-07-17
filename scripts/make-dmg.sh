@@ -48,7 +48,7 @@ APP_ZIP="$WORK_DIR/Ajman.zip"
 STAGING="$WORK_DIR/staging"
 RW_DMG="$WORK_DIR/Ajman-rw.dmg"
 FINAL_DMG="$WORK_DIR/Ajman-$VERSION.dmg"
-MOUNT_POINT="$WORK_DIR/mount"
+MOUNT_POINT="/Volumes/$VOLUME_NAME"
 MOUNT_DEVICE=""
 LAYOUT_TIMEOUT_SECONDS=10
 
@@ -108,8 +108,7 @@ fi
 hdiutil create -quiet -srcfolder "$STAGING" -volname "$VOLUME_NAME" -fs HFS+ \
   -format UDRW -ov "$RW_DMG"
 
-mkdir -p "$MOUNT_POINT"
-ATTACH_OUTPUT="$(hdiutil attach -readwrite -noverify -noautoopen -mountpoint "$MOUNT_POINT" "$RW_DMG")"
+ATTACH_OUTPUT="$(hdiutil attach -readwrite -noverify -noautoopen "$RW_DMG")"
 MOUNT_DEVICE="$(printf '%s\n' "$ATTACH_OUTPUT" | awk '/^\/dev\// {print $1; exit}')"
 if [[ -z "$MOUNT_DEVICE" || ! -d "$MOUNT_POINT" ]]; then
   echo "Could not locate the mounted DMG device or volume." >&2
@@ -126,7 +125,7 @@ with timeout of $LAYOUT_TIMEOUT_SECONDS seconds
       set toolbar visible of container window to false
       set statusbar visible of container window to false
       set pathbar visible of container window to false
-      set bounds of container window to {120, 120, 840, 580}
+      set bounds of container window to {120, 120, 840, 608}
       set theViewOptions to the icon view options of container window
       set arrangement of theViewOptions to not arranged
       set icon size of theViewOptions to 112
@@ -136,29 +135,47 @@ with timeout of $LAYOUT_TIMEOUT_SECONDS seconds
       end if
       set position of item "Ajman.app" of container window to {175, 235}
       set position of item "Applications" of container window to {545, 235}
-      update without registering applications
-      delay 2
       close
+      open
+      delay 1
+      set bounds of container window to {120, 120, 830, 598}
+      delay 1
+      set bounds of container window to {120, 120, 840, 608}
+      delay 3
     end tell
   end tell
 end timeout
 APPLESCRIPT
 }
 
-LAYOUT_SUCCEEDED=false
-for LAYOUT_ATTEMPT in 1 2 3; do
-  if LAYOUT_OUTPUT="$(layout_dmg_window 2>&1)"; then
-    LAYOUT_SUCCEEDED=true
-    echo "Finder DMG window layout succeeded on attempt $LAYOUT_ATTEMPT."
+FINDER_DISK_VISIBLE=false
+for FINDER_VISIBILITY_ATTEMPT in $(seq 1 15); do
+  if [[ "$(osascript -e 'tell application "Finder" to exists disk "'"$VOLUME_NAME"'"' 2>/dev/null)" == "true" ]]; then
+    FINDER_DISK_VISIBLE=true
+    echo "Finder sees disk $VOLUME_NAME after $FINDER_VISIBILITY_ATTEMPT attempt(s)."
     break
   fi
-  echo "WARNING: Finder DMG window layout attempt $LAYOUT_ATTEMPT failed; continuing with a functional DMG without custom icon arrangement or background." >&2
-  [[ -z "$LAYOUT_OUTPUT" ]] || printf '%s\n' "$LAYOUT_OUTPUT" >&2
-  if [[ $LAYOUT_ATTEMPT -lt 3 ]]; then
-    sleep 2
-  fi
+  sleep 1
 done
-if [[ "$LAYOUT_SUCCEEDED" != true ]]; then
+
+LAYOUT_SUCCEEDED=false
+if [[ "$FINDER_DISK_VISIBLE" == true ]]; then
+  for LAYOUT_ATTEMPT in 1 2 3; do
+    if LAYOUT_OUTPUT="$(layout_dmg_window 2>&1)"; then
+      LAYOUT_SUCCEEDED=true
+      echo "Finder DMG window layout succeeded on attempt $LAYOUT_ATTEMPT."
+      break
+    fi
+    echo "WARNING: Finder DMG window layout attempt $LAYOUT_ATTEMPT failed; continuing with a functional DMG without custom icon arrangement or background." >&2
+    [[ -z "$LAYOUT_OUTPUT" ]] || printf '%s\n' "$LAYOUT_OUTPUT" >&2
+    if [[ $LAYOUT_ATTEMPT -lt 3 ]]; then
+      sleep 2
+    fi
+  done
+else
+  echo "WARNING: Finder did not see disk $VOLUME_NAME after 15 attempts; continuing with a functional DMG without custom icon arrangement or background." >&2
+fi
+if [[ "$FINDER_DISK_VISIBLE" == true && "$LAYOUT_SUCCEEDED" != true ]]; then
   echo "WARNING: Giving up on Finder DMG window layout after 3 attempts; continuing the build." >&2
 fi
 
