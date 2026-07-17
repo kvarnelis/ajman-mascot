@@ -158,6 +158,8 @@ final class PetInstance {
     func show(useLegacyPositionFallback: Bool) {
         panel.restorePositionOrUseDefault(useLegacyFallback: useLegacyPositionFallback)
         panel.orderFrontRegardless()
+        panel.ensureVisible()
+        DispatchQueue.main.async { [weak panel] in panel?.ensureVisible() }
         resumeLiveReactions()
         scratchBehavior?.resumeScheduling()
     }

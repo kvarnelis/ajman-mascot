@@ -54,5 +54,13 @@ make_slot 512 icon_256x256@2x.png
 make_slot 512 icon_512x512.png
 make_slot 1024 icon_512x512@2x.png
 
-iconutil --convert icns --output "$OUTPUT_DIR/Ajman.icns" "$ICONSET"
+GENERATED_ICNS="$OUTPUT_DIR/Ajman-generated.icns"
+if iconutil --convert icns --output "$GENERATED_ICNS" "$ICONSET"; then
+  mv "$GENERATED_ICNS" "$OUTPUT_DIR/Ajman.icns"
+elif [[ -s "$OUTPUT_DIR/Ajman.icns" ]]; then
+  rm -f "$GENERATED_ICNS"
+  echo "WARNING: iconutil rejected the regenerated iconset; preserving the existing Ajman.icns." >&2
+else
+  exit 1
+fi
 echo "Built icon: $OUTPUT_DIR/Ajman.icns"

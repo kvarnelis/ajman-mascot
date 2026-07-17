@@ -2,7 +2,9 @@ import AppKit
 
 final class OverlayPanel: NSPanel, NSWindowDelegate {
     private static let legacyPositionKey = "AjmanPanelOrigin"
+    static let substantialOverlapThreshold: CGFloat = 0.55
     private var saveWorkItem: DispatchWorkItem?
+    private var screenParametersObserver: NSObjectProtocol?
     private let defaults: UserDefaults
     private var defaultPositionIndex: Int
     let positionPersistenceKey: String
@@ -48,6 +50,14 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         isMovableByWindowBackground = true
         hidesOnDeactivate = false
+
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.ensureVisible() }
+        }
     }
 
     override var canBecomeKey: Bool { false }
@@ -106,7 +116,10 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
             ?? (useLegacyFallback ? defaults.string(forKey: Self.legacyPositionKey) : nil)
         if let value = stored {
             let origin = NSPointFromString(value)
-            if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(NSRect(origin: origin, size: frame.size)) }) {
+            if Self.hasSubstantialOverlap(
+                panelFrame: NSRect(origin: origin, size: frame.size),
+                visibleFrames: Self.currentVisibleFrames()
+            ) {
                 setFrameOrigin(origin)
                 return
             }
@@ -115,13 +128,81 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
     }
 
     func resetPosition() {
-        guard let visibleFrame = NSScreen.main?.visibleFrame ?? NSScreen.screens.first?.visibleFrame else { return }
+        guard let visibleFrame = Self.preferredVisibleFrame() else {
+            return
+        }
         setFrameOrigin(Self.defaultOrigin(
             visibleFrame: visibleFrame,
             displaySize: frame.size,
             defaultPositionIndex: defaultPositionIndex
         ))
+        ensureVisible()
         savePosition()
+    }
+
+    /// Repairs a stale, invalid, or not-yet-positioned panel whenever usable screen
+    /// geometry is available. This is intentionally safe to call repeatedly.
+    func ensureVisible() {
+        let visibleFrames = Self.currentVisibleFrames()
+        guard !visibleFrames.isEmpty, let preferredFrame = Self.preferredVisibleFrame() else {
+            return
+        }
+        guard !Self.hasSubstantialOverlap(panelFrame: frame, visibleFrames: visibleFrames) else { return }
+        setFrameOrigin(Self.defaultOrigin(
+            visibleFrame: preferredFrame,
+            displaySize: frame.size,
+            defaultPositionIndex: defaultPositionIndex
+        ))
+        savePosition()
+    }
+
+    private static func currentVisibleFrames() -> [NSRect] {
+        NSScreen.screens.map(\.visibleFrame).filter(Self.isUsableScreenFrame)
+    }
+
+    private static func preferredVisibleFrame() -> NSRect? {
+        if let main = NSScreen.main?.visibleFrame, isUsableScreenFrame(main) { return main }
+        return NSScreen.screens.map(\.visibleFrame).first(where: isUsableScreenFrame)
+    }
+
+    private static func isUsableScreenFrame(_ frame: NSRect) -> Bool {
+        frame.width.isFinite && frame.height.isFinite && frame.width > 0 && frame.height > 0
+    }
+
+    static func hasSubstantialOverlap(
+        panelFrame: NSRect,
+        visibleFrames: [NSRect],
+        threshold: CGFloat = substantialOverlapThreshold
+    ) -> Bool {
+        guard panelFrame.width > 0, panelFrame.height > 0 else { return false }
+        let panelArea = panelFrame.width * panelFrame.height
+        let bottomCenter = NSPoint(x: panelFrame.midX, y: panelFrame.minY)
+        return visibleFrames.contains { visibleFrame in
+            guard isUsableScreenFrame(visibleFrame) else { return false }
+            let intersection = panelFrame.intersection(visibleFrame)
+            let overlapArea = intersection.isNull ? 0 : intersection.width * intersection.height
+            return overlapArea / panelArea >= threshold
+                || visibleFrame.contains(bottomCenter)
+        }
+    }
+
+    static func healedFrame(
+        panelFrame: NSRect,
+        visibleFrames: [NSRect],
+        preferredVisibleFrame: NSRect,
+        defaultPositionIndex: Int
+    ) -> NSRect {
+        guard !hasSubstantialOverlap(panelFrame: panelFrame, visibleFrames: visibleFrames) else {
+            return panelFrame
+        }
+        return NSRect(
+            origin: defaultOrigin(
+                visibleFrame: preferredVisibleFrame,
+                displaySize: panelFrame.size,
+                defaultPositionIndex: defaultPositionIndex
+            ),
+            size: panelFrame.size
+        )
     }
 
     static func defaultOrigin(
@@ -132,13 +213,24 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
         let groundLine = visibleFrame.minY + 24
         let scaledGroundMargin = CGFloat(SpriteSheet.contentMargin)
             * displaySize.height / CGFloat(SpriteSheet.cellHeight)
+        let intendedOrigin = NSPoint(
+            x: visibleFrame.maxX - displaySize.width - 24
+                - CGFloat(defaultPositionIndex) * displaySize.width * 1.5,
+            y: groundLine - scaledGroundMargin
+        )
+        return clampedOrigin(intendedOrigin, displaySize: displaySize, visibleFrame: visibleFrame)
+    }
+
+    static func clampedOrigin(
+        _ origin: NSPoint,
+        displaySize: NSSize,
+        visibleFrame: NSRect
+    ) -> NSPoint {
+        let maximumX = max(visibleFrame.minX, visibleFrame.maxX - displaySize.width)
+        let maximumY = max(visibleFrame.minY, visibleFrame.maxY - displaySize.height)
         return NSPoint(
-            x: max(
-                visibleFrame.minX,
-                visibleFrame.maxX - displaySize.width - 24
-                    - CGFloat(defaultPositionIndex) * displaySize.width * 1.5
-            ),
-            y: min(visibleFrame.maxY - displaySize.height, groundLine - scaledGroundMargin)
+            x: min(max(origin.x, visibleFrame.minX), maximumX),
+            y: min(max(origin.y, visibleFrame.minY), maximumY)
         )
     }
 
@@ -202,7 +294,17 @@ final class OverlayPanel: NSPanel, NSWindowDelegate {
     func teardown() {
         saveWorkItem?.cancel()
         saveWorkItem = nil
+        if let screenParametersObserver {
+            NotificationCenter.default.removeObserver(screenParametersObserver)
+            self.screenParametersObserver = nil
+        }
         orderOut(nil)
         close()
+    }
+
+    deinit {
+        if let screenParametersObserver {
+            NotificationCenter.default.removeObserver(screenParametersObserver)
+        }
     }
 }

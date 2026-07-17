@@ -297,6 +297,75 @@ private func runSelfTest() -> Int32 {
         }
         print("Pet instances: both packages load; distinct position keys; reset feet share one scaled ground line")
 
+        func isFullyContained(_ panelFrame: NSRect, in visibleFrame: NSRect) -> Bool {
+            visibleFrame.contains(panelFrame)
+        }
+        let largeDisplayFrames = [
+            NSRect(x: 0, y: 0, width: 5_120, height: 2_880),
+            NSRect(x: 0, y: 0, width: 2_560, height: 1_440),
+        ]
+        for visibleFrame in largeDisplayFrames {
+            for (index, size) in [defaultAjmanSize, defaultWinnieSize].enumerated() {
+                let origin = OverlayPanel.defaultOrigin(
+                    visibleFrame: visibleFrame,
+                    displaySize: size,
+                    defaultPositionIndex: index
+                )
+                guard isFullyContained(NSRect(origin: origin, size: size), in: visibleFrame) else {
+                    throw SelfTestError("default pet position escaped a large single display")
+                }
+            }
+        }
+
+        let offscreen = NSRect(x: 8_000, y: 8_000, width: defaultAjmanSize.width, height: defaultAjmanSize.height)
+        let healedOffscreen = OverlayPanel.healedFrame(
+            panelFrame: offscreen,
+            visibleFrames: [testVisibleFrame],
+            preferredVisibleFrame: testVisibleFrame,
+            defaultPositionIndex: 0
+        )
+        guard isFullyContained(healedOffscreen, in: testVisibleFrame) else {
+            throw SelfTestError("fully off-screen saved origin was not healed")
+        }
+
+        let onePixelIntersection = NSRect(
+            x: testVisibleFrame.maxX - 1,
+            y: testVisibleFrame.maxY - 1,
+            width: defaultAjmanSize.width,
+            height: defaultAjmanSize.height
+        )
+        guard !OverlayPanel.hasSubstantialOverlap(
+            panelFrame: onePixelIntersection,
+            visibleFrames: [testVisibleFrame]
+        ) else {
+            throw SelfTestError("one-pixel screen intersection counted as substantially visible")
+        }
+        let healedOnePixel = OverlayPanel.healedFrame(
+            panelFrame: onePixelIntersection,
+            visibleFrames: [testVisibleFrame],
+            preferredVisibleFrame: testVisibleFrame,
+            defaultPositionIndex: 0
+        )
+        guard isFullyContained(healedOnePixel, in: testVisibleFrame) else {
+            throw SelfTestError("one-pixel saved-origin intersection was not healed")
+        }
+
+        let negativeSecondary = NSRect(x: -1_920, y: -240, width: 1_920, height: 1_080)
+        let multiDisplayFrames = [testVisibleFrame, negativeSecondary]
+        let secondaryPet = NSRect(
+            origin: OverlayPanel.defaultOrigin(
+                visibleFrame: negativeSecondary,
+                displaySize: defaultWinnieSize,
+                defaultPositionIndex: 1
+            ),
+            size: defaultWinnieSize
+        )
+        guard isFullyContained(secondaryPet, in: negativeSecondary),
+              OverlayPanel.hasSubstantialOverlap(panelFrame: secondaryPet, visibleFrames: multiDisplayFrames) else {
+            throw SelfTestError("negative-origin secondary display did not keep a pet fully visible")
+        }
+        print("Panel visibility: 55%/bottom-center rule; off-screen and 1px origins heal; large and negative-origin displays contain all pets")
+
         let cycleOrder: [AnimationState] = [
             .idle, .runningRight, .runningLeft, .waving, .jumping, .failed,
             .waiting, .running, .review, .lookDirectionsA, .lookDirectionsB,
