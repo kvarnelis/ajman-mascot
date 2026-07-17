@@ -5,6 +5,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+VERSION="$(sed -nE 's/^[[:space:]]*static let version[[:space:]]*=[[:space:]]*AppVersion\("([^"]+)"\)![[:space:]]*$/\1/p' "$REPO_ROOT/Sources/Ajman/AppVersion.swift")"
+if [[ -z "$VERSION" || "$VERSION" == *$'\n'* ]] || ! printf '%s\n' "$VERSION" | grep -Eq '^[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?$'; then
+  echo "Could not read one valid AppVersion literal from Sources/Ajman/AppVersion.swift" >&2
+  exit 1
+fi
+
 # --disable-sandbox avoids SwiftPM's inner sandbox conflicting with an outer
 # agent sandbox (sandbox_apply: Operation not permitted). No build plugins here,
 # so this is safe and keeps agent builds deterministic.
@@ -19,7 +25,7 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 cp "$REPO_ROOT/.build/release/Ajman" "$CONTENTS/MacOS/Ajman"
 cp "$REPO_ROOT/.build/release/ajman-hook" "$CONTENTS/MacOS/ajman-hook"
 
-cat > "$CONTENTS/Info.plist" <<'PLIST'
+cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -29,7 +35,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <key>CFBundleExecutable</key><string>Ajman</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>Ajman.icns</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>LSUIElement</key><true/>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>

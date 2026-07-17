@@ -103,7 +103,7 @@ private func runSelfTest() -> Int32 {
         }
         print("First-run launch prompt: shows once; Yes enables; Not now stays off; both persist \(FirstRunLaunchPrompt.didAskKey)")
 
-        guard AjmanApp.version == AppVersion("v0.1.0"),
+        guard AjmanApp.version == AppVersion("v0.1.1"),
               AppVersion("1.2.4")! > AppVersion("1.2.3")!,
               AppVersion("1.2")! == AppVersion("1.2.0")!,
               AppVersion("1.2.3-beta.2")! < AppVersion("1.2.3")!,
@@ -112,13 +112,67 @@ private func runSelfTest() -> Int32 {
         }
         print("Updates: semver-ish newer/older/equal comparison passes; running version \(AjmanApp.version)")
 
+        let bubbleVisibleFrame = NSRect(x: 0, y: 0, width: 1000, height: 800)
+        let bubbleSize = NSSize(width: 310, height: 158)
+        let roomyAnchor = NSRect(x: 450, y: 300, width: 80, height: 80)
+        let roomyPlacement = UpdateBubbleController.bubblePlacement(
+            anchorFrame: roomyAnchor, visible: bubbleVisibleFrame, bubbleSize: bubbleSize
+        )
+        guard !roomyPlacement.tailOnTop,
+              abs(roomyPlacement.origin.y - 382) < 0.000_001,
+              abs(roomyPlacement.origin.x + roomyPlacement.tailTipX - roomyAnchor.midX) < 0.000_001 else {
+            throw SelfTestError("roomy update bubble did not sit above or point at its anchor")
+        }
+
+        let topAnchor = NSRect(x: 450, y: 740, width: 80, height: 50)
+        let topPlacement = UpdateBubbleController.bubblePlacement(
+            anchorFrame: topAnchor, visible: bubbleVisibleFrame, bubbleSize: bubbleSize
+        )
+        guard topPlacement.tailOnTop,
+              abs(topPlacement.origin.y - 580) < 0.000_001,
+              abs(topPlacement.origin.x + topPlacement.tailTipX - topAnchor.midX) < 0.000_001 else {
+            throw SelfTestError("top-edge update bubble did not flip below or point up at its anchor")
+        }
+
+        let rightAnchor = NSRect(x: 950, y: 300, width: 40, height: 80)
+        let rightPlacement = UpdateBubbleController.bubblePlacement(
+            anchorFrame: rightAnchor, visible: bubbleVisibleFrame, bubbleSize: bubbleSize
+        )
+        guard abs(rightPlacement.origin.x - 690) < 0.000_001,
+              abs(rightPlacement.tailTipX - 280) < 0.000_001,
+              abs(rightPlacement.origin.x + rightPlacement.tailTipX - rightAnchor.midX) < 0.000_001 else {
+            throw SelfTestError("right-edge update bubble tail did not compensate for the x clamp")
+        }
+
+        let extremeAnchors = [
+            NSRect(x: -30, y: 300, width: 10, height: 80),
+            NSRect(x: 995, y: 300, width: 5, height: 80),
+        ]
+        let extremeTips = extremeAnchors.map {
+            UpdateBubbleController.bubblePlacement(
+                anchorFrame: $0, visible: bubbleVisibleFrame, bubbleSize: bubbleSize
+            ).tailTipX
+        }
+        guard extremeTips.allSatisfy({
+            $0 >= UpdateBubbleController.tailTipInset
+                && $0 <= bubbleSize.width - UpdateBubbleController.tailTipInset
+        }) else {
+            throw SelfTestError("update bubble tail escaped the rounded-body inset")
+        }
+        print(
+            "Update bubble placement: roomy origin=\(roomyPlacement.origin) tailOnTop=\(roomyPlacement.tailOnTop) tipX=\(roomyPlacement.tailTipX); "
+                + "top origin=\(topPlacement.origin) tailOnTop=\(topPlacement.tailOnTop) tipX=\(topPlacement.tailTipX); "
+                + "right origin=\(rightPlacement.origin) tailOnTop=\(rightPlacement.tailOnTop) tipX=\(rightPlacement.tailTipX); "
+                + "extreme tips=\(extremeTips)"
+        )
+
         let updateSuiteName = "AjmanSelfTest.Updates.\(UUID().uuidString)"
         guard let updateDefaults = UserDefaults(suiteName: updateSuiteName) else {
             throw SelfTestError("could not create update defaults")
         }
         defer { updateDefaults.removePersistentDomain(forName: updateSuiteName) }
         let updatePreferences = UpdatePreferences(defaults: updateDefaults)
-        guard updatePreferences.shouldPrompt(for: "0.1.1") else {
+        guard updatePreferences.shouldPrompt(for: "0.1.2") else {
             throw SelfTestError("an enabled newer update did not prompt")
         }
         updatePreferences.promptsEnabled = false

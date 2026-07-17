@@ -2,15 +2,63 @@ import AppKit
 
 @MainActor
 final class UpdateBubbleController {
+    struct BubblePlacement {
+        let origin: NSPoint
+        let tailOnTop: Bool
+        let tailTipX: CGFloat
+    }
+
+    static let tailTipInset: CGFloat = 26
+
+    static func bubblePlacement(
+        anchorFrame: NSRect,
+        visible: NSRect,
+        bubbleSize: NSSize
+    ) -> BubblePlacement {
+        var origin = NSPoint(
+            x: anchorFrame.midX - bubbleSize.width + 38,
+            y: anchorFrame.maxY + 2
+        )
+        let tailOnTop = origin.y + bubbleSize.height > visible.maxY
+        if tailOnTop {
+            origin.y = anchorFrame.minY - bubbleSize.height - 2
+        }
+
+        let maxOriginX = max(visible.minX, visible.maxX - bubbleSize.width)
+        let maxOriginY = max(visible.minY, visible.maxY - bubbleSize.height)
+        origin.x = min(max(origin.x, visible.minX), maxOriginX)
+        origin.y = min(max(origin.y, visible.minY), maxOriginY)
+
+        let maxTailTipX = max(tailTipInset, bubbleSize.width - tailTipInset)
+        let tailTipX = min(
+            max(anchorFrame.midX - origin.x, tailTipInset),
+            maxTailTipX
+        )
+        return BubblePlacement(origin: origin, tailOnTop: tailOnTop, tailTipX: tailTipX)
+    }
+
     private final class BubblePanel: NSPanel {
         override var canBecomeKey: Bool { false }
         override var canBecomeMain: Bool { false }
     }
 
     private final class BubbleBackgroundView: NSView {
+        var tailOnTop = false {
+            didSet { if tailOnTop != oldValue { needsDisplay = true } }
+        }
+        var tailTipX: CGFloat = 0 {
+            didSet { if tailTipX != oldValue { needsDisplay = true } }
+        }
+
         override func draw(_ dirtyRect: NSRect) {
             super.draw(dirtyRect)
-            let body = NSRect(x: 2, y: 16, width: bounds.width - 4, height: bounds.height - 18)
+            let tailStripHeight: CGFloat = 16
+            let body = NSRect(
+                x: 2,
+                y: tailStripHeight,
+                width: bounds.width - 4,
+                height: bounds.height - (tailStripHeight * 2)
+            )
             NSColor.windowBackgroundColor.withAlphaComponent(0.97).setFill()
             NSColor.labelColor.withAlphaComponent(0.8).setStroke()
             let outline = NSBezierPath(roundedRect: body, xRadius: 17, yRadius: 17)
@@ -19,9 +67,11 @@ final class UpdateBubbleController {
             outline.stroke()
 
             let tail = NSBezierPath()
-            tail.move(to: NSPoint(x: bounds.width - 54, y: 17))
-            tail.line(to: NSPoint(x: bounds.width - 30, y: 2))
-            tail.line(to: NSPoint(x: bounds.width - 34, y: 18))
+            let baseY = tailOnTop ? body.maxY - 1 : body.minY + 1
+            let tipY = tailOnTop ? bounds.maxY - 2 : bounds.minY + 2
+            tail.move(to: NSPoint(x: tailTipX - 12, y: baseY))
+            tail.line(to: NSPoint(x: tailTipX, y: tipY))
+            tail.line(to: NSPoint(x: tailTipX + 12, y: baseY))
             tail.close()
             tail.fill()
             tail.stroke()
@@ -47,7 +97,7 @@ final class UpdateBubbleController {
 
     init() {
         panel = BubblePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 310, height: 142),
+            contentRect: NSRect(x: 0, y: 0, width: 310, height: 158),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -60,6 +110,7 @@ final class UpdateBubbleController {
         panel.hidesOnDeactivate = false
 
         let background = BubbleBackgroundView(frame: panel.contentView?.bounds ?? .zero)
+        background.tailTipX = panel.frame.width - 30
         background.autoresizingMask = [.width, .height]
         panel.contentView = background
 
@@ -92,7 +143,8 @@ final class UpdateBubbleController {
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: background.leadingAnchor, constant: 16),
             stack.trailingAnchor.constraint(equalTo: background.trailingAnchor, constant: -16),
-            stack.topAnchor.constraint(equalTo: background.topAnchor, constant: 15),
+            stack.topAnchor.constraint(equalTo: background.topAnchor, constant: 29),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: background.bottomAnchor, constant: -29),
             buttons.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor),
         ])
     }
@@ -158,13 +210,12 @@ final class UpdateBubbleController {
         guard let visible = screen?.visibleFrame else { return }
         let size = panel.frame.size
         let target = anchor ?? NSRect(x: visible.maxX - 100, y: visible.minY + 30, width: 70, height: 70)
-        var origin = NSPoint(x: target.midX - size.width + 38, y: target.maxY + 2)
-        if origin.y + size.height > visible.maxY {
-            origin.y = target.minY - size.height - 2
+        let placement = Self.bubblePlacement(anchorFrame: target, visible: visible, bubbleSize: size)
+        if let background = panel.contentView as? BubbleBackgroundView {
+            background.tailOnTop = placement.tailOnTop
+            background.tailTipX = placement.tailTipX
         }
-        origin.x = min(max(origin.x, visible.minX), visible.maxX - size.width)
-        origin.y = min(max(origin.y, visible.minY), visible.maxY - size.height)
-        panel.setFrameOrigin(origin)
+        panel.setFrameOrigin(placement.origin)
     }
 
     private func clearObservers() {
