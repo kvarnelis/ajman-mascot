@@ -123,9 +123,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         let reset = NSMenuItem(title: "Reset Position", action: #selector(resetPosition), keyEquivalent: "")
         reset.target = self
         menu.addItem(reset)
-        launchAtLoginItem.target = self
-        launchAtLoginItem.state = launchAtLogin.isEnabled ? .on : .off
-        menu.addItem(launchAtLoginItem)
+        if LaunchAtLogin.isSupported {
+            launchAtLoginItem.target = self
+            launchAtLoginItem.state = launchAtLogin.isEnabled ? .on : .off
+            menu.addItem(launchAtLoginItem)
+        }
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit Ajman", action: #selector(quit), keyEquivalent: "q")
         quit.target = self

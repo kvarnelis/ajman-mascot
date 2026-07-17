@@ -37,7 +37,7 @@ cat > "$CONTENTS/Info.plist" <<PLIST
   <key>CFBundleIconFile</key><string>Ajman.icns</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>LSUIElement</key><true/>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>

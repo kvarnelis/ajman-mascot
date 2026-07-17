@@ -10,7 +10,7 @@ Architecture and staged plan: docs/ARCHITECTURE-REVIEW.md. Evidence: docs/resear
 - Dev loop: `swift build` / `swift run` (runs as accessory app without a bundle).
 
 ## Constraints
-- Swift/AppKit only, zero SPM dependencies, macOS 13+.
+- Swift/AppKit only, zero SPM dependencies, macOS 12+. Launch at Login requires macOS 13+ and is hidden on macOS 12.
 - No metered AI APIs at runtime — ever (see ~/Developer/CLAUDE.md).
 - Passive operation (animation, hearing agents) requires NO Accessibility permission and no network egress. Accessibility is owner-approved (2026-07-12) for opt-in features that benefit — precise window/tab focus targeting, and focus-based alert dismissal — but keep it optional: the pet must still work fully without it.
 - The pet asset is the user's: read from `~/.codex/pets/ajman/`, bundle-copy as fallback, never regenerate or modify it.

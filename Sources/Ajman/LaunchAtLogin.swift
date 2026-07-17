@@ -2,6 +2,11 @@ import Foundation
 import ServiceManagement
 
 struct LaunchAtLogin {
+    static var isSupported: Bool {
+        if #available(macOS 13.0, *) { return true }
+        return false
+    }
+
     var isEnabled: Bool {
         guard #available(macOS 13.0, *) else { return false }
         return SMAppService.mainApp.status == .enabled

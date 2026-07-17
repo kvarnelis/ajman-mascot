@@ -188,6 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showFirstRunLaunchPromptIfNeeded(menu: StatusMenu) {
+        guard LaunchAtLogin.isSupported else { return }
         let launchAtLogin = LaunchAtLogin()
         do {
             try FirstRunLaunchPrompt().performIfNeeded(

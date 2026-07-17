@@ -99,7 +99,7 @@ else
     -stroke none -fill '#596579' \
     -draw 'polygon 466,211 505,239 462,258' \
     -fill '#6b7280' -pointsize 13 -gravity south \
-    -annotate +0+28 'macOS 13 or later' \
+    -annotate +0+28 'macOS 12 or later' \
     "$STAGING/.background/background.png"; then
     echo "WARNING: ImageMagick could not create the DMG background; continuing without it." >&2
     rm -rf "$STAGING/.background"
