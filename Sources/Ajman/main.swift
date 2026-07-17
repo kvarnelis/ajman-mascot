@@ -772,6 +772,53 @@ private func runSelfTest() -> Int32 {
               ScratchSide.right.poseIndex == 1 else {
             throw SelfTestError("Ajman's bundled scratch strip did not map left/right paws to left/right edges")
         }
+        guard let winnieWake = sleepingWinnie.wakeAnimation,
+              winnieWake.frameCount == 5,
+              let winnieScratch = sleepingWinnie.scratchAnimation,
+              winnieScratch.frameCount == 2 else {
+            throw SelfTestError("Winnie's bundled stretch/scratch strips did not load 5/2 poses")
+        }
+        let winnieCompanionFrames = winnieWake.frames + winnieScratch.frames
+        let winnieCompanionBounds = winnieCompanionFrames.compactMap(SpriteSheet.contentBounds)
+        guard winnieCompanionBounds.count == winnieCompanionFrames.count,
+              winnieCompanionBounds.allSatisfy({
+                  abs($0.maxY - CGFloat(SpriteSheet.cellHeight - SpriteSheet.contentMargin)) <= 1
+                      && $0.minX > 0
+                      && $0.maxX < CGFloat(SpriteSheet.cellWidth)
+                      && $0.maxY < CGFloat(SpriteSheet.cellHeight)
+              }) else {
+            throw SelfTestError(
+                "Winnie's stretch/scratch frames missed the ground line or touched a cell edge: \(winnieCompanionBounds)"
+            )
+        }
+        guard let leftUpperImage = winnieScratch.frames[ScratchSide.left.poseIndex].cropping(
+            to: CGRect(x: 0, y: 0, width: SpriteSheet.cellWidth, height: 80)
+        ),
+              let rightUpperImage = winnieScratch.frames[ScratchSide.right.poseIndex].cropping(
+                to: CGRect(x: 0, y: 0, width: SpriteSheet.cellWidth, height: 80)
+              ),
+              let leftUpperBounds = SpriteSheet.contentBounds(leftUpperImage),
+              let rightUpperBounds = SpriteSheet.contentBounds(rightUpperImage),
+              leftUpperBounds.minX < CGFloat(SpriteSheet.cellWidth) / 2,
+              leftUpperBounds.maxX < rightUpperBounds.maxX,
+              rightUpperBounds.minX > leftUpperBounds.minX,
+              rightUpperBounds.maxX > CGFloat(SpriteSheet.cellWidth) / 2 else {
+            throw SelfTestError("Winnie's scratch pose indices did not map pixel reach left=0/right=1")
+        }
+        let winnieActions = PetActionCycle.availableActions(
+            availableStates: sleepingWinnie.sheet.animationTable.states,
+            hasLoaf: sleepingWinnie.loafAnimation != nil,
+            hasSleep: sleepingWinnie.sleepAnimation != nil,
+            hasScratch: sleepingWinnie.scratchAnimation != nil
+        )
+        guard winnieActions.contains(.scratch),
+              Temperament.defaultValue(for: "winnie").scaledFidget(
+                probability: ScratchBehavior.triggerProbability
+              ) > Temperament.defaultValue(for: "ajman").scaledFidget(
+                probability: ScratchBehavior.triggerProbability
+              ) else {
+            throw SelfTestError("Winnie scratch was absent from direct actions or not more frequent than Ajman's default")
+        }
         guard ScratchEdgeGeometry.leftPawX == 37,
               ScratchEdgeGeometry.rightPawX == 155,
               ScratchEdgeGeometry.targetOriginX(
@@ -865,7 +912,7 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("Winnie's held sleep pose did not rotate to a different pose")
         }
         winnieSleepAnimator.stop()
-        print("Calm assets: Winnie sleep loads and rotates 8 weighted poses; Ajman loaf/sleep/wake/scratch load 8/8/5/2; autonomous scratch follows live position with a 27% far-edge branch; scratch panel reaches the edge and returns to its recorded start")
+        print("Calm assets: Winnie sleep/wake/scratch load 8/5/2 with y=203 grounding and pixel-mapped left=00/right=01; her Frisky scratch whim exceeds Ajman's Calm default; Ajman loaf/sleep/wake/scratch load 8/8/5/2; scratch travel returns home")
 
         var scratchEligibility = ScratchEligibility(
             hasAsset: true,

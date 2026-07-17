@@ -160,6 +160,8 @@ struct SpriteSheet {
 
     private struct Bitmap {
         let data: [UInt8]
+        let width: Int
+        let height: Int
     }
 
     private static func normalized(
@@ -179,7 +181,7 @@ struct SpriteSheet {
             }
         let measured = Dictionary(uniqueKeysWithValues: used.compactMap { location -> (FrameLocation, CGRect)? in
             guard let bitmap = rgbaBitmap(from: cells[location.row][location.column]),
-                  let bounds = contentBounds(in: bitmap.data) else { return nil }
+                  let bounds = contentBounds(in: bitmap) else { return nil }
             return (location, bounds)
         })
         let idleBounds = table.definition(for: .idle).map { definition in
@@ -248,20 +250,22 @@ struct SpriteSheet {
         return corrected.makeImage() ?? rendered
     }
 
-    private static func contentBounds(_ image: CGImage) -> CGRect? {
+    static func contentBounds(_ image: CGImage) -> CGRect? {
         guard let bitmap = rgbaBitmap(from: image) else { return nil }
-        return contentBounds(in: bitmap.data)
+        return contentBounds(in: bitmap)
     }
 
     private static func rgbaBitmap(from image: CGImage) -> Bitmap? {
-        guard let context = rgbaContext(width: cellWidth, height: cellHeight) else { return nil }
-        context.draw(image, in: CGRect(x: 0, y: 0, width: cellWidth, height: cellHeight))
+        let width = image.width
+        let height = image.height
+        guard let context = rgbaContext(width: width, height: height) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         guard let pointer = context.data else { return nil }
         let data = Array(UnsafeBufferPointer(
             start: pointer.assumingMemoryBound(to: UInt8.self),
-            count: cellWidth * cellHeight * 4
+            count: width * height * 4
         ))
-        return Bitmap(data: data)
+        return Bitmap(data: data, width: width, height: height)
     }
 
     private static func rgbaContext(width: Int, height: Int) -> CGContext? {
@@ -276,13 +280,14 @@ struct SpriteSheet {
         )
     }
 
-    private static func contentBounds(in rgba: [UInt8]) -> CGRect? {
-        var minX = cellWidth
-        var minY = cellHeight
+    private static func contentBounds(in bitmap: Bitmap) -> CGRect? {
+        var minX = bitmap.width
+        var minY = bitmap.height
         var maxX = -1
         var maxY = -1
-        for y in 0..<cellHeight {
-            for x in 0..<cellWidth where rgba[(y * cellWidth + x) * 4 + 3] > contentAlphaThreshold {
+        for y in 0..<bitmap.height {
+            for x in 0..<bitmap.width
+                where bitmap.data[(y * bitmap.width + x) * 4 + 3] > contentAlphaThreshold {
                 minX = min(minX, x)
                 minY = min(minY, y)
                 maxX = max(maxX, x)
