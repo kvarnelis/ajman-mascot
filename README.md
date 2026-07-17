@@ -4,7 +4,7 @@ Ajman is a small macOS desktop companion starring two real cats: Ajman, a tuxedo
 
 ## Install
 
-Requires macOS 14 or later. Open the Ajman DMG, drag **Ajman.app** onto **Applications**, then open Ajman from Applications.
+Requires macOS 13 or later. Open the Ajman DMG, drag **Ajman.app** onto **Applications**, then open Ajman from Applications.
 
 On first launch, Ajman asks whether he should launch at startup. You can change that choice later from **Launch at Login** in the menu-bar menu.
 

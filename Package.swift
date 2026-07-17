@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Ajman",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v13)],
     products: [
         .executable(name: "Ajman", targets: ["Ajman"]),
         .executable(name: "ajman-tools", targets: ["AjmanTools"]),

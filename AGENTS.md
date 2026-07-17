@@ -10,7 +10,7 @@ Architecture and staged plan: docs/ARCHITECTURE-REVIEW.md. Evidence: docs/resear
 - Dev loop: `swift build` / `swift run` (runs as accessory app without a bundle).
 
 ## Constraints
-- Swift/AppKit only, zero SPM dependencies, macOS 14+.
+- Swift/AppKit only, zero SPM dependencies, macOS 13+.
 - No metered AI APIs at runtime — ever (see ~/Developer/CLAUDE.md).
 - No Accessibility permission for passive operation; no network egress in v1.
 - The pet asset is the user's: read from `~/.codex/pets/ajman/`, bundle-copy as fallback, never regenerate or modify it.
