@@ -103,8 +103,7 @@ private func runSelfTest() -> Int32 {
         }
         print("First-run launch prompt: shows once; Yes enables; Not now stays off; both persist \(FirstRunLaunchPrompt.didAskKey)")
 
-        guard AjmanApp.version == AppVersion("v0.1.2"),
-              AppVersion("1.2.4")! > AppVersion("1.2.3")!,
+        guard AppVersion("1.2.4")! > AppVersion("1.2.3")!,
               AppVersion("1.2")! == AppVersion("1.2.0")!,
               AppVersion("1.2.3-beta.2")! < AppVersion("1.2.3")!,
               AppVersion("1.2.3")! < AppVersion("2.0.0")! else {
@@ -201,18 +200,30 @@ private func runSelfTest() -> Int32 {
         }
         defer { updateDefaults.removePersistentDomain(forName: updateSuiteName) }
         let updatePreferences = UpdatePreferences(defaults: updateDefaults)
-        guard updatePreferences.shouldPrompt(for: "0.1.3") else {
+        let updateTestRunningVersion = AppVersion("0.1.2")!
+        guard updatePreferences.shouldPrompt(for: "0.1.3", runningVersion: updateTestRunningVersion) else {
             throw SelfTestError("an enabled newer update did not prompt")
         }
         updatePreferences.promptsEnabled = false
-        guard !updatePreferences.shouldPrompt(for: "9.0.0"),
+        guard !updatePreferences.shouldPrompt(for: "9.0.0", runningVersion: updateTestRunningVersion),
               updateDefaults.bool(forKey: UpdatePreferences.promptsDisabledKey) else {
             throw SelfTestError("don't-ask-again did not persistently disable prompts")
         }
         updatePreferences.promptsEnabled = true
         updatePreferences.skippedVersion = "0.2.0"
-        guard !updatePreferences.shouldPrompt(for: "0.2.0"), updatePreferences.shouldPrompt(for: "0.2.1") else {
+        guard !updatePreferences.shouldPrompt(for: "0.2.0", runningVersion: updateTestRunningVersion),
+              updatePreferences.shouldPrompt(for: "0.2.1", runningVersion: updateTestRunningVersion) else {
             throw SelfTestError("skipped update version was not isolated")
+        }
+        let helperSuccessTail = #"""
+/usr/bin/open "$CURRENT" >/dev/null 2>&1 || restore_old "the updated app could not be relaunched"
+/bin/rm -f "$MARKER"
+/bin/rm -rf "$BACKUP" || true
+/bin/rm -rf "$WORK" || true
+exit 0
+"""#
+        guard UpdateInstaller.helperScriptForTesting.contains(helperSuccessTail) else {
+            throw SelfTestError("successful update helper does not remove its backup and work directory before exit")
         }
         let previewBubble = UpdateBubbleController()
         previewBubble.showPreview(
@@ -223,7 +234,7 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("preview update bubble did not construct/show with three controls")
         }
         previewBubble.dismiss()
-        print("Updates: don't-ask-again persists/re-enables; preview bubble shows Update/Later/Don't ask again")
+        print("Updates: don't-ask-again persists/re-enables; successful helper cleans backup/work; preview bubble shows Update/Later/Don't ask again")
 
         let suiteName = "AjmanSelfTest.PetScale.\(UUID().uuidString)"
         guard let scaleDefaults = UserDefaults(suiteName: suiteName) else { throw SelfTestError("could not create scale defaults") }

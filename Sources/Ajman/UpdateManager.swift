@@ -204,6 +204,8 @@ enum UpdateInstaller {
         )) != nil
     }
 
+    static var helperScriptForTesting: String { helperScript }
+
     private static let helperScript = #"""
 #!/bin/bash
 set -u
@@ -240,6 +242,8 @@ if [ -n "$ROOT_LINK" ]; then
 fi
 /usr/bin/open "$CURRENT" >/dev/null 2>&1 || restore_old "the updated app could not be relaunched"
 /bin/rm -f "$MARKER"
+/bin/rm -rf "$BACKUP" || true
+/bin/rm -rf "$WORK" || true
 exit 0
 """#
 }
