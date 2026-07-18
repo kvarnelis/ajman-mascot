@@ -773,19 +773,47 @@ exit 0
         )
         let sleepingWinnie = try sleepCatalog.load(id: "winnie")
         let sleepingAjman = try sleepCatalog.load(id: "ajman")
-        let temperamentAnimator = Animator(sheet: sleepingAjman.sheet, view: nil)
-        guard let normalIdleDurations = temperamentAnimator.playbackDurations(of: .idle) else {
-            throw SelfTestError("idle animation durations were unavailable")
+        var perPetIdleTotals: [String: [Temperament: TimeInterval]] = [:]
+        for (petID, loadedPet) in [("ajman", sleepingAjman), ("winnie", sleepingWinnie)] {
+            let temperamentAnimator = Animator(sheet: loadedPet.sheet, view: nil)
+            guard let normalIdleDurations = temperamentAnimator.playbackDurations(of: .idle) else {
+                throw SelfTestError("\(petID) idle animation durations were unavailable")
+            }
+            perPetIdleTotals[petID, default: [:]][.normal] = normalIdleDurations.reduce(0, +)
+            for temperament in [Temperament.catatonic, .insane] {
+                temperament.save(for: petID, to: temperamentDefaults)
+                let effectiveTemperament = Temperament.load(for: petID, from: temperamentDefaults)
+                temperamentAnimator.setTemperament(effectiveTemperament)
+                guard let effectiveDurations = temperamentAnimator.playbackDurations(of: .idle),
+                      effectiveDurations == normalIdleDurations.map({
+                          $0 / temperament.idleLivelinessMultiplier
+                      }) else {
+                    throw SelfTestError("\(petID) Animator did not apply \(temperament.rawValue) idle cadence")
+                }
+                perPetIdleTotals[petID, default: [:]][temperament] = effectiveDurations.reduce(0, +)
+            }
+            temperamentAnimator.stop()
         }
-        temperamentAnimator.setTemperament(.catatonic)
-        let catatonicIdleDurations = temperamentAnimator.playbackDurations(of: .idle)
-        temperamentAnimator.setTemperament(.insane)
-        let insaneIdleDurations = temperamentAnimator.playbackDurations(of: .idle)
-        guard catatonicIdleDurations == normalIdleDurations.map({ $0 / Temperament.catatonic.idleLivelinessMultiplier }),
-              insaneIdleDurations == normalIdleDurations.map({ $0 / Temperament.insane.idleLivelinessMultiplier }) else {
-            throw SelfTestError("Animator did not apply temperament to the visible idle frame cadence")
+        guard let ajmanIdleTotals = perPetIdleTotals["ajman"],
+              let winnieIdleTotals = perPetIdleTotals["winnie"],
+              ajmanIdleTotals[.normal] == winnieIdleTotals[.normal],
+              ajmanIdleTotals[.insane] == winnieIdleTotals[.insane],
+              ajmanIdleTotals[.catatonic] == winnieIdleTotals[.catatonic],
+              ajmanIdleTotals[.insane]! < ajmanIdleTotals[.normal]!,
+              ajmanIdleTotals[.catatonic]! > ajmanIdleTotals[.normal]!,
+              Temperament.insane.scaledFidget(range: PetMode.randomIntervalRange) == 5...17.5,
+              Temperament.catatonic.scaledFidget(range: PetMode.randomIntervalRange) == 2_000...7_000,
+              Temperament.insane.scaledFidget(range: ScratchBehavior.scheduleRange) == 6...9.5,
+              Temperament.catatonic.scaledFidget(range: ScratchBehavior.scheduleRange) == 2_400...3_800,
+              abs(Temperament.insane.scaledFidget(probability: ScratchBehavior.triggerProbability) - 0.56) < 1e-12,
+              abs(Temperament.catatonic.scaledFidget(probability: ScratchBehavior.triggerProbability) - 0.0014) < 1e-12,
+              Temperament.insane.scaled(probability: InterCatGlanceCoordinator.defaultProbability) == 1,
+              abs(Temperament.catatonic.scaled(probability: InterCatGlanceCoordinator.defaultProbability) - 0.03) < 1e-12,
+              !Temperament.insane.allowsAutomaticRest,
+              Temperament.catatonic.allowsAutomaticRest else {
+            throw SelfTestError("Ajman/Winnie effective temperament scaling diverged")
         }
-        temperamentAnimator.stop()
+        print("Per-pet temperament: Ajman/Winnie idle both Normal 6.60s, Insane 1.65s, Catatonic 132.00s; Insane fidget 5.00...17.50s, scratch 6.00...9.50s @ 56%, glance 100%, never rests")
         guard let winnieSleep = sleepingWinnie.sleepAnimation,
               winnieSleep.frameCount == 8,
               winnieSleep.poseWeights.count == 8,

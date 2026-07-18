@@ -305,12 +305,16 @@ final class ScratchBehavior {
         whimTimer?.invalidate()
         whimTimer = nil
         let temperament = temperament()
-        guard randomUnit() < temperament.scaledFidget(probability: Self.triggerProbability) else { return }
-        if let lastScratchAt,
-           now().timeIntervalSince(lastScratchAt) < temperament.scaledFidget(interval: Self.minimumSpacing) {
+        guard randomUnit() < temperament.scaledFidget(probability: Self.triggerProbability) else {
+            resumeScheduling()
             return
         }
-        _ = startIfEligible()
+        if let lastScratchAt,
+           now().timeIntervalSince(lastScratchAt) < temperament.scaledFidget(interval: Self.minimumSpacing) {
+            resumeScheduling()
+            return
+        }
+        if !startIfEligible() { resumeScheduling() }
     }
 
     private func begin(side: ScratchSide, recordsSpacing: Bool) {
