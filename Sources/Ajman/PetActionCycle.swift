@@ -17,6 +17,7 @@ enum PetCycleAction: Equatable {
     case loaf
     case sleep
     case scratch
+    case groom
 }
 
 enum PetActionCycle {
@@ -25,7 +26,7 @@ enum PetActionCycle {
 
     /// Full order used by direct per-pet control/right-click cycling.
     static let directOrder: [PetCycleAction] =
-        AnimationState.allCases.map(PetCycleAction.animation) + [.loaf, .sleep, .scratch]
+        AnimationState.allCases.map(PetCycleAction.animation) + [.loaf, .sleep, .scratch, .groom]
 
     static func next(after current: AnimationState?, availableStates: [AnimationState]) -> AnimationState? {
         let available = Set(availableStates)
@@ -39,7 +40,8 @@ enum PetActionCycle {
         availableStates: [AnimationState],
         hasLoaf: Bool,
         hasSleep: Bool,
-        hasScratch: Bool
+        hasScratch: Bool,
+        hasGroom: Bool = false
     ) -> [PetCycleAction] {
         let states = Set(availableStates)
         return directOrder.filter { action in
@@ -48,6 +50,7 @@ enum PetActionCycle {
             case .loaf: hasLoaf
             case .sleep: hasSleep
             case .scratch: hasScratch
+            case .groom: hasGroom
             }
         }
     }

@@ -1,0 +1,9 @@
+{
+  "pet_id": "winnie-running-review-v2",
+  "display_name": "Winnie left-running review v2",
+  "chroma_key": {
+    "hex": "#FF00FF",
+    "rgb": [255, 0, 255],
+    "name": "magenta"
+  }
+}

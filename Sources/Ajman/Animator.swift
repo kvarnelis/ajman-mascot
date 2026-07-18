@@ -160,6 +160,22 @@ final class Animator {
         return true
     }
 
+    func playLoop(_ animation: SleepAnimation, as state: AnimationState, frameDuration: TimeInterval) {
+        guard !animation.frames.isEmpty, frameDuration > 0 else { return }
+        timer?.cancel()
+        timer = nil
+        calmPoseMode = nil
+        currentCalmPoseIndex = nil
+        view?.setBreathingEnabled(false)
+        view?.setScratchRaking(false)
+        currentState = state
+        frames = animation.frames
+        frameDurations = Array(repeating: frameDuration, count: frames.count)
+        frameIndex = 0
+        stateDidChange?(state)
+        showCurrentFrameAndScheduleNext()
+    }
+
     func setScratchRaking(_ enabled: Bool, amplitude: CGFloat = ScratchBehavior.rakeAmplitude) {
         view?.setScratchRaking(enabled, amplitude: amplitude)
     }

@@ -1,0 +1,34 @@
+{
+  "jobs": [
+    {
+      "id": "running-right",
+      "kind": "row-strip",
+      "status": "complete",
+      "output_path": "decoded/running-right.png"
+    },
+    {
+      "id": "running-left",
+      "kind": "row-strip",
+      "status": "complete",
+      "output_path": "decoded/running-left.png",
+      "mirror_policy": {
+        "may_derive_from": "running-right"
+      },
+      "source_path": "decoded/running-right.png",
+      "derived_from": "running-right",
+      "completed_at": "2026-07-18T02:17:15.403977+00:00",
+      "metadata": {
+        "width": 1536,
+        "height": 208,
+        "mode": "RGBA",
+        "format": "PNG"
+      },
+      "mirror_decision": {
+        "approved": true,
+        "approved_at": "2026-07-18T02:17:15.403977+00:00",
+        "note": "Winnie has no handed prop or directional text; the source is the exact approved frames-stable running-right sequence assembled into eight 192x208 cells, so official framewise mirroring preserves index, cadence, scale, baseline, collar, tag, ringed tail, and visible flat TNR ear.",
+        "transform": "framewise-horizontal-mirror-preserving-order"
+      }
+    }
+  ]
+}

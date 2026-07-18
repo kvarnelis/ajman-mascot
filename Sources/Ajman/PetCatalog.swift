@@ -14,6 +14,14 @@ struct LoadedPet {
     let sleepAnimation: SleepAnimation?
     let wakeAnimation: SleepAnimation?
     let scratchAnimation: SleepAnimation?
+    let groomAnimation: SleepAnimation?
+    let runLeftAnimation: SleepAnimation?
+    let runRightAnimation: SleepAnimation?
+
+    func travelAnimation(for side: ScratchSide) -> SleepAnimation? {
+        guard runLeftAnimation != nil, runRightAnimation != nil else { return nil }
+        return side == .left ? runLeftAnimation : runRightAnimation
+    }
 }
 
 struct PetCatalog {
@@ -92,7 +100,10 @@ struct PetCatalog {
                     loafAnimation: loadPoseStrip(named: "loaf", for: id),
                     sleepAnimation: loadSleepAnimation(for: id),
                     wakeAnimation: loadPoseStrip(named: "stretch", for: id),
-                    scratchAnimation: loadPoseStrip(named: "scratch", for: id)
+                    scratchAnimation: loadPoseStrip(named: "scratch", for: id),
+                    groomAnimation: loadPoseStrip(named: "groom", for: id),
+                    runLeftAnimation: loadPoseStrip(named: "run-left", for: id),
+                    runRightAnimation: loadPoseStrip(named: "run-right", for: id)
                 )
             }
             catch {
@@ -118,7 +129,10 @@ struct PetCatalog {
                     loafAnimation: loadPoseStrip(named: "loaf", for: Self.defaultPetID),
                     sleepAnimation: loadSleepAnimation(for: Self.defaultPetID),
                     wakeAnimation: loadPoseStrip(named: "stretch", for: Self.defaultPetID),
-                    scratchAnimation: loadPoseStrip(named: "scratch", for: Self.defaultPetID)
+                    scratchAnimation: loadPoseStrip(named: "scratch", for: Self.defaultPetID),
+                    groomAnimation: loadPoseStrip(named: "groom", for: Self.defaultPetID),
+                    runLeftAnimation: loadPoseStrip(named: "run-left", for: Self.defaultPetID),
+                    runRightAnimation: loadPoseStrip(named: "run-right", for: Self.defaultPetID)
                 )
             } catch { log("bundled ajman fallback failed: \(error.localizedDescription)") }
         }

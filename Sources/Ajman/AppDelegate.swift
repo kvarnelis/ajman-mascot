@@ -53,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 temperaments: temperamentMap(),
                 debugStates: commonDebugStates(),
                 sleepAvailable: pets.contains(where: \.hasSleepAnimation),
+                groomAvailable: pets.contains(where: \.hasGroomAnimation),
                 agentNotificationsEnabled: AgentNotificationPreferences().isEnabled
             )
             statusMenu = menu
@@ -172,6 +173,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.debugScratchHandler = { [weak self] in
             self?.pets.forEach { $0.setDebugScratch() }
+        }
+        menu.debugGroomHandler = { [weak self] in
+            self?.pets.forEach { $0.setDebugGroom() }
         }
         menu.resumeLiveHandler = { [weak self] in
             guard let self, let registry = self.registry else { return }
@@ -303,7 +307,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             relativeScales: relativeScaleMap(),
             temperaments: temperamentMap(),
             debugStates: commonDebugStates(),
-            sleepAvailable: pets.contains(where: \.hasSleepAnimation)
+            sleepAvailable: pets.contains(where: \.hasSleepAnimation),
+            groomAvailable: pets.contains(where: \.hasGroomAnimation)
         )
     }
 

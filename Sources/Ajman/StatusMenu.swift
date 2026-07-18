@@ -9,6 +9,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let cycleItem = NSMenuItem(title: "Cycle All States", action: #selector(toggleCycle(_:)), keyEquivalent: "")
     private let sleepItem = NSMenuItem(title: "Sleep", action: #selector(selectSleep(_:)), keyEquivalent: "")
     private let scratchItem = NSMenuItem(title: "Scratch", action: #selector(selectScratch(_:)), keyEquivalent: "")
+    private let groomItem = NSMenuItem(title: "Groom", action: #selector(selectGroom(_:)), keyEquivalent: "")
     private let steadySizeItem = NSMenuItem(title: "Steady Size", action: #selector(toggleSteadySize(_:)), keyEquivalent: "")
     private let agentNotificationsItem = NSMenuItem(
         title: "Show agent notifications", action: #selector(toggleAgentNotifications(_:)), keyEquivalent: ""
@@ -28,6 +29,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private var temperaments: [String: Temperament]
     private var debugStates: [AnimationState]
     private var sleepAvailable: Bool
+    private var groomAvailable: Bool
     private var cycleTimer: Timer?
     private var cycleState: AnimationState?
     private let claudeSettingsPath: URL
@@ -35,7 +37,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private(set) var manualMode = false
     private(set) var manualSleep = false
     private(set) var manualScratch = false
-    var debugState: AnimationState? { manualMode && !manualSleep && !manualScratch ? cycleState : nil }
+    private(set) var manualGroom = false
+    var debugState: AnimationState? {
+        manualMode && !manualSleep && !manualScratch && !manualGroom ? cycleState : nil
+    }
 
     var showPetHandler: ((String, Bool) -> Void)?
     var bindingHandler: ((String, AgentEvent.Provider?) -> Void)?
@@ -47,6 +52,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     var debugStateHandler: ((AnimationState) -> Void)?
     var debugSleepHandler: (() -> Void)?
     var debugScratchHandler: (() -> Void)?
+    var debugGroomHandler: (() -> Void)?
     var resumeLiveHandler: (() -> Void)?
     var resetPositionsHandler: (() -> Void)?
     var previewUpdateHandler: (() -> Void)?
@@ -61,6 +67,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         temperaments: [String: Temperament],
         debugStates: [AnimationState],
         sleepAvailable: Bool,
+        groomAvailable: Bool = false,
         agentNotificationsEnabled: Bool,
         claudeSettingsPath: URL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/settings.json")
@@ -70,6 +77,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         self.temperaments = temperaments
         self.debugStates = debugStates
         self.sleepAvailable = sleepAvailable
+        self.groomAvailable = groomAvailable
         self.claudeSettingsPath = claudeSettingsPath
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -144,7 +152,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         relativeScales: [String: Double],
         temperaments: [String: Temperament],
         debugStates: [AnimationState],
-        sleepAvailable: Bool
+        sleepAvailable: Bool,
+        groomAvailable: Bool
     ) {
         rebuildPetMenu(
             pets: pets,
@@ -154,17 +163,25 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         )
         self.pets = pets
         self.temperaments = temperaments
-        if self.debugStates != debugStates || self.sleepAvailable != sleepAvailable {
+        if self.debugStates != debugStates || self.sleepAvailable != sleepAvailable
+            || self.groomAvailable != groomAvailable {
             self.debugStates = debugStates
             self.sleepAvailable = sleepAvailable
+            self.groomAvailable = groomAvailable
             stopCycling()
-            if manualMode, !manualSleep, !manualScratch,
+            if manualMode, !manualSleep, !manualScratch, !manualGroom,
                cycleState.map({ !debugStates.contains($0) }) ?? true {
                 cycleState = debugStates.first
                 if let cycleState { debugStateHandler?(cycleState) }
             }
             if manualSleep, !sleepAvailable {
                 manualSleep = false
+                manualMode = false
+                cycleState = nil
+                resumeLiveHandler?()
+            }
+            if manualGroom, !groomAvailable {
+                manualGroom = false
                 manualMode = false
                 cycleState = nil
                 resumeLiveHandler?()
@@ -256,6 +273,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
         scratchItem.target = self
         debugMenu.addItem(scratchItem)
+        if groomAvailable {
+            groomItem.target = self
+            debugMenu.addItem(groomItem)
+        }
         debugMenu.addItem(.separator())
         for pet in pets {
             let temperamentMenu = NSMenu(title: "\(pet.displayName) Temperament")
@@ -298,7 +319,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     private func refreshActivityIndicator() {
         if manualMode {
-            let title = manualSleep ? "Sleep" : manualScratch ? "Scratch" : cycleState?.title ?? "Actions"
+            let title = manualSleep ? "Sleep"
+                : manualScratch ? "Scratch"
+                : manualGroom ? "Groom"
+                : cycleState?.title ?? "Actions"
             activityItem.title = "Manual: \(title) — live paused"
         } else {
             updateActivity(state: registry.currentState(for: nil), sessionCount: registry.sessionCount(for: nil))
@@ -360,6 +384,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         manualMode = true
         manualSleep = false
         manualScratch = false
+        manualGroom = false
         cycleState = state
         debugStateHandler?(state)
         updateDebugChecks()
@@ -375,6 +400,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         manualMode = true
         manualSleep = false
         manualScratch = false
+        manualGroom = false
         cycleItem.state = .on
         playNextDebugState()
         cycleTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
@@ -402,6 +428,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         manualMode = true
         manualSleep = true
         manualScratch = false
+        manualGroom = false
         cycleState = nil
         debugSleepHandler?()
         updateDebugChecks()
@@ -413,8 +440,22 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         manualMode = true
         manualSleep = false
         manualScratch = true
+        manualGroom = false
         cycleState = nil
         debugScratchHandler?()
+        updateDebugChecks()
+        refreshActivityIndicator()
+    }
+
+    @objc private func selectGroom(_ sender: NSMenuItem) {
+        guard groomAvailable else { return }
+        stopCycling()
+        manualMode = true
+        manualSleep = false
+        manualScratch = false
+        manualGroom = true
+        cycleState = nil
+        debugGroomHandler?()
         updateDebugChecks()
         refreshActivityIndicator()
     }
@@ -424,6 +465,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         manualMode = false
         manualSleep = false
         manualScratch = false
+        manualGroom = false
         cycleState = nil
         updateDebugChecks()
         resumeLiveHandler?()
@@ -439,6 +481,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         for (state, item) in stateItems { item.state = state == cycleState && manualMode ? .on : .off }
         sleepItem.state = manualMode && manualSleep ? .on : .off
         scratchItem.state = manualMode && manualScratch ? .on : .off
+        groomItem.state = manualMode && manualGroom ? .on : .off
     }
 
     private func updateScaleChecks(for scale: PetScale) {
