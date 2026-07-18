@@ -467,18 +467,19 @@ exit 0
             hasStretch: true,
             hasScratch: true,
             hasGroom: true,
-            hasScream: true
+            hasScream: true,
+            hasZoomies: true
         )
         let expectedAfterIdle: [PetCycleAction] = [
             .animation(.runningRight), .animation(.runningLeft), .animation(.waving),
             .animation(.jumping), .animation(.failed), .animation(.waiting),
             .animation(.running), .animation(.review), .animation(.lookDirectionsA),
-            .animation(.lookDirectionsB), .loaf, .sleep, .stretch, .scratch, .groom, .scream,
+            .animation(.lookDirectionsB), .loaf, .sleep, .stretch, .scratch, .groom, .scream, .zoomies,
             .animation(.idle),
         ]
         guard fullActionCycle == PetActionCycle.directOrder,
-              fullActionCycle.suffix(6) == [.loaf, .sleep, .stretch, .scratch, .groom, .scream] else {
-            throw SelfTestError("per-pet action cycle did not place scream immediately after groom")
+              fullActionCycle.suffix(7) == [.loaf, .sleep, .stretch, .scratch, .groom, .scream, .zoomies] else {
+            throw SelfTestError("per-pet action cycle did not place zoomies immediately after scream")
         }
 
         var ajmanCursor = PetActionCycle.Cursor()
@@ -518,7 +519,8 @@ exit 0
             hasStretch: true,
             hasScratch: false,
             hasGroom: true,
-            hasScream: true
+            hasScream: true,
+            hasZoomies: true
         )
         let noStretchCycle = PetActionCycle.availableActions(
             availableStates: cycleOrder,
@@ -527,21 +529,22 @@ exit 0
             hasStretch: false,
             hasScratch: true,
             hasGroom: true,
-            hasScream: true
+            hasScream: true,
+            hasZoomies: true
         )
         var resyncCursor = PetActionCycle.Cursor()
         for _ in 0..<fullActionCycle.count {
             _ = resyncCursor.next(availableActions: fullActionCycle)
         }
         guard !noScratchCycle.contains(.scratch),
-              noScratchCycle.suffix(5) == [.loaf, .sleep, .stretch, .groom, .scream],
+              noScratchCycle.suffix(6) == [.loaf, .sleep, .stretch, .groom, .scream, .zoomies],
               !noStretchCycle.contains(.stretch),
-              noStretchCycle.suffix(5) == [.loaf, .sleep, .scratch, .groom, .scream],
+              noStretchCycle.suffix(6) == [.loaf, .sleep, .scratch, .groom, .scream, .zoomies],
               resyncCursor.next(availableActions: noScratchCycle) == .animation(.idle),
               PetActionCycle.next(after: .lookDirectionsB, availableStates: cycleOrder) == .idle else {
             throw SelfTestError("per-pet action cycle did not skip unavailable behavior assets")
         }
-        print("Pet action clicks: per-pet cursor traverses 11 states plus loaf/sleep/stretch/scratch/groom/scream; scream follows groom; missing assets skip; order wraps")
+        print("Pet action clicks: per-pet cursor traverses 11 states plus loaf/sleep/stretch/scratch/groom/scream/zoomies; Zoomies follows Scream; missing assets skip; order wraps")
 
         let temperamentSuiteName = "AjmanSelfTest.Temperament.\(UUID().uuidString)"
         guard let temperamentDefaults = UserDefaults(suiteName: temperamentSuiteName) else {
@@ -940,7 +943,8 @@ exit 0
             hasStretch: sleepingWinnie.wakeAnimation != nil,
             hasScratch: sleepingWinnie.scratchAnimation != nil,
             hasGroom: sleepingWinnie.groomAnimation != nil,
-            hasScream: sleepingWinnie.screamAnimation != nil
+            hasScream: sleepingWinnie.screamAnimation != nil,
+            hasZoomies: sleepingWinnie.runLeftAnimation != nil && sleepingWinnie.runRightAnimation != nil
         )
         let ajmanActions = PetActionCycle.availableActions(
             availableStates: sleepingAjman.sheet.animationTable.states,
@@ -949,7 +953,8 @@ exit 0
             hasStretch: sleepingAjman.wakeAnimation != nil,
             hasScratch: sleepingAjman.scratchAnimation != nil,
             hasGroom: sleepingAjman.groomAnimation != nil,
-            hasScream: sleepingAjman.screamAnimation != nil
+            hasScream: sleepingAjman.screamAnimation != nil,
+            hasZoomies: sleepingAjman.runLeftAnimation != nil && sleepingAjman.runRightAnimation != nil
         )
         guard let winnieLookBIndex = winnieActions.firstIndex(of: .animation(.lookDirectionsB)),
               let winnieLoafIndex = winnieActions.firstIndex(of: .loaf),
@@ -958,6 +963,7 @@ exit 0
               let winnieScratchIndex = winnieActions.firstIndex(of: .scratch),
               let winnieGroomIndex = winnieActions.firstIndex(of: .groom),
               let winnieScreamIndex = winnieActions.firstIndex(of: .scream),
+              let winnieZoomiesIndex = winnieActions.firstIndex(of: .zoomies),
               let ajmanSleepIndex = ajmanActions.firstIndex(of: .sleep),
               let ajmanStretchIndex = ajmanActions.firstIndex(of: .stretch),
               let ajmanScratchIndex = ajmanActions.firstIndex(of: .scratch),
@@ -967,10 +973,12 @@ exit 0
               winnieStretchIndex < winnieScratchIndex,
               winnieGroomIndex == winnieScratchIndex + 1,
               winnieScreamIndex == winnieGroomIndex + 1,
+              winnieZoomiesIndex == winnieScreamIndex + 1,
               ajmanSleepIndex < ajmanStretchIndex,
               ajmanStretchIndex < ajmanScratchIndex,
               winnieActions.contains(.scratch), winnieActions.contains(.groom),
-              winnieActions.contains(.scream), !ajmanActions.contains(.scream),
+              winnieActions.contains(.scream), winnieActions.contains(.zoomies),
+              !ajmanActions.contains(.scream), !ajmanActions.contains(.zoomies),
               HeldSequenceEligibility(
                 hasAsset: true, isShown: true, liveState: .idle,
                 displayedState: .idle, isManual: false,
@@ -992,7 +1000,7 @@ exit 0
               ) > Temperament.defaultValue(for: "ajman").scaledFidget(
                 probability: ScratchBehavior.triggerProbability
               ) else {
-            throw SelfTestError("Winnie scratch/groom/scream availability or cycle order was incorrect")
+            throw SelfTestError("Winnie scratch/groom/scream/zoomies availability or cycle order was incorrect")
         }
         let screamSettings = Temperament.allCases.map(ScreamSequence.whimSettings)
         let screamRates = screamSettings.map { settings -> Double in
@@ -1057,6 +1065,135 @@ exit 0
         }
         print("Whim reschedule: probability miss, cooldown, and ineligible start each schedule the next attempt")
         print("Winnie companions: scream loads 8 grounded frames as random 0-3/4-7 escalations; Scream follows Groom in the direct cycle; Ajman has no scream")
+
+        let zoomiesSettings = Temperament.allCases.map(ZoomiesSchedule.whimSettings)
+        let zoomiesRates = zoomiesSettings.map { settings -> Double in
+            guard settings.triggerProbability > 0 else { return 0 }
+            return settings.triggerProbability
+                / ((settings.scheduleRange.lowerBound + settings.scheduleRange.upperBound) / 2)
+        }
+        guard zoomiesSettings.map(\.scheduleRange) == [
+                  0...0, 2_700...3_600, 1_200...1_800, 600...900, 180...300,
+              ],
+              zoomiesSettings.map(\.triggerProbability) == [0, 0.20, 0.40, 0.45, 0.65],
+              zoomiesSettings.map(\.minimumSpacing) == [.infinity, 7_200, 2_700, 1_200, 300],
+              zip(zoomiesRates, zoomiesRates.dropFirst()).allSatisfy({ $0 < $1 }),
+              zoomiesSettings.dropFirst().allSatisfy(\.reschedulesAfterMiss),
+              !zoomiesSettings[0].reschedulesAfterMiss,
+              ZoomiesSchedule.velocity == 352,
+              ZoomiesSchedule.velocityMultiplier == 3.2,
+              [0.0, 0.34, 0.999].map(ZoomiesSchedule.dashCount) == [1, 2, 3] else {
+            throw SelfTestError("zoomies temperament table, velocity, or 1-3 dash bounds changed")
+        }
+
+        guard let farLeftZoomX = ZoomiesGeometry.targetOriginX(
+                  currentOriginX: 500, visibleMinX: 0, visibleMaxX: 1_000,
+                  panelWidth: 100, randomUnit: 0
+              ),
+              let farRightZoomX = ZoomiesGeometry.targetOriginX(
+                  currentOriginX: 500, visibleMinX: 0, visibleMaxX: 1_000,
+                  panelWidth: 100, randomUnit: 0.999
+              ),
+              farLeftZoomX >= 0, farRightZoomX <= 900,
+              abs(farLeftZoomX - 500) >= ZoomiesSchedule.minimumDashLength,
+              abs(farRightZoomX - 500) >= ZoomiesSchedule.minimumDashLength,
+              ZoomiesGeometry.targetOriginX(
+                  currentOriginX: 20, visibleMinX: 0, visibleMaxX: 300,
+                  panelWidth: 200, randomUnit: 0.5
+              ) == nil else {
+            throw SelfTestError("zoomies targets were not clamped on-screen with a meaningful minimum dash")
+        }
+
+        var zoomiesEligibility = ZoomiesEligibility(
+            hasRunCompanions: true, isShown: true, liveState: .running,
+            displayedState: .idle, isManual: false, isCalmPose: false, isGlancing: false
+        )
+        var zoomiesOrigin = NSPoint(x: 500, y: 40)
+        var zoomiesTargets = [
+            NSPoint(x: 100, y: 40), NSPoint(x: 800, y: 40), NSPoint(x: 200, y: 40),
+        ]
+        var zoomiesDashes: [(NSPoint, NSPoint)] = []
+        var zoomiesEvents: [String] = []
+        let zoomiesBehavior = ZoomiesBehavior(
+            hasRunCompanions: true,
+            eligibility: { zoomiesEligibility },
+            willStart: { zoomiesEvents.append("start") },
+            nextTarget: { zoomiesTargets.isEmpty ? nil : zoomiesTargets.removeFirst() },
+            moveDash: { target, completion in
+                let start = zoomiesOrigin
+                zoomiesDashes.append((start, target))
+                zoomiesEvents.append(target.x < start.x ? "left" : "right")
+                zoomiesOrigin = target
+                completion()
+            },
+            cancelMovement: { zoomiesEvents.append("cancel-move") },
+            showIdle: { zoomiesEvents.append("idle") },
+            didFinish: { zoomiesEvents.append("finish") },
+            dashCountRandomUnit: { 0.999 }
+        )
+        guard !zoomiesBehavior.startIfEligible() else {
+            throw SelfTestError("zoomies started during an agent-reaction state")
+        }
+        zoomiesEligibility = ZoomiesEligibility(
+            hasRunCompanions: true, isShown: true, liveState: .idle,
+            displayedState: .idle, isManual: false, isCalmPose: false, isGlancing: false
+        )
+        guard zoomiesBehavior.startIfEligible(), !zoomiesBehavior.isPerforming,
+              zoomiesDashes.count == 3,
+              zoomiesDashes.allSatisfy({ hypot($0.1.x - $0.0.x, $0.1.y - $0.0.y) >= ZoomiesSchedule.minimumDashLength }),
+              zoomiesEvents == ["start", "left", "right", "left", "idle", "finish"] else {
+            throw SelfTestError("zoomies episode did not run 1-3 meaningful dashes and settle seated: \(zoomiesEvents)")
+        }
+        let noRunZoomies = ZoomiesBehavior(
+            hasRunCompanions: false,
+            eligibility: { zoomiesEligibility }, willStart: {}, nextTarget: { nil },
+            moveDash: { _, _ in }, cancelMovement: {}, showIdle: {}, didFinish: {}
+        )
+        guard !noRunZoomies.forceStart() else {
+            throw SelfTestError("zoomies bypassed paired run-companion asset gating")
+        }
+
+        var interruptedCompletion: (@MainActor () -> Void)?
+        var interruptionEvents: [String] = []
+        let interruptedZoomies = ZoomiesBehavior(
+            hasRunCompanions: true,
+            eligibility: { zoomiesEligibility }, willStart: { interruptionEvents.append("start") },
+            nextTarget: { NSPoint(x: 700, y: 40) },
+            moveDash: { _, completion in interruptedCompletion = completion },
+            cancelMovement: { interruptionEvents.append("stop") },
+            showIdle: { interruptionEvents.append("idle") },
+            didFinish: { interruptionEvents.append("finish") },
+            dashCountRandomUnit: { 0 }
+        )
+        guard interruptedZoomies.forceStart(), interruptedZoomies.isPerforming else {
+            throw SelfTestError("zoomies interruption fixture did not begin its dash")
+        }
+        interruptedZoomies.cancel(returnToIdle: true)
+        interruptedCompletion?()
+        guard !interruptedZoomies.isPerforming,
+              interruptionEvents == ["start", "stop", "idle"] else {
+            throw SelfTestError("zoomies interruption did not stop cleanly and settle without stale completion")
+        }
+        zoomiesBehavior.teardown()
+        interruptedZoomies.teardown()
+
+        let zoomiesSource = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .appendingPathComponent("ZoomiesBehavior.swift"),
+            encoding: .utf8
+        )
+        let zoomiesRescheduleBranches = zoomiesSource.components(
+            separatedBy: "if settings.reschedulesAfterMiss { resumeScheduling() }"
+        ).count - 1
+        guard zoomiesRescheduleBranches == 3 else {
+            throw SelfTestError(
+                "zoomies misses did not reschedule after probability/cooldown/ineligible checks (branches=\(zoomiesRescheduleBranches))"
+            )
+        }
+        print("Zoomies table: Catatonic off; Calm 2700...3600s @20% floor 7200s; Normal 1200...1800s @40% floor 2700s; Frisky 600...900s @45% floor 1200s; Insane 180...300s @65% floor 300s")
+        print("Zoomies episode: 1-3 dashes; minimum 120pt; 352pt/s = 3.2x scratch; alternating directions; interruption stops cleanly; final frame seated idle")
+        print("Zoomies gating: Winnie paired run companions enable cycle/menu; Ajman has neither companion and no Zoomies action; all three whim misses reschedule")
         guard ScratchEdgeGeometry.leftPawX == 37,
               ScratchEdgeGeometry.rightPawX == 155,
               ScratchEdgeGeometry.targetOriginX(
@@ -1741,18 +1878,18 @@ exit 0
         let heldFixtureStart = manualExpiryCallbacks.count
         var heldActionDidSettle: (@MainActor () -> Void)?
         connectionMenu.petActionHandler = { _, action, actionDidSettle in
-            guard action == .scream else { return }
+            guard action == .zoomies else { return }
             heldActionDidSettle = actionDidSettle
         }
-        connectionMenu.performPetActionForTesting(petID: "winnie", action: .scream)
+        connectionMenu.performPetActionForTesting(petID: "winnie", action: .zoomies)
         guard connectionMenu.manualMode,
               heldActionDidSettle != nil,
               manualExpiryCallbacks.count == heldFixtureStart else {
-            throw SelfTestError("held action armed expiry before its sequence finished")
+            throw SelfTestError("menu Zoomies armed expiry before its episode finished")
         }
         heldActionDidSettle?()
         guard manualExpiryCallbacks.count == heldFixtureStart + 1 else {
-            throw SelfTestError("held action completion did not arm manual expiry")
+            throw SelfTestError("menu Zoomies completion did not arm manual expiry")
         }
         connectionMenu.resumeLiveReactionsForTesting()
         connectionMenu.petActionHandler = { id, action, actionDidSettle in
@@ -1813,7 +1950,7 @@ exit 0
         }
         print("Status icon fixture: aqua selects original 🐈‍⬛ title with no image; darkAqua selects 18pt/36px template silhouette")
         print("Actions playback: Ajman/Winnie Jumping and Loaf enter and hold their real animator/mode through live agent updates")
-        print("Manual expiry fixture: dispatch pauses; redispatch resets 600s; expiry resumes; explicit Resume cancels; menu Sleep remains held")
+        print("Manual expiry fixture: menu Zoomies holds manual mode until settled, then arms 600s expiry; redispatch resets; expiry resumes; explicit Resume cancels; menu Sleep remains held")
         print("Menu fixture: Agents contains exactly Hear Claude Code=on, Hear Codex=on, Show agent notifications=off; no top-level Show agent notifications remains")
         print("Menu fixture: Pets > Ajman/Winnie > Reacts to is hidden with agent notifications off, present with notifications on, and hidden again when off")
         let codexPreferenceSuiteName = "AjmanSelfTest.HearCodex.\(UUID().uuidString)"

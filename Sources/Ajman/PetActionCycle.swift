@@ -20,6 +20,7 @@ enum PetCycleAction: Equatable {
     case scratch
     case groom
     case scream
+    case zoomies
 
     var menuTitle: String {
         switch self {
@@ -30,6 +31,7 @@ enum PetCycleAction: Equatable {
         case .scratch: "Scratch"
         case .groom: "Groom"
         case .scream: "Scream"
+        case .zoomies: "Zoomies"
         }
     }
 }
@@ -40,7 +42,8 @@ enum PetActionCycle {
 
     /// Full order used by direct per-pet control/right-click cycling.
     static let directOrder: [PetCycleAction] =
-        AnimationState.allCases.map(PetCycleAction.animation) + [.loaf, .sleep, .stretch, .scratch, .groom, .scream]
+        AnimationState.allCases.map(PetCycleAction.animation)
+            + [.loaf, .sleep, .stretch, .scratch, .groom, .scream, .zoomies]
 
     static func next(after current: AnimationState?, availableStates: [AnimationState]) -> AnimationState? {
         let available = Set(availableStates)
@@ -57,7 +60,8 @@ enum PetActionCycle {
         hasStretch: Bool = false,
         hasScratch: Bool,
         hasGroom: Bool = false,
-        hasScream: Bool = false
+        hasScream: Bool = false,
+        hasZoomies: Bool = false
     ) -> [PetCycleAction] {
         let states = Set(availableStates)
         return directOrder.filter { action in
@@ -69,6 +73,7 @@ enum PetActionCycle {
             case .scratch: hasScratch
             case .groom: hasGroom
             case .scream: hasScream
+            case .zoomies: hasZoomies
             }
         }
     }
