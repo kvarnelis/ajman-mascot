@@ -54,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 debugStates: commonDebugStates(),
                 sleepAvailable: pets.contains(where: \.hasSleepAnimation),
                 groomAvailable: pets.contains(where: \.hasGroomAnimation),
+                screamAvailable: pets.contains(where: \.hasScreamAnimation),
                 agentNotificationsEnabled: AgentNotificationPreferences().isEnabled
             )
             statusMenu = menu
@@ -176,6 +177,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         menu.debugGroomHandler = { [weak self] in
             self?.pets.forEach { $0.setDebugGroom() }
+        }
+        menu.debugScreamHandler = { [weak self] in
+            self?.pets.forEach { $0.setDebugScream() }
         }
         menu.resumeLiveHandler = { [weak self] in
             guard let self, let registry = self.registry else { return }
@@ -308,7 +312,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             temperaments: temperamentMap(),
             debugStates: commonDebugStates(),
             sleepAvailable: pets.contains(where: \.hasSleepAnimation),
-            groomAvailable: pets.contains(where: \.hasGroomAnimation)
+            groomAvailable: pets.contains(where: \.hasGroomAnimation),
+            screamAvailable: pets.contains(where: \.hasScreamAnimation)
         )
     }
 

@@ -1,0 +1,160 @@
+{
+  "chromaKey" : "#FF00FF",
+  "frames" : [
+    {
+      "index" : 0,
+      "outputBox" : {
+        "maxX" : 155,
+        "maxY" : 203,
+        "minX" : 36,
+        "minY" : 54
+      },
+      "scaledHeight" : 150,
+      "scaledWidth" : 120,
+      "sourceBox" : {
+        "maxX" : 330,
+        "maxY" : 589,
+        "minX" : 23,
+        "minY" : 206
+      },
+      "variant" : "crouch"
+    },
+    {
+      "index" : 1,
+      "outputBox" : {
+        "maxX" : 153,
+        "maxY" : 203,
+        "minX" : 37,
+        "minY" : 54
+      },
+      "scaledHeight" : 150,
+      "scaledWidth" : 117,
+      "sourceBox" : {
+        "maxX" : 607,
+        "maxY" : 589,
+        "minX" : 309,
+        "minY" : 205
+      },
+      "variant" : "crouch"
+    },
+    {
+      "index" : 2,
+      "outputBox" : {
+        "maxX" : 149,
+        "maxY" : 203,
+        "minX" : 42,
+        "minY" : 55
+      },
+      "scaledHeight" : 149,
+      "scaledWidth" : 108,
+      "sourceBox" : {
+        "maxX" : 858,
+        "maxY" : 589,
+        "minX" : 581,
+        "minY" : 209
+      },
+      "variant" : "crouch"
+    },
+    {
+      "index" : 3,
+      "outputBox" : {
+        "maxX" : 148,
+        "maxY" : 203,
+        "minX" : 42,
+        "minY" : 61
+      },
+      "scaledHeight" : 143,
+      "scaledWidth" : 107,
+      "sourceBox" : {
+        "maxX" : 1120,
+        "maxY" : 583,
+        "minX" : 847,
+        "minY" : 218
+      },
+      "variant" : "crouch"
+    },
+    {
+      "index" : 4,
+      "outputBox" : {
+        "maxX" : 139,
+        "maxY" : 203,
+        "minX" : 51,
+        "minY" : 108
+      },
+      "scaledHeight" : 96,
+      "scaledWidth" : 89,
+      "sourceBox" : {
+        "maxX" : 1378,
+        "maxY" : 557,
+        "minX" : 1151,
+        "minY" : 313
+      },
+      "variant" : "gremlin"
+    },
+    {
+      "index" : 5,
+      "outputBox" : {
+        "maxX" : 139,
+        "maxY" : 203,
+        "minX" : 51,
+        "minY" : 108
+      },
+      "scaledHeight" : 96,
+      "scaledWidth" : 89,
+      "sourceBox" : {
+        "maxX" : 1634,
+        "maxY" : 557,
+        "minX" : 1406,
+        "minY" : 311
+      },
+      "variant" : "gremlin"
+    },
+    {
+      "index" : 6,
+      "outputBox" : {
+        "maxX" : 139,
+        "maxY" : 203,
+        "minX" : 51,
+        "minY" : 107
+      },
+      "scaledHeight" : 97,
+      "scaledWidth" : 89,
+      "sourceBox" : {
+        "maxX" : 1890,
+        "maxY" : 557,
+        "minX" : 1662,
+        "minY" : 310
+      },
+      "variant" : "gremlin"
+    },
+    {
+      "index" : 7,
+      "outputBox" : {
+        "maxX" : 139,
+        "maxY" : 203,
+        "minX" : 51,
+        "minY" : 110
+      },
+      "scaledHeight" : 94,
+      "scaledWidth" : 89,
+      "sourceBox" : {
+        "maxX" : 2145,
+        "maxY" : 557,
+        "minX" : 1917,
+        "minY" : 318
+      },
+      "variant" : "gremlin"
+    }
+  ],
+  "groundY" : 203,
+  "method" : "Euclidean RGB distance from #FF00FF at threshold 96; 4-connected components; eight largest pose seeds ordered by center x; nearby components assigned to nearest pose; component-owned masks prevent overlap; owner-delivered transparent final supplies clean edge color; shared high-quality scale; centered; alpha content grounded at y=203.",
+  "output" : "assets/pets/winnie/scream.webp",
+  "scale" : 0.39,
+  "scaleEvidence" : {
+    "crouchFamily" : "full-body low-wide poses retain source scale and are checked against Winnie's stretch-bow family",
+    "gremlinFamily" : "compact poses retain the same source scale and are checked against Winnie's loaf family",
+    "loafPrecedent" : "winnie-loaf-normalization.json uses shared scale 0.39 from the seated collar ruler (0.3921568627)"
+  },
+  "source" : "assets/winnie/winnie-scream-study-v1/source/winnie-scream-strip-chroma.png",
+  "threshold" : 96
+}

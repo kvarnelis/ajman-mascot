@@ -7,6 +7,48 @@ enum GroomingSequence {
     nonisolated static let minimumSpacing: TimeInterval = 75
 }
 
+struct HeldSequenceWhimSettings: Equatable {
+    let scheduleRange: ClosedRange<TimeInterval>
+    let triggerProbability: Double
+    let minimumSpacing: TimeInterval
+    let reschedulesAfterMiss: Bool
+}
+
+enum ScreamSequence {
+    nonisolated static let frameDurations: [TimeInterval] = [0.7, 0.8, 1.0, 1.5]
+    nonisolated static let variants = [[0, 1, 2, 3], [4, 5, 6, 7]]
+
+    nonisolated static func whimSettings(for temperament: Temperament) -> HeldSequenceWhimSettings {
+        switch temperament {
+        case .catatonic:
+            HeldSequenceWhimSettings(
+                scheduleRange: 0...0, triggerProbability: 0,
+                minimumSpacing: .infinity, reschedulesAfterMiss: false
+            )
+        case .calm:
+            HeldSequenceWhimSettings(
+                scheduleRange: 1_800...2_700, triggerProbability: 0.15,
+                minimumSpacing: 7_200, reschedulesAfterMiss: true
+            )
+        case .normal:
+            HeldSequenceWhimSettings(
+                scheduleRange: 1_200...1_800, triggerProbability: 0.25,
+                minimumSpacing: 3_600, reschedulesAfterMiss: true
+            )
+        case .frisky:
+            HeldSequenceWhimSettings(
+                scheduleRange: 600...900, triggerProbability: 0.35,
+                minimumSpacing: 1_200, reschedulesAfterMiss: true
+            )
+        case .insane:
+            HeldSequenceWhimSettings(
+                scheduleRange: 360...600, triggerProbability: 0.35,
+                minimumSpacing: 720, reschedulesAfterMiss: true
+            )
+        }
+    }
+}
+
 struct HeldSequenceEligibility {
     let hasAsset: Bool
     let isShown: Bool
@@ -30,9 +72,7 @@ final class HeldSequenceBehavior {
 
     private let animation: SleepAnimation?
     private let frameDurations: [TimeInterval]
-    private let scheduleRange: ClosedRange<TimeInterval>
-    private let triggerProbability: Double
-    private let minimumSpacing: TimeInterval
+    private let frameSequences: [[Int]]
     private let eligibility: () -> HeldSequenceEligibility
     private let willStart: () -> Void
     private let showFrame: (Int) -> Bool
@@ -42,11 +82,14 @@ final class HeldSequenceBehavior {
     private let randomUnit: () -> Double
     private let now: () -> Date
     private let temperament: () -> Temperament
+    private let whimSettings: (Temperament) -> HeldSequenceWhimSettings
+    private let sequenceRandomUnit: () -> Double
 
     private var whimTimer: Timer?
     private var sequenceID = 0
     private var lastPerformedAt: Date?
     private var recordsSpacing = false
+    private var activeFrameSequence: [Int] = []
     private(set) var isPerforming = false
 
     init(
@@ -55,6 +98,7 @@ final class HeldSequenceBehavior {
         scheduleRange: ClosedRange<TimeInterval>,
         triggerProbability: Double,
         minimumSpacing: TimeInterval,
+        frameSequences: [[Int]]? = nil,
         eligibility: @escaping () -> HeldSequenceEligibility,
         willStart: @escaping () -> Void,
         showFrame: @escaping (Int) -> Bool,
@@ -63,13 +107,13 @@ final class HeldSequenceBehavior {
         scheduler: Scheduler? = nil,
         randomUnit: @escaping () -> Double = { Double.random(in: 0..<1) },
         now: @escaping () -> Date = Date.init,
-        temperament: @escaping () -> Temperament = { .normal }
+        temperament: @escaping () -> Temperament = { .normal },
+        whimSettings: ((Temperament) -> HeldSequenceWhimSettings)? = nil,
+        sequenceRandomUnit: @escaping () -> Double = { Double.random(in: 0..<1) }
     ) {
         self.animation = animation
         self.frameDurations = frameDurations
-        self.scheduleRange = scheduleRange
-        self.triggerProbability = triggerProbability
-        self.minimumSpacing = minimumSpacing
+        self.frameSequences = frameSequences ?? []
         self.eligibility = eligibility
         self.willStart = willStart
         self.showFrame = showFrame
@@ -83,12 +127,22 @@ final class HeldSequenceBehavior {
         self.randomUnit = randomUnit
         self.now = now
         self.temperament = temperament
+        self.whimSettings = whimSettings ?? { temperament in
+            HeldSequenceWhimSettings(
+                scheduleRange: temperament.scaledFidget(range: scheduleRange),
+                triggerProbability: temperament.scaledFidget(probability: triggerProbability),
+                minimumSpacing: temperament.scaledFidget(interval: minimumSpacing),
+                reschedulesAfterMiss: false
+            )
+        }
+        self.sequenceRandomUnit = sequenceRandomUnit
     }
 
     func resumeScheduling() {
-        guard animation != nil, frameDurations.count == animation?.frameCount,
-              !isPerforming, whimTimer == nil else { return }
-        let delay = TimeInterval.random(in: temperament().scaledFidget(range: scheduleRange))
+        guard isConfigured, !isPerforming, whimTimer == nil else { return }
+        let settings = whimSettings(temperament())
+        guard settings.triggerProbability > 0 else { return }
+        let delay = TimeInterval.random(in: settings.scheduleRange)
         whimTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.considerWhim() }
         }
@@ -105,7 +159,7 @@ final class HeldSequenceBehavior {
 
     @discardableResult
     func startIfEligible() -> Bool {
-        guard !isPerforming, animation != nil, frameDurations.count == animation?.frameCount,
+        guard !isPerforming, isConfigured,
               eligibility().canStart else { return false }
         begin(recordsSpacing: true)
         return true
@@ -113,7 +167,7 @@ final class HeldSequenceBehavior {
 
     @discardableResult
     func forceStart() -> Bool {
-        guard !isPerforming, animation != nil, frameDurations.count == animation?.frameCount else { return false }
+        guard !isPerforming, isConfigured else { return false }
         begin(recordsSpacing: false)
         return true
     }
@@ -132,26 +186,37 @@ final class HeldSequenceBehavior {
     private func considerWhim() {
         whimTimer?.invalidate()
         whimTimer = nil
-        let temperament = temperament()
-        guard randomUnit() < temperament.scaledFidget(probability: triggerProbability) else { return }
-        if let lastPerformedAt,
-           now().timeIntervalSince(lastPerformedAt) < temperament.scaledFidget(interval: minimumSpacing) {
+        let settings = whimSettings(temperament())
+        guard randomUnit() < settings.triggerProbability else {
+            if settings.reschedulesAfterMiss { resumeScheduling() }
             return
         }
-        _ = startIfEligible()
+        if let lastPerformedAt,
+           now().timeIntervalSince(lastPerformedAt) < settings.minimumSpacing {
+            if settings.reschedulesAfterMiss { resumeScheduling() }
+            return
+        }
+        if !startIfEligible(), settings.reschedulesAfterMiss { resumeScheduling() }
     }
 
     private func begin(recordsSpacing: Bool) {
         willStart()
         isPerforming = true
         self.recordsSpacing = recordsSpacing
+        if frameSequences.isEmpty {
+            activeFrameSequence = Array(0..<frameDurations.count)
+        } else {
+            let unit = min(max(sequenceRandomUnit(), 0), 0.999999999)
+            activeFrameSequence = frameSequences[min(Int(unit * Double(frameSequences.count)), frameSequences.count - 1)]
+        }
         sequenceID += 1
         playFrame(0, id: sequenceID)
     }
 
     private func playFrame(_ index: Int, id: Int) {
         guard isCurrent(id) else { return }
-        guard frameDurations.indices.contains(index), showFrame(index) else {
+        guard frameDurations.indices.contains(index), activeFrameSequence.indices.contains(index),
+              showFrame(activeFrameSequence[index]) else {
             finish(id: id)
             return
         }
@@ -176,5 +241,14 @@ final class HeldSequenceBehavior {
 
     private func isCurrent(_ id: Int) -> Bool {
         isPerforming && sequenceID == id
+    }
+
+    private var isConfigured: Bool {
+        guard let animation else { return false }
+        if frameSequences.isEmpty { return frameDurations.count == animation.frameCount }
+        return frameSequences.allSatisfy { sequence in
+            sequence.count == frameDurations.count
+                && sequence.allSatisfy { animation.frames.indices.contains($0) }
+        }
     }
 }

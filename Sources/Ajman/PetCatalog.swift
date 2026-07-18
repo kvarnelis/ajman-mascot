@@ -15,6 +15,7 @@ struct LoadedPet {
     let wakeAnimation: SleepAnimation?
     let scratchAnimation: SleepAnimation?
     let groomAnimation: SleepAnimation?
+    let screamAnimation: SleepAnimation?
     let runLeftAnimation: SleepAnimation?
     let runRightAnimation: SleepAnimation?
 
@@ -102,6 +103,7 @@ struct PetCatalog {
                     wakeAnimation: loadPoseStrip(named: "stretch", for: id),
                     scratchAnimation: loadPoseStrip(named: "scratch", for: id),
                     groomAnimation: loadPoseStrip(named: "groom", for: id),
+                    screamAnimation: loadPoseStrip(named: "scream", for: id),
                     runLeftAnimation: loadPoseStrip(named: "run-left", for: id),
                     runRightAnimation: loadPoseStrip(named: "run-right", for: id)
                 )
@@ -131,6 +133,7 @@ struct PetCatalog {
                     wakeAnimation: loadPoseStrip(named: "stretch", for: Self.defaultPetID),
                     scratchAnimation: loadPoseStrip(named: "scratch", for: Self.defaultPetID),
                     groomAnimation: loadPoseStrip(named: "groom", for: Self.defaultPetID),
+                    screamAnimation: loadPoseStrip(named: "scream", for: Self.defaultPetID),
                     runLeftAnimation: loadPoseStrip(named: "run-left", for: Self.defaultPetID),
                     runRightAnimation: loadPoseStrip(named: "run-right", for: Self.defaultPetID)
                 )

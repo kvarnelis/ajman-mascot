@@ -465,18 +465,19 @@ private func runSelfTest() -> Int32 {
             hasSleep: true,
             hasStretch: true,
             hasScratch: true,
-            hasGroom: true
+            hasGroom: true,
+            hasScream: true
         )
         let expectedAfterIdle: [PetCycleAction] = [
             .animation(.runningRight), .animation(.runningLeft), .animation(.waving),
             .animation(.jumping), .animation(.failed), .animation(.waiting),
             .animation(.running), .animation(.review), .animation(.lookDirectionsA),
-            .animation(.lookDirectionsB), .loaf, .sleep, .stretch, .scratch, .groom,
+            .animation(.lookDirectionsB), .loaf, .sleep, .stretch, .scratch, .groom, .scream,
             .animation(.idle),
         ]
         guard fullActionCycle == PetActionCycle.directOrder,
-              fullActionCycle.suffix(5) == [.loaf, .sleep, .stretch, .scratch, .groom] else {
-            throw SelfTestError("per-pet action cycle did not include ordered loaf, sleep, stretch, scratch, and groom")
+              fullActionCycle.suffix(6) == [.loaf, .sleep, .stretch, .scratch, .groom, .scream] else {
+            throw SelfTestError("per-pet action cycle did not place scream immediately after groom")
         }
 
         var ajmanCursor = PetActionCycle.Cursor()
@@ -515,7 +516,8 @@ private func runSelfTest() -> Int32 {
             hasSleep: true,
             hasStretch: true,
             hasScratch: false,
-            hasGroom: true
+            hasGroom: true,
+            hasScream: true
         )
         let noStretchCycle = PetActionCycle.availableActions(
             availableStates: cycleOrder,
@@ -523,21 +525,22 @@ private func runSelfTest() -> Int32 {
             hasSleep: true,
             hasStretch: false,
             hasScratch: true,
-            hasGroom: true
+            hasGroom: true,
+            hasScream: true
         )
         var resyncCursor = PetActionCycle.Cursor()
         for _ in 0..<fullActionCycle.count {
             _ = resyncCursor.next(availableActions: fullActionCycle)
         }
         guard !noScratchCycle.contains(.scratch),
-              noScratchCycle.suffix(4) == [.loaf, .sleep, .stretch, .groom],
+              noScratchCycle.suffix(5) == [.loaf, .sleep, .stretch, .groom, .scream],
               !noStretchCycle.contains(.stretch),
-              noStretchCycle.suffix(4) == [.loaf, .sleep, .scratch, .groom],
+              noStretchCycle.suffix(5) == [.loaf, .sleep, .scratch, .groom, .scream],
               resyncCursor.next(availableActions: noScratchCycle) == .animation(.idle),
               PetActionCycle.next(after: .lookDirectionsB, availableStates: cycleOrder) == .idle else {
             throw SelfTestError("per-pet action cycle did not skip unavailable behavior assets")
         }
-        print("Pet action clicks: per-pet cursor traverses 11 states plus loaf/sleep/stretch/scratch/groom despite idle resets; missing stretch/scratch assets skip; order wraps")
+        print("Pet action clicks: per-pet cursor traverses 11 states plus loaf/sleep/stretch/scratch/groom/scream; scream follows groom; missing assets skip; order wraps")
 
         let temperamentSuiteName = "AjmanSelfTest.Temperament.\(UUID().uuidString)"
         guard let temperamentDefaults = UserDefaults(suiteName: temperamentSuiteName) else {
@@ -815,6 +818,15 @@ private func runSelfTest() -> Int32 {
               sleepingAjman.groomAnimation == nil else {
             throw SelfTestError("Winnie's six-frame grooming ritual or Ajman isolation was incorrect")
         }
+        guard let winnieScream = sleepingWinnie.screamAnimation,
+              winnieScream.frameCount == 8,
+              ScreamSequence.frameDurations.count == 4,
+              ScreamSequence.frameDurations.reduce(0, +) >= 3,
+              ScreamSequence.frameDurations.reduce(0, +) <= 6,
+              ScreamSequence.variants == [[0, 1, 2, 3], [4, 5, 6, 7]],
+              sleepingAjman.screamAnimation == nil else {
+            throw SelfTestError("Winnie's eight-frame scream variants or Ajman isolation was incorrect")
+        }
         guard let winnieRunLeft = sleepingWinnie.travelAnimation(for: .left),
               let winnieRunRight = sleepingWinnie.travelAnimation(for: .right),
               winnieRunLeft.frameCount == 8,
@@ -826,10 +838,12 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("Winnie's 8+8 directional travel gait or Ajman isolation was incorrect")
         }
         let winnieGroomBounds = winnieGroom.frames.compactMap(SpriteSheet.contentBounds)
+        let winnieScreamBounds = winnieScream.frames.compactMap(SpriteSheet.contentBounds)
         let winnieLoafBounds = winnieLoaf.frames.compactMap(SpriteSheet.contentBounds)
         let winnieTravelFrames = winnieRunLeft.frames + winnieRunRight.frames
         let winnieTravelBounds = winnieTravelFrames.compactMap(SpriteSheet.contentBounds)
         guard winnieGroomBounds.count == 6,
+              winnieScreamBounds.count == 8,
               winnieLoafBounds.count == 6,
               winnieTravelBounds.count == 16,
               winnieLoafBounds.allSatisfy({
@@ -846,6 +860,13 @@ private func runSelfTest() -> Int32 {
                       && $0.maxX < CGFloat(SpriteSheet.cellWidth)
                       && $0.maxY < CGFloat(SpriteSheet.cellHeight)
               }),
+              winnieScreamBounds.allSatisfy({
+                  $0.maxY == 204
+                      && $0.minX > 0
+                      && $0.maxX < CGFloat(SpriteSheet.cellWidth)
+                      && $0.minY > 0
+                      && $0.maxY < CGFloat(SpriteSheet.cellHeight)
+              }),
               winnieTravelBounds.allSatisfy({
                   $0.maxY == 203
                       && $0.minX > 0
@@ -853,7 +874,7 @@ private func runSelfTest() -> Int32 {
                       && $0.maxY < CGFloat(SpriteSheet.cellHeight)
               }) else {
             throw SelfTestError(
-                "Winnie loaf/groom/run frames missed the ground line or touched a cell edge: loaf=\(winnieLoafBounds), groom=\(winnieGroomBounds), run=\(winnieTravelBounds)"
+                "Winnie loaf/groom/scream/run frames missed the ground line or touched a cell edge: loaf=\(winnieLoafBounds), groom=\(winnieGroomBounds), scream=\(winnieScreamBounds), run=\(winnieTravelBounds)"
             )
         }
         let winnieCompanionFrames = winnieWake.frames + winnieScratch.frames
@@ -889,7 +910,8 @@ private func runSelfTest() -> Int32 {
             hasSleep: sleepingWinnie.sleepAnimation != nil,
             hasStretch: sleepingWinnie.wakeAnimation != nil,
             hasScratch: sleepingWinnie.scratchAnimation != nil,
-            hasGroom: sleepingWinnie.groomAnimation != nil
+            hasGroom: sleepingWinnie.groomAnimation != nil,
+            hasScream: sleepingWinnie.screamAnimation != nil
         )
         let ajmanActions = PetActionCycle.availableActions(
             availableStates: sleepingAjman.sheet.animationTable.states,
@@ -897,13 +919,16 @@ private func runSelfTest() -> Int32 {
             hasSleep: sleepingAjman.sleepAnimation != nil,
             hasStretch: sleepingAjman.wakeAnimation != nil,
             hasScratch: sleepingAjman.scratchAnimation != nil,
-            hasGroom: sleepingAjman.groomAnimation != nil
+            hasGroom: sleepingAjman.groomAnimation != nil,
+            hasScream: sleepingAjman.screamAnimation != nil
         )
         guard let winnieLookBIndex = winnieActions.firstIndex(of: .animation(.lookDirectionsB)),
               let winnieLoafIndex = winnieActions.firstIndex(of: .loaf),
               let winnieSleepIndex = winnieActions.firstIndex(of: .sleep),
               let winnieStretchIndex = winnieActions.firstIndex(of: .stretch),
               let winnieScratchIndex = winnieActions.firstIndex(of: .scratch),
+              let winnieGroomIndex = winnieActions.firstIndex(of: .groom),
+              let winnieScreamIndex = winnieActions.firstIndex(of: .scream),
               let ajmanSleepIndex = ajmanActions.firstIndex(of: .sleep),
               let ajmanStretchIndex = ajmanActions.firstIndex(of: .stretch),
               let ajmanScratchIndex = ajmanActions.firstIndex(of: .scratch),
@@ -911,9 +936,12 @@ private func runSelfTest() -> Int32 {
               winnieSleepIndex == winnieLoafIndex + 1,
               winnieSleepIndex < winnieStretchIndex,
               winnieStretchIndex < winnieScratchIndex,
+              winnieGroomIndex == winnieScratchIndex + 1,
+              winnieScreamIndex == winnieGroomIndex + 1,
               ajmanSleepIndex < ajmanStretchIndex,
               ajmanStretchIndex < ajmanScratchIndex,
               winnieActions.contains(.scratch), winnieActions.contains(.groom),
+              winnieActions.contains(.scream), !ajmanActions.contains(.scream),
               HeldSequenceEligibility(
                 hasAsset: true, isShown: true, liveState: .idle,
                 displayedState: .idle, isManual: false,
@@ -935,9 +963,56 @@ private func runSelfTest() -> Int32 {
               ) > Temperament.defaultValue(for: "ajman").scaledFidget(
                 probability: ScratchBehavior.triggerProbability
               ) else {
-            throw SelfTestError("Winnie scratch/groom whim availability or default frequency was incorrect")
+            throw SelfTestError("Winnie scratch/groom/scream availability or cycle order was incorrect")
         }
-        print("Winnie companions: loaf/groom/run load 6/6/8+8 grounded frames; direct cycle places Loaf between Look B and Sleep; travel direction maps left/right assets")
+        let screamSettings = Temperament.allCases.map(ScreamSequence.whimSettings)
+        let screamRates = screamSettings.map { settings -> Double in
+            guard settings.triggerProbability > 0 else { return 0 }
+            return settings.triggerProbability
+                / ((settings.scheduleRange.lowerBound + settings.scheduleRange.upperBound) / 2)
+        }
+        guard screamSettings[0].triggerProbability == 0,
+              screamSettings[1].scheduleRange == 1_800...2_700,
+              screamSettings[2].scheduleRange == 1_200...1_800,
+              screamSettings[3].scheduleRange == 600...900,
+              screamSettings[4].scheduleRange == 360...600,
+              zip(screamRates, screamRates.dropFirst()).allSatisfy({ pair in pair.0 < pair.1 }),
+              (1 / screamRates[2]) > 10 * (24 / GroomingSequence.triggerProbability) else {
+            throw SelfTestError("scream rarity windows were not strictly ordered or an order of magnitude below groom")
+        }
+        var crouchFrames: [Int] = []
+        let crouchScream = HeldSequenceBehavior(
+            animation: winnieScream,
+            frameDurations: ScreamSequence.frameDurations,
+            scheduleRange: 0...0, triggerProbability: 0, minimumSpacing: 0,
+            frameSequences: ScreamSequence.variants,
+            eligibility: { HeldSequenceEligibility(
+                hasAsset: true, isShown: true, liveState: .idle, displayedState: .idle,
+                isManual: false, isCalmPose: false, isGlancing: false
+            ) },
+            willStart: {}, showFrame: { crouchFrames.append($0); return true },
+            showIdle: {}, didFinish: {}, scheduler: { _, action in action() },
+            sequenceRandomUnit: { 0 }
+        )
+        var gremlinFrames: [Int] = []
+        let gremlinScream = HeldSequenceBehavior(
+            animation: winnieScream,
+            frameDurations: ScreamSequence.frameDurations,
+            scheduleRange: 0...0, triggerProbability: 0, minimumSpacing: 0,
+            frameSequences: ScreamSequence.variants,
+            eligibility: { HeldSequenceEligibility(
+                hasAsset: true, isShown: true, liveState: .idle, displayedState: .idle,
+                isManual: false, isCalmPose: false, isGlancing: false
+            ) },
+            willStart: {}, showFrame: { gremlinFrames.append($0); return true },
+            showIdle: {}, didFinish: {}, scheduler: { _, action in action() },
+            sequenceRandomUnit: { 0.999 }
+        )
+        guard crouchScream.forceStart(), gremlinScream.forceStart(),
+              crouchFrames == [0, 1, 2, 3], gremlinFrames == [4, 5, 6, 7] else {
+            throw SelfTestError("scream variant selection did not preserve the two four-frame escalations")
+        }
+        print("Winnie companions: scream loads 8 grounded frames as random 0-3/4-7 escalations; Scream follows Groom in the direct cycle; Ajman has no scream")
         guard ScratchEdgeGeometry.leftPawX == 37,
               ScratchEdgeGeometry.rightPawX == 155,
               ScratchEdgeGeometry.targetOriginX(
