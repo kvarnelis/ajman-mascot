@@ -1,0 +1,147 @@
+{
+  "source": "assets/winnie/winnie-loaf-study-v2/source/winnie-loaf-strip-chroma.png",
+  "output": "assets/pets/winnie/loaf.webp",
+  "method": "Euclidean RGB distance from #FF00FF at threshold 96; 4-connected components; six largest pose seeds ordered by center x; established nearest-component grouping; shared Lanczos scale; centered; alpha content grounded at y=203.",
+  "chromaKey": "#FF00FF",
+  "threshold": 96.0,
+  "scale": 0.39,
+  "scaleEvidence": {
+    "seatedIdleFrame": "assets/pets/winnie/spritesheet.webp row 0 frame 0",
+    "seatedIdleContentBox": {
+      "width": 88,
+      "height": 198
+    },
+    "seatedIdleCollarWidth": 40,
+    "alertFrontSourceCollarWidth": 102,
+    "collarRatio": 0.39215686274509803,
+    "decision": "Use 0.39 for all poses; matches the collar ruler (0.392) and keeps loaf heights/widths in the existing sleep family."
+  },
+  "frames": [
+    {
+      "index": 0,
+      "sourceBox": {
+        "x": 45,
+        "y": 293,
+        "width": 229,
+        "height": 286
+      },
+      "scaledSizeBeforeAlphaTrim": [
+        89,
+        112
+      ],
+      "contentBox": {
+        "minX": 51,
+        "minY": 92,
+        "maxX": 139,
+        "maxY": 203,
+        "width": 89,
+        "height": 112
+      }
+    },
+    {
+      "index": 1,
+      "sourceBox": {
+        "x": 324,
+        "y": 301,
+        "width": 289,
+        "height": 280
+      },
+      "scaledSizeBeforeAlphaTrim": [
+        113,
+        109
+      ],
+      "contentBox": {
+        "minX": 39,
+        "minY": 95,
+        "maxX": 151,
+        "maxY": 203,
+        "width": 113,
+        "height": 109
+      }
+    },
+    {
+      "index": 2,
+      "sourceBox": {
+        "x": 647,
+        "y": 293,
+        "width": 298,
+        "height": 288
+      },
+      "scaledSizeBeforeAlphaTrim": [
+        116,
+        112
+      ],
+      "contentBox": {
+        "minX": 38,
+        "minY": 92,
+        "maxX": 153,
+        "maxY": 203,
+        "width": 116,
+        "height": 112
+      }
+    },
+    {
+      "index": 3,
+      "sourceBox": {
+        "x": 975,
+        "y": 275,
+        "width": 230,
+        "height": 302
+      },
+      "scaledSizeBeforeAlphaTrim": [
+        90,
+        118
+      ],
+      "contentBox": {
+        "minX": 51,
+        "minY": 86,
+        "maxX": 140,
+        "maxY": 203,
+        "width": 90,
+        "height": 118
+      }
+    },
+    {
+      "index": 4,
+      "sourceBox": {
+        "x": 1258,
+        "y": 314,
+        "width": 258,
+        "height": 261
+      },
+      "scaledSizeBeforeAlphaTrim": [
+        101,
+        102
+      ],
+      "contentBox": {
+        "minX": 45,
+        "minY": 102,
+        "maxX": 145,
+        "maxY": 203,
+        "width": 101,
+        "height": 102
+      }
+    },
+    {
+      "index": 5,
+      "sourceBox": {
+        "x": 1561,
+        "y": 377,
+        "width": 251,
+        "height": 202
+      },
+      "scaledSizeBeforeAlphaTrim": [
+        98,
+        79
+      ],
+      "contentBox": {
+        "minX": 47,
+        "minY": 125,
+        "maxX": 144,
+        "maxY": 203,
+        "width": 98,
+        "height": 79
+      }
+    }
+  ]
+}

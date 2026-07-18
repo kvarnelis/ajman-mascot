@@ -1,0 +1,9 @@
+# Winnie loaf strip prompt
+
+Create one coherent horizontal production strip of exactly six distinct full-body loaf poses of Winnie, the same female brown mackerel tabby cat in the reference images. Preserve her exact identity across all six: warm brown-and-black striped coat, yellow-green eyes, pink collar, round silver tag, natural feline proportions, and the characteristic flat-notched ear tip visible in the canonical reference. Use the same clean, softly realistic illustrated cutout style as the canonical base and seated strip.
+
+Left to right, show: 1) classic front-facing loaf with all paws fully tucked, calm open eyes; 2) three-quarter-view loaf with body angled and head turned toward viewer; 3) true side-profile loaf with paws completely tucked and tail wrapped close; 4) alert loaf, body still tucked but head higher, ears forward, eyes wide; 5) sleepy loaf with relaxed shoulders and half-closed eyes; 6) very compact tucked loaf with chin held low near the chest and paws entirely hidden.
+
+Each pose must be a complete separate cat with generous even spacing and no overlap. Keep scale and baseline consistent. All six must read unmistakably as loafing, never sitting upright, standing, crouching, or exposing extended forelegs. Pink collar and silver tag remain attached and visible where physically possible.
+
+Place everything on one perfectly flat solid `#ff00ff` chroma-key background for clean removal. The background must be uniform with no gradients, texture, floor plane, lighting variation, or checkerboard. No shadows, cast shadows, contact shadows, reflections, scenery, extra objects, text, labels, numbers, borders, panels, guides, effects, watermark, or detached elements. Do not use `#ff00ff` anywhere in Winnie. Keep every whisker, ear, tail, and fur edge comfortably inside the canvas.

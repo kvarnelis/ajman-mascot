@@ -787,6 +787,11 @@ private func runSelfTest() -> Int32 {
         guard let ajmanLoaf = sleepingAjman.loafAnimation, ajmanLoaf.frameCount == 8 else {
             throw SelfTestError("Ajman's bundled loaf strip did not load eight ordered poses")
         }
+        guard let winnieLoaf = sleepingWinnie.loafAnimation,
+              winnieLoaf.frameCount == 6,
+              winnieLoaf.sourceURL.lastPathComponent == "loaf.webp" else {
+            throw SelfTestError("Winnie's bundled loaf strip did not load six ordered poses")
+        }
         guard let ajmanWake = sleepingAjman.wakeAnimation, ajmanWake.frameCount == 5 else {
             throw SelfTestError("Ajman's bundled stretch/yawn strip did not load five ordered poses")
         }
@@ -821,10 +826,20 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("Winnie's 8+8 directional travel gait or Ajman isolation was incorrect")
         }
         let winnieGroomBounds = winnieGroom.frames.compactMap(SpriteSheet.contentBounds)
+        let winnieLoafBounds = winnieLoaf.frames.compactMap(SpriteSheet.contentBounds)
         let winnieTravelFrames = winnieRunLeft.frames + winnieRunRight.frames
         let winnieTravelBounds = winnieTravelFrames.compactMap(SpriteSheet.contentBounds)
         guard winnieGroomBounds.count == 6,
+              winnieLoafBounds.count == 6,
               winnieTravelBounds.count == 16,
+              winnieLoafBounds.allSatisfy({
+                  // CGRect.maxY is exclusive: 204 means the last occupied pixel is y=203.
+                  $0.maxY == 204
+                      && $0.minX > 0
+                      && $0.maxX < CGFloat(SpriteSheet.cellWidth - 1)
+                      && $0.minY > 0
+                      && $0.maxY < CGFloat(SpriteSheet.cellHeight)
+              }),
               winnieGroomBounds.allSatisfy({
                   $0.maxY >= 201 && $0.maxY <= 204
                       && $0.minX > 0
@@ -838,7 +853,7 @@ private func runSelfTest() -> Int32 {
                       && $0.maxY < CGFloat(SpriteSheet.cellHeight)
               }) else {
             throw SelfTestError(
-                "Winnie groom/run frames missed the ground line or touched a cell edge: groom=\(winnieGroomBounds), run=\(winnieTravelBounds)"
+                "Winnie loaf/groom/run frames missed the ground line or touched a cell edge: loaf=\(winnieLoafBounds), groom=\(winnieGroomBounds), run=\(winnieTravelBounds)"
             )
         }
         let winnieCompanionFrames = winnieWake.frames + winnieScratch.frames
@@ -884,12 +899,16 @@ private func runSelfTest() -> Int32 {
             hasScratch: sleepingAjman.scratchAnimation != nil,
             hasGroom: sleepingAjman.groomAnimation != nil
         )
-        guard let winnieSleepIndex = winnieActions.firstIndex(of: .sleep),
+        guard let winnieLookBIndex = winnieActions.firstIndex(of: .animation(.lookDirectionsB)),
+              let winnieLoafIndex = winnieActions.firstIndex(of: .loaf),
+              let winnieSleepIndex = winnieActions.firstIndex(of: .sleep),
               let winnieStretchIndex = winnieActions.firstIndex(of: .stretch),
               let winnieScratchIndex = winnieActions.firstIndex(of: .scratch),
               let ajmanSleepIndex = ajmanActions.firstIndex(of: .sleep),
               let ajmanStretchIndex = ajmanActions.firstIndex(of: .stretch),
               let ajmanScratchIndex = ajmanActions.firstIndex(of: .scratch),
+              winnieLoafIndex == winnieLookBIndex + 1,
+              winnieSleepIndex == winnieLoafIndex + 1,
               winnieSleepIndex < winnieStretchIndex,
               winnieStretchIndex < winnieScratchIndex,
               ajmanSleepIndex < ajmanStretchIndex,
@@ -918,7 +937,7 @@ private func runSelfTest() -> Int32 {
               ) else {
             throw SelfTestError("Winnie scratch/groom whim availability or default frequency was incorrect")
         }
-        print("Winnie companions: groom 6 frames/5.05s and run 8+8 frames are grounded; Ajman and Winnie direct actions order Sleep/Stretch/Scratch; travel direction maps left/right assets")
+        print("Winnie companions: loaf/groom/run load 6/6/8+8 grounded frames; direct cycle places Loaf between Look B and Sleep; travel direction maps left/right assets")
         guard ScratchEdgeGeometry.leftPawX == 37,
               ScratchEdgeGeometry.rightPawX == 155,
               ScratchEdgeGeometry.targetOriginX(
@@ -997,22 +1016,68 @@ private func runSelfTest() -> Int32 {
             throw SelfTestError("scratch panel did not return to its recorded start after the rake")
         }
         movementMover.cancel()
-        let winnieSleepAnimator = Animator(
+        let winnieCalmAnimator = Animator(
             sheet: sleepingWinnie.sheet,
             view: nil,
             sleepHoldRange: 0.03...0.03
         )
-        winnieSleepAnimator.playSleep(winnieSleep)
-        let firstWinnieSleepPose = winnieSleepAnimator.currentSleepPoseIndex
+        winnieCalmAnimator.playLoaf(winnieLoaf)
+        let firstWinnieLoafPose = winnieCalmAnimator.currentLoafPoseIndex
+        guard firstWinnieLoafPose != nil,
+              pump(until: {
+                  winnieCalmAnimator.currentLoafPoseIndex != nil
+                      && winnieCalmAnimator.currentLoafPoseIndex != firstWinnieLoafPose
+              }) else {
+            throw SelfTestError("Winnie's held loaf pose did not rotate to a different pose")
+        }
+        winnieCalmAnimator.playSleep(winnieSleep)
+        let firstWinnieSleepPose = winnieCalmAnimator.currentSleepPoseIndex
         guard firstWinnieSleepPose != nil,
               pump(until: {
-                  winnieSleepAnimator.currentSleepPoseIndex != nil
-                      && winnieSleepAnimator.currentSleepPoseIndex != firstWinnieSleepPose
+                  winnieCalmAnimator.currentSleepPoseIndex != nil
+                      && winnieCalmAnimator.currentSleepPoseIndex != firstWinnieSleepPose
               }) else {
             throw SelfTestError("Winnie's held sleep pose did not rotate to a different pose")
         }
-        winnieSleepAnimator.stop()
-        print("Calm assets: Winnie sleep/wake/scratch load 8/5/2 with y=203 grounding and pixel-mapped left=00/right=01; her Frisky scratch whim exceeds Ajman's Calm default; Ajman loaf/sleep/wake/scratch load 8/8/5/2; scratch travel returns home")
+        winnieCalmAnimator.stop()
+
+        var winnieRestState = AnimationState.idle
+        let winnieRestAnimator = Animator(
+            sheet: sleepingWinnie.sheet,
+            view: nil,
+            sleepHoldRange: 0.03...0.03
+        )
+        let winnieRestMode = PetMode(
+            animator: winnieRestAnimator,
+            loafAnimation: winnieLoaf,
+            sleepAnimation: winnieSleep,
+            wakeAnimation: winnieWake,
+            currentLiveState: { winnieRestState },
+            isManualMode: { false },
+            loafInterval: 0.04,
+            dozeInterval: 0.14,
+            wakeHoldRange: 0.05...0.05
+        )
+        winnieRestMode.resumeAtRest()
+        guard pump(until: { winnieRestMode.isLoafing && winnieRestAnimator.isPlayingLoaf }),
+              pump(until: { winnieRestMode.isSleeping && winnieRestAnimator.isPlayingSleep }),
+              !winnieRestMode.isLoafing else {
+            throw SelfTestError("Winnie's sustained calm did not progress idle to loaf to sleep")
+        }
+        winnieRestMode.stir()
+        guard winnieRestMode.isWaking, winnieRestAnimator.isPlayingWake,
+              winnieRestAnimator.currentWakePoseIndex != nil else {
+            throw SelfTestError("Winnie did not wake from sleep through her stretch strip")
+        }
+        winnieRestState = .idle
+        guard pump(until: {
+            !winnieRestMode.isWaking && winnieRestAnimator.currentState == .idle
+        }) else {
+            throw SelfTestError("Winnie's stretch wake did not settle back to seated idle")
+        }
+        winnieRestMode.teardown()
+        winnieRestAnimator.stop()
+        print("Calm assets: Winnie loaf/sleep/wake/scratch load 6/8/5/2; loaf and sleep rotate with shared calm breathing; sustained calm reaches sleep and stir wakes through stretch; Ajman remains 8/8/5/2")
 
         var scratchEligibility = ScratchEligibility(
             hasAsset: true,
