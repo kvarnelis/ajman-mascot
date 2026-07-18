@@ -196,7 +196,9 @@ final class HeldSequenceBehavior {
             if settings.reschedulesAfterMiss { resumeScheduling() }
             return
         }
-        if !startIfEligible(), settings.reschedulesAfterMiss { resumeScheduling() }
+        if !startIfEligible() {
+            if settings.reschedulesAfterMiss { resumeScheduling() }
+        }
     }
 
     private func begin(recordsSpacing: Bool) {

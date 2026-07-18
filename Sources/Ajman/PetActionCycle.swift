@@ -20,6 +20,18 @@ enum PetCycleAction: Equatable {
     case scratch
     case groom
     case scream
+
+    var menuTitle: String {
+        switch self {
+        case let .animation(state): state.title
+        case .loaf: "Loaf"
+        case .sleep: "Sleep"
+        case .stretch: "Stretch"
+        case .scratch: "Scratch"
+        case .groom: "Groom"
+        case .scream: "Scream"
+        }
+    }
 }
 
 enum PetActionCycle {

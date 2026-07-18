@@ -51,8 +51,8 @@ struct SpriteSheet {
     static let cellWidth = 192
     static let cellHeight = 208
     static let contentAlphaThreshold: UInt8 = 10
-    static let contentMargin = Int(SteadySize.margin)
-    static let topSafety = Int(SteadySize.topSafety)
+    static let contentMargin = 4
+    private static let topSafety: CGFloat = 2
 
     let animationTable: AnimationTable
     let sourceURL: URL
@@ -62,16 +62,16 @@ struct SpriteSheet {
         try PetCatalog().loadSelected().sheet
     }
 
-    static func load(directory: URL, steadySize: Bool = true) throws -> SpriteSheet {
+    static func load(directory: URL) throws -> SpriteSheet {
         let manifestURL = directory.appendingPathComponent("pet.json")
         let sheetURL = directory.appendingPathComponent("spritesheet.webp")
         guard FileManager.default.isReadableFile(atPath: manifestURL.path) else {
             throw SpriteSheetError.missingPackage(directory)
         }
-        return try load(manifestURL: manifestURL, defaultSheetURL: sheetURL, steadySize: steadySize)
+        return try load(manifestURL: manifestURL, defaultSheetURL: sheetURL)
     }
 
-    private static func load(manifestURL: URL, defaultSheetURL: URL, steadySize: Bool) throws -> SpriteSheet {
+    private static func load(manifestURL: URL, defaultSheetURL: URL) throws -> SpriteSheet {
         let manifest: PetManifest
         do {
             manifest = try JSONDecoder().decode(PetManifest.self, from: Data(contentsOf: manifestURL))
@@ -127,20 +127,16 @@ struct SpriteSheet {
         let fitReference = manifest.contentFitReference.map {
             CGSize(width: $0.width, height: $0.height)
         }
-        if steadySize {
-            cells = normalized(cells: cells, table: table, minimumTargetBox: fitReference)
-        } else {
-            let manifestID = manifest.id?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let petID = (manifestID?.isEmpty == false ? manifestID : nil)
-                ?? manifestURL.deletingLastPathComponent().lastPathComponent
-            if petID.caseInsensitiveCompare("winnie") == .orderedSame {
-                cells = normalized(
-                    cells: cells,
-                    table: table,
-                    states: [.failed],
-                    minimumTargetBox: fitReference
-                )
-            }
+        let manifestID = manifest.id?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let petID = (manifestID?.isEmpty == false ? manifestID : nil)
+            ?? manifestURL.deletingLastPathComponent().lastPathComponent
+        if petID.caseInsensitiveCompare("winnie") == .orderedSame {
+            cells = normalized(
+                cells: cells,
+                table: table,
+                states: [.failed],
+                minimumTargetBox: fitReference
+            )
         }
         return SpriteSheet(animationTable: table, sourceURL: sheetURL, cells: cells)
     }
@@ -188,20 +184,16 @@ struct SpriteSheet {
             (0..<definition.frameCount).compactMap { measured[FrameLocation(row: definition.row, column: $0)] }
         } ?? []
         let targetCandidates = idleBounds.isEmpty ? Array(measured.values) : idleBounds
-        guard var targetBox = SteadySize.targetBox(
-            idleBounds: targetCandidates,
-            cellWidth: cellWidth,
-            cellHeight: cellHeight
-        ) else { return result }
+        guard var targetBox = targetBox(for: targetCandidates) else { return result }
         if let minimumTargetBox {
             targetBox = CGSize(
                 width: min(
                     max(targetBox.width, minimumTargetBox.width),
-                    CGFloat(cellWidth) - 2 * SteadySize.margin
+                    CGFloat(cellWidth) - 2 * CGFloat(contentMargin)
                 ),
                 height: min(
                     max(targetBox.height, minimumTargetBox.height),
-                    CGFloat(cellHeight) - SteadySize.margin - SteadySize.topSafety
+                    CGFloat(cellHeight) - CGFloat(contentMargin) - topSafety
                 )
             )
         }
@@ -219,12 +211,7 @@ struct SpriteSheet {
     }
 
     private static func normalize(_ frame: CGImage, contentBounds: CGRect, targetBox: CGSize) -> CGImage? {
-        guard let scale = SteadySize.scale(
-            contentSize: contentBounds.size,
-            targetBox: targetBox,
-            cellWidth: cellWidth,
-            cellHeight: cellHeight
-        ),
+        guard let scale = normalizationScale(contentSize: contentBounds.size, targetBox: targetBox),
               let context = rgbaContext(width: cellWidth, height: cellHeight) else { return nil }
 
         context.interpolationQuality = .high
@@ -232,7 +219,7 @@ struct SpriteSheet {
         let contentLeft = (CGFloat(cellWidth) - scaledContentWidth) / 2
         let drawRect = CGRect(
             x: contentLeft - contentBounds.minX * scale,
-            y: SteadySize.margin - contentBounds.minY * scale,
+            y: CGFloat(contentMargin) - contentBounds.minY * scale,
             width: CGFloat(cellWidth) * scale,
             height: CGFloat(cellHeight) * scale
         )
@@ -240,7 +227,7 @@ struct SpriteSheet {
         guard let rendered = context.makeImage(),
               let renderedBounds = Self.contentBounds(rendered) else { return context.makeImage() }
         // CGImage scanlines and CGContext user-space Y run in opposite directions.
-        let verticalCorrection = renderedBounds.minY - SteadySize.margin
+        let verticalCorrection = renderedBounds.minY - CGFloat(contentMargin)
         guard abs(verticalCorrection) >= 0.5,
               let corrected = rgbaContext(width: cellWidth, height: cellHeight) else { return rendered }
         corrected.draw(
@@ -248,6 +235,29 @@ struct SpriteSheet {
             in: CGRect(x: 0, y: verticalCorrection, width: CGFloat(cellWidth), height: CGFloat(cellHeight))
         )
         return corrected.makeImage() ?? rendered
+    }
+
+    private static func targetBox(for idleBounds: [CGRect]) -> CGSize? {
+        guard let widest = idleBounds.map(\.width).max(),
+              let tallest = idleBounds.map(\.height).max(),
+              widest > 0, tallest > 0 else { return nil }
+        return CGSize(
+            width: min(widest, CGFloat(cellWidth - 2 * contentMargin)),
+            height: min(tallest, CGFloat(cellHeight - contentMargin) - topSafety)
+        )
+    }
+
+    private static func normalizationScale(contentSize: CGSize, targetBox: CGSize) -> CGFloat? {
+        guard contentSize.width > 0, contentSize.height > 0 else { return nil }
+        let usableWidth = CGFloat(cellWidth - 2 * contentMargin)
+        let usableHeight = CGFloat(cellHeight - contentMargin) - topSafety
+        let scale = min(
+            targetBox.width / contentSize.width,
+            targetBox.height / contentSize.height,
+            usableWidth / contentSize.width,
+            usableHeight / contentSize.height
+        )
+        return scale.isFinite && scale > 0 ? scale : nil
     }
 
     static func contentBounds(_ image: CGImage) -> CGRect? {

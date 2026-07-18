@@ -16,11 +16,11 @@ Ajman lives in the menu bar under the cat icon. From there you can:
 - set each cat's **Temperament**, from Catatonic to Insane;
 - show or hide cats under **Pets**, change **Overall Size**, or **Reset Position**;
 - toggle **Launch at Login** and **Show agent notifications**; and
-- **Connect to Claude Code**.
+- **Hear Claude Code**.
 
 Control-click or right-click a cat to step just that cat through its actions without changing the other one.
 
-**Connect to Claude Code** adds Ajman's event hooks to `~/.claude/settings.json`, letting the cats hear what Claude Code is doing. Untick it to remove Ajman's hooks again.
+**Hear Claude Code** adds Ajman's event hooks to `~/.claude/settings.json`, letting the cats hear what Claude Code is doing. Untick it to remove Ajman's hooks again.
 
 ## A note about the cats
 

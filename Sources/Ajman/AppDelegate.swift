@@ -52,9 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 relativeScales: relativeScaleMap(),
                 temperaments: temperamentMap(),
                 debugStates: commonDebugStates(),
-                sleepAvailable: pets.contains(where: \.hasSleepAnimation),
-                groomAvailable: pets.contains(where: \.hasGroomAnimation),
-                screamAvailable: pets.contains(where: \.hasScreamAnimation),
+                directActionsByPetID: directActionMap(),
                 agentNotificationsEnabled: AgentNotificationPreferences().isEnabled
             )
             statusMenu = menu
@@ -147,12 +145,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             temperament.save(for: id)
             self?.pets.first(where: { $0.petID == id })?.setTemperament(temperament)
         }
-        menu.steadySizeHandler = { [weak self] enabled in
-            self?.pets.forEach { pet in
-                do { try pet.setSteadySize(enabled) }
-                catch { self?.log("could not re-prepare pet '\(pet.petID)': \(error.localizedDescription)") }
-            }
-        }
         menu.agentNotificationsHandler = { [weak self] enabled in
             let preferences = AgentNotificationPreferences()
             preferences.isEnabled = enabled
@@ -169,17 +161,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.debugStateHandler = { [weak self] state in
             self?.pets.forEach { $0.setDebugState(state) }
         }
-        menu.debugSleepHandler = { [weak self] in
-            self?.pets.forEach { $0.setDebugSleep() }
-        }
-        menu.debugScratchHandler = { [weak self] in
-            self?.pets.forEach { $0.setDebugScratch() }
-        }
-        menu.debugGroomHandler = { [weak self] in
-            self?.pets.forEach { $0.setDebugGroom() }
-        }
-        menu.debugScreamHandler = { [weak self] in
-            self?.pets.forEach { $0.setDebugScream() }
+        menu.petActionHandler = { [weak self] id, action in
+            self?.statusMenu?.resumeLiveReactionsIfManual()
+            self?.pets.first(where: { $0.petID == id })?.performDirectAction(action)
         }
         menu.resumeLiveHandler = { [weak self] in
             guard let self, let registry = self.registry else { return }
@@ -311,17 +295,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             relativeScales: relativeScaleMap(),
             temperaments: temperamentMap(),
             debugStates: commonDebugStates(),
-            sleepAvailable: pets.contains(where: \.hasSleepAnimation),
-            groomAvailable: pets.contains(where: \.hasGroomAnimation),
-            screamAvailable: pets.contains(where: \.hasScreamAnimation)
+            directActionsByPetID: directActionMap()
         )
     }
 
     private func handleAgentEvent(_ event: AgentEvent, registry: SessionRegistry) {
         let relevantPets = pets.filter { $0.binding == nil || $0.binding == event.provider }
-        if statusMenu?.manualSleep == true, relevantPets.contains(where: \.hasSleepAnimation) {
-            statusMenu?.resumeLiveReactionsIfManual()
-        }
         for pet in relevantPets {
             pet.handleAgentActivity()
         }
@@ -353,6 +332,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ?? Temperament.load(for: descriptor.id)
             return (descriptor.id, current)
         })
+    }
+
+    private func directActionMap() -> [String: [PetCycleAction]] {
+        Dictionary(uniqueKeysWithValues: pets.map { ($0.petID, $0.availableDirectActions) })
     }
 
     private func commonDebugStates() -> [AnimationState] {

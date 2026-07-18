@@ -88,7 +88,7 @@ struct PetCatalog {
         }
     }
 
-    func load(id: String, steadySize: Bool? = nil) throws -> LoadedPet {
+    func load(id: String) throws -> LoadedPet {
         let candidates = descriptors(in: liveRoot, isBundled: false).filter { $0.id == id }
             + descriptors(in: bundledRoot, isBundled: true).filter { $0.id == id }
         guard !candidates.isEmpty else { throw SpriteSheetError.missingPackage(liveRoot.appendingPathComponent(id)) }
@@ -97,7 +97,7 @@ struct PetCatalog {
             do {
                 return LoadedPet(
                     descriptor: descriptor,
-                    sheet: try SpriteSheet.load(directory: descriptor.directory, steadySize: steadySize ?? SteadySize.load(from: defaults)),
+                    sheet: try SpriteSheet.load(directory: descriptor.directory),
                     loafAnimation: loadPoseStrip(named: "loaf", for: id),
                     sleepAnimation: loadSleepAnimation(for: id),
                     wakeAnimation: loadPoseStrip(named: "stretch", for: id),
@@ -127,7 +127,7 @@ struct PetCatalog {
                 let descriptor = try descriptor(at: ajman, isBundled: true)
                 return LoadedPet(
                     descriptor: descriptor,
-                    sheet: try SpriteSheet.load(directory: ajman, steadySize: SteadySize.load(from: defaults)),
+                    sheet: try SpriteSheet.load(directory: ajman),
                     loafAnimation: loadPoseStrip(named: "loaf", for: Self.defaultPetID),
                     sleepAnimation: loadSleepAnimation(for: Self.defaultPetID),
                     wakeAnimation: loadPoseStrip(named: "stretch", for: Self.defaultPetID),

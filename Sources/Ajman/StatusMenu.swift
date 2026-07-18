@@ -2,21 +2,26 @@ import AppKit
 
 @MainActor
 final class StatusMenu: NSObject, NSMenuDelegate {
+    private final class PetActionSelection: NSObject {
+        let petID: String
+        let action: PetCycleAction
+
+        init(petID: String, action: PetCycleAction) {
+            self.petID = petID
+            self.action = action
+        }
+    }
+
     private let registry: SessionRegistry
     private let statusItem: NSStatusItem
     private let launchAtLogin = LaunchAtLogin()
     private let activityItem = NSMenuItem(title: "Agents: Idle — 0 sessions", action: nil, keyEquivalent: "")
     private let cycleItem = NSMenuItem(title: "Cycle All States", action: #selector(toggleCycle(_:)), keyEquivalent: "")
-    private let sleepItem = NSMenuItem(title: "Sleep", action: #selector(selectSleep(_:)), keyEquivalent: "")
-    private let scratchItem = NSMenuItem(title: "Scratch", action: #selector(selectScratch(_:)), keyEquivalent: "")
-    private let groomItem = NSMenuItem(title: "Groom", action: #selector(selectGroom(_:)), keyEquivalent: "")
-    private let screamItem = NSMenuItem(title: "Scream", action: #selector(selectScream(_:)), keyEquivalent: "")
-    private let steadySizeItem = NSMenuItem(title: "Steady Size", action: #selector(toggleSteadySize(_:)), keyEquivalent: "")
     private let agentNotificationsItem = NSMenuItem(
         title: "Show agent notifications", action: #selector(toggleAgentNotifications(_:)), keyEquivalent: ""
     )
     private let claudeConnectionItem = NSMenuItem(
-        title: "Connect to Claude Code", action: #selector(toggleClaudeConnection(_:)), keyEquivalent: ""
+        title: "Hear Claude Code", action: #selector(toggleClaudeConnection(_:)), keyEquivalent: ""
     )
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
     private let updateChecksItem = NSMenuItem(title: "Check for updates", action: #selector(toggleUpdateChecks(_:)), keyEquivalent: "")
@@ -24,39 +29,26 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let debugMenu = NSMenu(title: "Actions")
     private var scaleItems: [PetScale: NSMenuItem] = [:]
     private var relativeScaleItems: [String: [Double: NSMenuItem]] = [:]
-    private var stateItems: [AnimationState: NSMenuItem] = [:]
     private var temperamentItems: [String: [Temperament: NSMenuItem]] = [:]
     private var pets: [PetDescriptor]
+    private var shownPetIDs: Set<String>
+    private var directActionsByPetID: [String: [PetCycleAction]]
     private var temperaments: [String: Temperament]
     private var debugStates: [AnimationState]
-    private var sleepAvailable: Bool
-    private var groomAvailable: Bool
-    private var screamAvailable: Bool
     private var cycleTimer: Timer?
     private var cycleState: AnimationState?
     private let claudeSettingsPath: URL
 
     private(set) var manualMode = false
-    private(set) var manualSleep = false
-    private(set) var manualScratch = false
-    private(set) var manualGroom = false
-    private(set) var manualScream = false
-    var debugState: AnimationState? {
-        manualMode && !manualSleep && !manualScratch && !manualGroom && !manualScream ? cycleState : nil
-    }
 
     var showPetHandler: ((String, Bool) -> Void)?
     var bindingHandler: ((String, AgentEvent.Provider?) -> Void)?
     var scaleHandler: ((PetScale) -> Void)?
     var relativeScaleHandler: ((String, Double) -> Void)?
     var temperamentHandler: ((String, Temperament) -> Void)?
-    var steadySizeHandler: ((Bool) -> Void)?
     var agentNotificationsHandler: ((Bool) -> Void)?
+    var petActionHandler: ((String, PetCycleAction) -> Void)?
     var debugStateHandler: ((AnimationState) -> Void)?
-    var debugSleepHandler: (() -> Void)?
-    var debugScratchHandler: (() -> Void)?
-    var debugGroomHandler: (() -> Void)?
-    var debugScreamHandler: (() -> Void)?
     var resumeLiveHandler: (() -> Void)?
     var resetPositionsHandler: (() -> Void)?
     var previewUpdateHandler: (() -> Void)?
@@ -70,25 +62,28 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         relativeScales: [String: Double],
         temperaments: [String: Temperament],
         debugStates: [AnimationState],
-        sleepAvailable: Bool,
-        groomAvailable: Bool = false,
-        screamAvailable: Bool = false,
+        directActionsByPetID: [String: [PetCycleAction]],
         agentNotificationsEnabled: Bool,
         claudeSettingsPath: URL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/settings.json")
     ) {
         self.registry = registry
         self.pets = pets
+        self.shownPetIDs = shownPetIDs
+        self.directActionsByPetID = directActionsByPetID
         self.temperaments = temperaments
         self.debugStates = debugStates
-        self.sleepAvailable = sleepAvailable
-        self.groomAvailable = groomAvailable
-        self.screamAvailable = screamAvailable
         self.claudeSettingsPath = claudeSettingsPath
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
-        statusItem.button?.title = "🐈‍⬛"
+        if let button = statusItem.button {
+            button.title = ""
+            button.image = Self.makeStatusIcon()
+            button.imagePosition = .imageOnly
+            button.imageScaling = .scaleProportionallyDown
+            button.toolTip = "Ajman"
+        }
         let menu = NSMenu()
         menu.delegate = self
         activityItem.isEnabled = false
@@ -104,14 +99,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         petsItem.submenu = petMenu
         menu.addItem(petsItem)
 
-        steadySizeItem.target = self
-        steadySizeItem.state = SteadySize.load() ? .on : .off
-        menu.addItem(steadySizeItem)
         agentNotificationsItem.target = self
         agentNotificationsItem.state = agentNotificationsEnabled ? .on : .off
         menu.addItem(agentNotificationsItem)
-        menu.addItem(.separator())
-
         claudeConnectionItem.target = self
         updateClaudeConnectionCheck()
         menu.addItem(claudeConnectionItem)
@@ -158,9 +148,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         relativeScales: [String: Double],
         temperaments: [String: Temperament],
         debugStates: [AnimationState],
-        sleepAvailable: Bool,
-        groomAvailable: Bool,
-        screamAvailable: Bool
+        directActionsByPetID: [String: [PetCycleAction]]
     ) {
         rebuildPetMenu(
             pets: pets,
@@ -169,36 +157,15 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             relativeScales: relativeScales
         )
         self.pets = pets
+        self.shownPetIDs = shownPetIDs
+        self.directActionsByPetID = directActionsByPetID
         self.temperaments = temperaments
-        if self.debugStates != debugStates || self.sleepAvailable != sleepAvailable
-            || self.groomAvailable != groomAvailable || self.screamAvailable != screamAvailable {
+        if self.debugStates != debugStates {
             self.debugStates = debugStates
-            self.sleepAvailable = sleepAvailable
-            self.groomAvailable = groomAvailable
-            self.screamAvailable = screamAvailable
             stopCycling()
-            if manualMode, !manualSleep, !manualScratch, !manualGroom, !manualScream,
-               cycleState.map({ !debugStates.contains($0) }) ?? true {
+            if manualMode, cycleState.map({ !debugStates.contains($0) }) ?? true {
                 cycleState = debugStates.first
                 if let cycleState { debugStateHandler?(cycleState) }
-            }
-            if manualSleep, !sleepAvailable {
-                manualSleep = false
-                manualMode = false
-                cycleState = nil
-                resumeLiveHandler?()
-            }
-            if manualGroom, !groomAvailable {
-                manualGroom = false
-                manualMode = false
-                cycleState = nil
-                resumeLiveHandler?()
-            }
-            if manualScream, !screamAvailable {
-                manualScream = false
-                manualMode = false
-                cycleState = nil
-                resumeLiveHandler?()
             }
         }
         rebuildDebugMenu()
@@ -272,28 +239,22 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     private func rebuildDebugMenu() {
         debugMenu.removeAllItems()
-        stateItems.removeAll()
         temperamentItems.removeAll()
-        for state in debugStates {
-            let item = NSMenuItem(title: state.title, action: #selector(selectState(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = state.rawValue
-            debugMenu.addItem(item)
-            stateItems[state] = item
-        }
-        if sleepAvailable {
-            sleepItem.target = self
-            debugMenu.addItem(sleepItem)
-        }
-        scratchItem.target = self
-        debugMenu.addItem(scratchItem)
-        if groomAvailable {
-            groomItem.target = self
-            debugMenu.addItem(groomItem)
-        }
-        if screamAvailable {
-            screamItem.target = self
-            debugMenu.addItem(screamItem)
+        for pet in pets where shownPetIDs.contains(pet.id) {
+            let actionsMenu = NSMenu(title: pet.displayName)
+            for action in directActionsByPetID[pet.id] ?? [] {
+                let item = NSMenuItem(
+                    title: action.menuTitle,
+                    action: #selector(selectPetAction(_:)),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.representedObject = PetActionSelection(petID: pet.id, action: action)
+                actionsMenu.addItem(item)
+            }
+            let petItem = NSMenuItem(title: pet.displayName, action: nil, keyEquivalent: "")
+            petItem.submenu = actionsMenu
+            debugMenu.addItem(petItem)
         }
         debugMenu.addItem(.separator())
         for pet in pets {
@@ -337,11 +298,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     private func refreshActivityIndicator() {
         if manualMode {
-            let title = manualSleep ? "Sleep"
-                : manualScratch ? "Scratch"
-                : manualGroom ? "Groom"
-                : manualScream ? "Scream"
-                : cycleState?.title ?? "Actions"
+            let title = cycleState?.title ?? "Actions"
             activityItem.title = "Manual: \(title) — live paused"
         } else {
             updateActivity(state: registry.currentState(for: nil), sessionCount: registry.sessionCount(for: nil))
@@ -383,32 +340,15 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
     }
 
-    @objc private func toggleSteadySize(_ sender: NSMenuItem) {
-        let enabled = sender.state != .on
-        SteadySize.save(enabled)
-        sender.state = enabled ? .on : .off
-        steadySizeHandler?(enabled)
-    }
-
     @objc private func toggleAgentNotifications(_ sender: NSMenuItem) {
         let enabled = sender.state != .on
         sender.state = enabled ? .on : .off
         agentNotificationsHandler?(enabled)
     }
 
-    @objc private func selectState(_ sender: NSMenuItem) {
-        stopCycling()
-        guard let raw = sender.representedObject as? String,
-              let state = AnimationState(rawValue: raw) else { return }
-        manualMode = true
-        manualSleep = false
-        manualScratch = false
-        manualGroom = false
-        manualScream = false
-        cycleState = state
-        debugStateHandler?(state)
-        updateDebugChecks()
-        refreshActivityIndicator()
+    @objc private func selectPetAction(_ sender: NSMenuItem) {
+        guard let selection = sender.representedObject as? PetActionSelection else { return }
+        petActionHandler?(selection.petID, selection.action)
     }
 
     @objc private func toggleCycle(_ sender: NSMenuItem) {
@@ -418,10 +358,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private func startCycling() {
         guard !debugStates.isEmpty else { return }
         manualMode = true
-        manualSleep = false
-        manualScratch = false
-        manualGroom = false
-        manualScream = false
         cycleItem.state = .on
         playNextDebugState()
         cycleTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
@@ -443,68 +379,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         cycleItem.state = .off
     }
 
-    @objc private func selectSleep(_ sender: NSMenuItem) {
-        guard sleepAvailable else { return }
-        stopCycling()
-        manualMode = true
-        manualSleep = true
-        manualScratch = false
-        manualGroom = false
-        manualScream = false
-        cycleState = nil
-        debugSleepHandler?()
-        updateDebugChecks()
-        refreshActivityIndicator()
-    }
-
-    @objc private func selectScratch(_ sender: NSMenuItem) {
-        stopCycling()
-        manualMode = true
-        manualSleep = false
-        manualScratch = true
-        manualGroom = false
-        manualScream = false
-        cycleState = nil
-        debugScratchHandler?()
-        updateDebugChecks()
-        refreshActivityIndicator()
-    }
-
-    @objc private func selectGroom(_ sender: NSMenuItem) {
-        guard groomAvailable else { return }
-        stopCycling()
-        manualMode = true
-        manualSleep = false
-        manualScratch = false
-        manualGroom = true
-        manualScream = false
-        cycleState = nil
-        debugGroomHandler?()
-        updateDebugChecks()
-        refreshActivityIndicator()
-    }
-
-    @objc private func selectScream(_ sender: NSMenuItem) {
-        guard screamAvailable else { return }
-        stopCycling()
-        manualMode = true
-        manualSleep = false
-        manualScratch = false
-        manualGroom = false
-        manualScream = true
-        cycleState = nil
-        debugScreamHandler?()
-        updateDebugChecks()
-        refreshActivityIndicator()
-    }
-
     @objc private func resumeLiveReactions() {
         stopCycling()
         manualMode = false
-        manualSleep = false
-        manualScratch = false
-        manualGroom = false
-        manualScream = false
         cycleState = nil
         updateDebugChecks()
         resumeLiveHandler?()
@@ -517,11 +394,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     private func updateDebugChecks() {
-        for (state, item) in stateItems { item.state = state == cycleState && manualMode ? .on : .off }
-        sleepItem.state = manualMode && manualSleep ? .on : .off
-        scratchItem.state = manualMode && manualScratch ? .on : .off
-        groomItem.state = manualMode && manualGroom ? .on : .off
-        screamItem.state = manualMode && manualScream ? .on : .off
+        cycleItem.state = cycleTimer == nil ? .off : .on
     }
 
     private func updateScaleChecks(for scale: PetScale) {
@@ -618,7 +491,92 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         claudeConnectionItem.state = ClaudeHookInstaller.isInstalled(settingsPath: claudeSettingsPath) ? .on : .off
     }
 
+    private static func makeStatusIcon() -> NSImage {
+        let pointSize = NSSize(width: 18, height: 18)
+        let scale = 2
+        guard let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(pointSize.width) * scale,
+            pixelsHigh: Int(pointSize.height) * scale,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ), let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
+            let image = NSImage(size: pointSize)
+            image.isTemplate = true
+            return image
+        }
+
+        bitmap.size = pointSize
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        context.cgContext.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
+        NSColor.black.setFill()
+        NSColor.black.setStroke()
+
+        let tail = NSBezierPath()
+        tail.move(to: NSPoint(x: 12.5, y: 5))
+        tail.curve(
+            to: NSPoint(x: 16.2, y: 10.4),
+            controlPoint1: NSPoint(x: 16.4, y: 4.2),
+            controlPoint2: NSPoint(x: 17.4, y: 7.7)
+        )
+        tail.lineWidth = 2.2
+        tail.lineCapStyle = .round
+        tail.stroke()
+
+        NSBezierPath(ovalIn: NSRect(x: 4.2, y: 2.1, width: 10.2, height: 10.6)).fill()
+        NSBezierPath(ovalIn: NSRect(x: 3.8, y: 8.2, width: 10.4, height: 7.5)).fill()
+
+        let leftEar = NSBezierPath()
+        leftEar.move(to: NSPoint(x: 4.6, y: 12.7))
+        leftEar.line(to: NSPoint(x: 5.3, y: 17))
+        leftEar.line(to: NSPoint(x: 8.1, y: 14.6))
+        leftEar.close()
+        leftEar.fill()
+
+        let rightEar = NSBezierPath()
+        rightEar.move(to: NSPoint(x: 10, y: 14.7))
+        rightEar.line(to: NSPoint(x: 12.8, y: 17))
+        rightEar.line(to: NSPoint(x: 13.5, y: 12.7))
+        rightEar.close()
+        rightEar.fill()
+        NSGraphicsContext.restoreGraphicsState()
+
+        let image = NSImage(size: pointSize)
+        image.addRepresentation(bitmap)
+        image.isTemplate = true
+        return image
+    }
+
     var topLevelMenuTitlesForTesting: [String] { statusItem.menu?.items.map(\.title) ?? [] }
+    var actionsTopLevelTitlesForTesting: [String] { debugMenu.items.map(\.title) }
+    var actionsMenuTreeForTesting: [String: [String]] {
+        Dictionary(uniqueKeysWithValues: debugMenu.items.compactMap { item in
+            item.submenu.map { (item.title, $0.items.map(\.title)) }
+        })
+    }
+    var statusIconProofForTesting: (isTemplate: Bool, pointSize: NSSize, pixelSize: NSSize?) {
+        let image = statusItem.button?.image
+        let bitmap = image?.representations.compactMap { $0 as? NSBitmapImageRep }.first
+        let pixels = bitmap.map { NSSize(width: $0.pixelsWide, height: $0.pixelsHigh) }
+        return (image?.isTemplate == true, image?.size ?? .zero, pixels)
+    }
+    func performPetActionForTesting(petID: String, action: PetCycleAction) {
+        for petItem in debugMenu.items {
+            guard let submenu = petItem.submenu else { continue }
+            for item in submenu.items {
+                guard let selection = item.representedObject as? PetActionSelection,
+                      selection.petID == petID, selection.action == action else { continue }
+                selectPetAction(item)
+                return
+            }
+        }
+    }
     var claudeConnectionStateForTesting: NSControl.StateValue { claudeConnectionItem.state }
     var agentNotificationsStateForTesting: NSControl.StateValue { agentNotificationsItem.state }
     func refreshClaudeConnectionStateForTesting() { updateClaudeConnectionCheck() }

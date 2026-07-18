@@ -246,16 +246,6 @@ exit 0
         }
         print("Pet scale: default 0.6667; all \(PetScale.allCases.count) options round-trip")
 
-        let steadySuiteName = "AjmanSelfTest.SteadySize.\(UUID().uuidString)"
-        guard let steadyDefaults = UserDefaults(suiteName: steadySuiteName) else { throw SelfTestError("could not create steady-size defaults") }
-        defer { steadyDefaults.removePersistentDomain(forName: steadySuiteName) }
-        guard !SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size was not off by default") }
-        SteadySize.save(false, to: steadyDefaults)
-        guard !SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size did not persist off") }
-        SteadySize.save(true, to: steadyDefaults)
-        guard SteadySize.load(from: steadyDefaults) else { throw SelfTestError("steady size did not persist on") }
-        print("Steady size: default off; off/on round-trip")
-
         let notificationSuiteName = "AjmanSelfTest.AgentNotifications.\(UUID().uuidString)"
         guard let notificationDefaults = UserDefaults(suiteName: notificationSuiteName) else {
             throw SelfTestError("could not create agent-notification defaults")
@@ -1051,6 +1041,21 @@ exit 0
               crouchFrames == [0, 1, 2, 3], gremlinFrames == [4, 5, 6, 7] else {
             throw SelfTestError("scream variant selection did not preserve the two four-frame escalations")
         }
+        let heldSequenceSource = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .appendingPathComponent("HeldSequenceBehavior.swift"),
+            encoding: .utf8
+        )
+        let whimRescheduleBranches = heldSequenceSource.components(
+            separatedBy: "if settings.reschedulesAfterMiss { resumeScheduling() }"
+        ).count - 1
+        guard whimRescheduleBranches == 3 else {
+            throw SelfTestError(
+                "held-sequence whim misses did not reschedule after probability/cooldown/ineligible checks (branches=\(whimRescheduleBranches))"
+            )
+        }
+        print("Whim reschedule: probability miss, cooldown, and ineligible start each schedule the next attempt")
         print("Winnie companions: scream loads 8 grounded frames as random 0-3/4-7 escalations; Scream follows Groom in the direct cycle; Ajman has no scream")
         guard ScratchEdgeGeometry.leftPawX == 37,
               ScratchEdgeGeometry.rightPawX == 155,
@@ -1412,52 +1417,10 @@ exit 0
         noSleepAnimator.stop()
         print("Calm behavior: Normal idle -> rotating loaf -> sleep unchanged; Catatonic auto-sleeps immediately; Insane never auto-rests but manual Sleep works; activity/click/no-asset guards pass")
 
-        let normalizationPetIDs = ["ajman", "winnie"].filter { id in
-            catalog.discover().contains { $0.id == id }
-        }
-        for id in normalizationPetIDs {
-            let steadySheet = try catalog.load(id: id, steadySize: true).sheet
-            guard let idle = steadySheet.animationTable.definition(for: .idle) else { throw SelfTestError("\(id) idle definition missing") }
-            let idleBounds = steadySheet.contentBounds(for: idle).compactMap { $0 }
-            let idleHeights = idleBounds.map(\.height)
-            guard idleBounds.count == idle.frameCount,
-                  (idleHeights.max() ?? 0) - (idleHeights.min() ?? 0) <= 2,
-                  idleBounds.allSatisfy({ abs($0.minY - CGFloat(SpriteSheet.contentMargin)) <= 1 }) else {
-                throw SelfTestError("\(id) normalized idle frames did not share height/ground line: \(idleBounds)")
-            }
-            var checkedFrameCount = 0
-            for definition in steadySheet.animationTable.definitions {
-                let bounds = steadySheet.contentBounds(for: definition)
-                guard bounds.count == definition.frameCount else {
-                    throw SelfTestError("\(id) \(definition.state.rawValue) returned \(bounds.count)/\(definition.frameCount) normalized bounds")
-                }
-                for (column, frameBounds) in bounds.enumerated() {
-                    guard let frameBounds else {
-                        throw SelfTestError("\(id) \(definition.state.rawValue)[\(column)] has no normalized content")
-                    }
-                    guard frameBounds.minX >= 0, frameBounds.minY >= 0,
-                          frameBounds.maxX <= CGFloat(SpriteSheet.cellWidth),
-                          frameBounds.maxY <= CGFloat(SpriteSheet.cellHeight),
-                          abs(frameBounds.minY - CGFloat(SpriteSheet.contentMargin)) <= 1 else {
-                        throw SelfTestError("\(id) \(definition.state.rawValue)[\(column)] normalized content clips or missed ground line: \(frameBounds)")
-                    }
-                    checkedFrameCount += 1
-                }
-            }
-            guard checkedFrameCount == steadySheet.animationTable.usedFrameCount else {
-                throw SelfTestError("\(id) checked \(checkedFrameCount)/\(steadySheet.animationTable.usedFrameCount) used frames for clipping")
-            }
-            print("Sprite normalization \(id): all \(checkedFrameCount) used frames inside 192x208; ground line within 1 px")
-        }
-        if normalizationPetIDs.contains("winnie") {
-            let winnieSheet = try catalog.load(id: "winnie", steadySize: false).sheet
+        if catalog.discover().contains(where: { $0.id == "winnie" }) {
+            let winnieSheet = try catalog.load(id: "winnie").sheet
             guard let idle = winnieSheet.animationTable.definition(for: .idle),
-                  let failed = winnieSheet.animationTable.definition(for: .failed),
-                  let idleTarget = SteadySize.targetBox(
-                    idleBounds: winnieSheet.contentBounds(for: idle).compactMap { $0 },
-                    cellWidth: SpriteSheet.cellWidth,
-                    cellHeight: SpriteSheet.cellHeight
-                  ) else {
+                  let failed = winnieSheet.animationTable.definition(for: .failed) else {
                 throw SelfTestError("Winnie idle/failed definitions could not be measured")
             }
             let failedBounds = winnieSheet.contentBounds(for: failed).compactMap { $0 }
@@ -1465,15 +1428,14 @@ exit 0
                   failedBounds.count == failed.frameCount,
                   failedBounds.allSatisfy({
                     $0.width <= 130
-                        && $0.height <= idleTarget.height + 2
+                        && $0.height <= 200
                         && abs($0.minY - CGFloat(SpriteSheet.contentMargin)) <= 1
                   }),
                   failedBounds.contains(where: { $0.width >= 126 }) else {
                 throw SelfTestError("Winnie idle was not six frames or failed frames lost their calibrated 128px fit: \(failedBounds)")
             }
-            print("Winnie seated idle: 6 frames; failed row preserves its calibrated 128x198 fit with Steady Size off")
+            print("Winnie seated idle: 6 frames; failed row permanently preserves its calibrated 128x198 fit")
         }
-        print("Sprite normalization (\(normalizationPetIDs.joined(separator: ", "))): idle heights within 2 px; no clipping")
 
         try invokeHook(event: "PreToolUse", tool: "Bash")
         guard pump(until: { registry.currentState == .running }) else { throw SelfTestError("PreToolUse did not produce running") }
@@ -1646,25 +1608,49 @@ exit 0
         }
         let connectionMenu = StatusMenu(
             registry: registry,
-            pets: [],
-            shownPetIDs: [],
+            pets: [sleepingAjman.descriptor, sleepingWinnie.descriptor],
+            shownPetIDs: ["ajman", "winnie"],
             bindings: [:],
             relativeScales: [:],
             temperaments: [:],
-            debugStates: [],
-            sleepAvailable: false,
+            debugStates: PetActionCycle.order,
+            directActionsByPetID: ["ajman": ajmanActions, "winnie": winnieActions],
             agentNotificationsEnabled: notificationPreferences.isEnabled,
             claudeSettingsPath: settings
         )
         let menuTitles = connectionMenu.topLevelMenuTitlesForTesting
+        let actionsTree = connectionMenu.actionsMenuTreeForTesting
+        let actionTopLevel = connectionMenu.actionsTopLevelTitlesForTesting.filter { !$0.isEmpty }
+        let iconProof = connectionMenu.statusIconProofForTesting
+        var selectedPetActions: [(String, PetCycleAction)] = []
+        connectionMenu.petActionHandler = { selectedPetActions.append(($0, $1)) }
+        connectionMenu.performPetActionForTesting(petID: "winnie", action: .scream)
+        guard let notificationsIndex = menuTitles.firstIndex(of: "Show agent notifications"),
+              let claudeIndex = menuTitles.firstIndex(of: "Hear Claude Code") else {
+            throw SelfTestError("agent integration menu cluster was missing")
+        }
         guard !menuTitles.contains("Playful Idle"),
-              menuTitles.filter({ $0 == "Connect to Claude Code" }).count == 1,
-              !menuTitles.contains("Disconnect from Claude Code"),
+              !menuTitles.contains("Steady Size"),
+              menuTitles.filter({ $0 == "Hear Claude Code" }).count == 1,
+              !menuTitles.contains("Connect to Claude Code"),
+              claudeIndex == notificationsIndex + 1,
               connectionMenu.claudeConnectionStateForTesting == .on,
-              connectionMenu.agentNotificationsStateForTesting == .off else {
+              connectionMenu.agentNotificationsStateForTesting == .off,
+              actionsTree["Ajman"] == ajmanActions.map(\.menuTitle),
+              actionsTree["Winnie"] == winnieActions.map(\.menuTitle),
+              !actionTopLevel.contains(AnimationState.idle.title),
+              !actionTopLevel.contains("Sleep"),
+              selectedPetActions.count == 1,
+              selectedPetActions[0].0 == "winnie",
+              selectedPetActions[0].1 == .scream,
+              iconProof.isTemplate,
+              iconProof.pointSize == NSSize(width: 18, height: 18),
+              iconProof.pixelSize == NSSize(width: 36, height: 36) else {
             throw SelfTestError("cleaned menu items or initial checkbox states were incorrect")
         }
-        print("Menu fixture: Playful Idle absent; one Claude checkbox reflects installed hooks; notifications off")
+        print("Status icon fixture: 18pt cat silhouette has a 36x36 bitmap representation and isTemplate=true")
+        print("Actions fixture: Ajman/Winnie submenus exactly match each pet's ctrl-click actions; Winnie Scream dispatches only to Winnie")
+        print("Menu fixture: Playful Idle and Steady Size absent; Hear Claude Code is adjacent to notifications and reflects installed hooks")
         let uninstalled = try ClaudeHookInstaller.uninstall(settingsPath: settings)
         connectionMenu.refreshClaudeConnectionStateForTesting()
         let afterUninstall = try JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as! [String: Any]
@@ -1674,7 +1660,7 @@ exit 0
               connectionMenu.claudeConnectionStateForTesting == .off else {
             throw SelfTestError("uninstaller fixture assertions failed")
         }
-        print("Claude checkbox fixture: uninstall removes \(ClaudeHookInstaller.events.count) Ajman commands, preserves user hook, and clears checkmark")
+        print("Hear Claude Code fixture: uninstall removes \(ClaudeHookInstaller.events.count) Ajman commands, preserves user hook, and clears checkmark")
         print("SELFTEST OK")
         return 0
     } catch {

@@ -25,6 +25,17 @@ final class PetInstance {
     var hasGroomAnimation: Bool { loadedPet.groomAnimation != nil }
     var hasScreamAnimation: Bool { loadedPet.screamAnimation != nil }
     var hasTravelGait: Bool { loadedPet.runLeftAnimation != nil && loadedPet.runRightAnimation != nil }
+    var availableDirectActions: [PetCycleAction] {
+        PetActionCycle.availableActions(
+            availableStates: animator.availableStates,
+            hasLoaf: hasLoafAnimation,
+            hasSleep: hasSleepAnimation,
+            hasStretch: hasStretchAnimation,
+            hasScratch: hasScratchAnimation,
+            hasGroom: hasGroomAnimation,
+            hasScream: hasScreamAnimation
+        )
+    }
     var positionPersistenceKey: String { panel.positionPersistenceKey }
     var screenCenter: NSPoint { NSPoint(x: panel.frame.midX, y: panel.frame.midY) }
     var glanceEligibility: InterCatGlanceEligibility {
@@ -379,21 +390,6 @@ final class PetInstance {
         panel.apply(relativeScale: scale)
     }
 
-    func setSteadySize(_ enabled: Bool) throws {
-        cancelGlance(returnToRest: true)
-        scratchBehavior?.cancel(returnToIdle: true)
-        groomingBehavior?.cancel(returnToIdle: true)
-        screamingBehavior?.cancel(returnToIdle: true)
-        let state = animator.currentState
-        loadedPet = try catalog.load(id: petID, steadySize: enabled)
-        petMode.replaceCalmAnimations(
-            loaf: loadedPet.loafAnimation,
-            sleep: loadedPet.sleepAnimation,
-            wake: loadedPet.wakeAnimation
-        )
-        animator.replaceSheet(loadedPet.sheet, playing: state)
-    }
-
     func setTemperament(_ temperament: Temperament) {
         guard self.temperament != temperament else { return }
         self.temperament = temperament
@@ -406,24 +402,20 @@ final class PetInstance {
     }
 
     func cycleToNextAction() {
-        let availableActions = PetActionCycle.availableActions(
-            availableStates: animator.availableStates,
-            hasLoaf: hasLoafAnimation,
-            hasSleep: hasSleepAnimation,
-            hasStretch: hasStretchAnimation,
-            hasScratch: hasScratchAnimation,
-            hasGroom: hasGroomAnimation,
-            hasScream: hasScreamAnimation
-        )
         guard let next = actionCycleCursor.next(
-            availableActions: availableActions,
+            availableActions: availableDirectActions,
             startingAfter: .animation(animator.currentState)
         ) else { return }
+        performDirectAction(next)
+    }
+
+    func performDirectAction(_ action: PetCycleAction) {
+        guard availableDirectActions.contains(action) else { return }
         cancelGlance(returnToRest: false)
         scratchBehavior?.cancel(returnToIdle: false)
         groomingBehavior?.cancel(returnToIdle: false)
         screamingBehavior?.cancel(returnToIdle: false)
-        switch next {
+        switch action {
         case let .animation(state):
             petMode.yieldToHigherPriorityDriver()
             isDirectCycling = true
@@ -453,42 +445,6 @@ final class PetInstance {
         screamingBehavior?.cancel(returnToIdle: false)
         petMode.yieldToHigherPriorityDriver()
         animator.play(state)
-    }
-
-    func setDebugSleep() {
-        cancelGlance(returnToRest: false)
-        scratchBehavior?.cancel(returnToIdle: false)
-        groomingBehavior?.cancel(returnToIdle: false)
-        screamingBehavior?.cancel(returnToIdle: false)
-        _ = petMode.forceSleep()
-    }
-
-    func setDebugScratch() {
-        cancelGlance(returnToRest: false)
-        scratchBehavior?.cancel(returnToIdle: false)
-        screamingBehavior?.cancel(returnToIdle: false)
-        guard let side = farScratchSide() else { return }
-        _ = scratchBehavior?.forceStart(side: side)
-    }
-
-    func setDebugGroom() {
-        guard hasGroomAnimation else { return }
-        cancelGlance(returnToRest: false)
-        scratchBehavior?.cancel(returnToIdle: false)
-        groomingBehavior?.cancel(returnToIdle: false)
-        screamingBehavior?.cancel(returnToIdle: false)
-        petMode.yieldToHigherPriorityDriver()
-        _ = groomingBehavior?.forceStart()
-    }
-
-    func setDebugScream() {
-        guard hasScreamAnimation else { return }
-        cancelGlance(returnToRest: false)
-        scratchBehavior?.cancel(returnToIdle: false)
-        groomingBehavior?.cancel(returnToIdle: false)
-        screamingBehavior?.cancel(returnToIdle: false)
-        petMode.yieldToHigherPriorityDriver()
-        _ = screamingBehavior?.forceStart()
     }
 
     @discardableResult
