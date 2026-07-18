@@ -37,6 +37,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private var debugStates: [AnimationState]
     private var cycleTimer: Timer?
     private var cycleState: AnimationState?
+    private var manualAction: PetCycleAction?
     private let claudeSettingsPath: URL
 
     private(set) var manualMode = false
@@ -298,7 +299,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     private func refreshActivityIndicator() {
         if manualMode {
-            let title = cycleState?.title ?? "Actions"
+            let title = manualAction?.menuTitle ?? cycleState?.title ?? "Actions"
             activityItem.title = "Manual: \(title) — live paused"
         } else {
             updateActivity(state: registry.currentState(for: nil), sessionCount: registry.sessionCount(for: nil))
@@ -348,7 +349,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     @objc private func selectPetAction(_ sender: NSMenuItem) {
         guard let selection = sender.representedObject as? PetActionSelection else { return }
+        stopCycling()
+        manualMode = true
+        manualAction = selection.action
+        cycleState = nil
         petActionHandler?(selection.petID, selection.action)
+        refreshActivityIndicator()
     }
 
     @objc private func toggleCycle(_ sender: NSMenuItem) {
@@ -358,6 +364,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private func startCycling() {
         guard !debugStates.isEmpty else { return }
         manualMode = true
+        manualAction = nil
         cycleItem.state = .on
         playNextDebugState()
         cycleTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
@@ -382,6 +389,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     @objc private func resumeLiveReactions() {
         stopCycling()
         manualMode = false
+        manualAction = nil
         cycleState = nil
         updateDebugChecks()
         resumeLiveHandler?()

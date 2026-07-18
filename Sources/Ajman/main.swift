@@ -1622,9 +1622,54 @@ exit 0
         let actionsTree = connectionMenu.actionsMenuTreeForTesting
         let actionTopLevel = connectionMenu.actionsTopLevelTitlesForTesting.filter { !$0.isEmpty }
         let iconProof = connectionMenu.statusIconProofForTesting
+        let menuPetSuiteName = "AjmanSelfTest.MenuPetPlayback.\(UUID().uuidString)"
+        guard let menuPetDefaults = UserDefaults(suiteName: menuPetSuiteName) else {
+            throw SelfTestError("could not create menu playback defaults")
+        }
+        defer { menuPetDefaults.removePersistentDomain(forName: menuPetSuiteName) }
+        let menuAjman = try PetInstance(
+            petID: "ajman", binding: nil, catalog: sleepCatalog, scale: .medium,
+            defaultPositionIndex: 0, defaults: menuPetDefaults,
+            isManualMode: { connectionMenu.manualMode }, petWasClicked: {},
+            dismissNotification: { _ in }, livelyAnimationBegan: { _, _ in }
+        )
+        let menuWinnie = try PetInstance(
+            petID: "winnie", binding: nil, catalog: sleepCatalog, scale: .medium,
+            defaultPositionIndex: 1, defaults: menuPetDefaults,
+            isManualMode: { connectionMenu.manualMode }, petWasClicked: {},
+            dismissNotification: { _ in }, livelyAnimationBegan: { _, _ in }
+        )
+        defer {
+            menuAjman.teardown()
+            menuWinnie.teardown()
+        }
+        let menuPets = [menuAjman, menuWinnie]
         var selectedPetActions: [(String, PetCycleAction)] = []
-        connectionMenu.petActionHandler = { selectedPetActions.append(($0, $1)) }
-        connectionMenu.performPetActionForTesting(petID: "winnie", action: .scream)
+        connectionMenu.petActionHandler = { id, action in
+            selectedPetActions.append((id, action))
+            menuPets.first(where: { $0.petID == id })?.performDirectAction(action)
+        }
+
+        for pet in menuPets {
+            connectionMenu.performPetActionForTesting(petID: pet.petID, action: .animation(.jumping))
+            pet.applyState(.running)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+            guard connectionMenu.manualMode,
+                  pet.animator.currentState == .jumping,
+                  !pet.animator.isPlayingCalmPose else {
+                throw SelfTestError("Actions -> \(pet.petID) -> Jumping did not enter and hold the sheet state")
+            }
+
+            connectionMenu.performPetActionForTesting(petID: pet.petID, action: .loaf)
+            pet.applyState(.waiting)
+            pet.handleAgentActivity()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+            guard connectionMenu.manualMode,
+                  pet.petMode.isLoafing,
+                  pet.animator.isPlayingLoaf else {
+                throw SelfTestError("Actions -> \(pet.petID) -> Loaf did not enter and hold the companion mode")
+            }
+        }
         guard let notificationsIndex = menuTitles.firstIndex(of: "Show agent notifications"),
               let claudeIndex = menuTitles.firstIndex(of: "Hear Claude Code") else {
             throw SelfTestError("agent integration menu cluster was missing")
@@ -1640,16 +1685,15 @@ exit 0
               actionsTree["Winnie"] == winnieActions.map(\.menuTitle),
               !actionTopLevel.contains(AnimationState.idle.title),
               !actionTopLevel.contains("Sleep"),
-              selectedPetActions.count == 1,
-              selectedPetActions[0].0 == "winnie",
-              selectedPetActions[0].1 == .scream,
+              selectedPetActions.map(\.0) == ["ajman", "ajman", "winnie", "winnie"],
+              selectedPetActions.map(\.1) == [.animation(.jumping), .loaf, .animation(.jumping), .loaf],
               iconProof.isTemplate,
               iconProof.pointSize == NSSize(width: 18, height: 18),
               iconProof.pixelSize == NSSize(width: 36, height: 36) else {
             throw SelfTestError("cleaned menu items or initial checkbox states were incorrect")
         }
         print("Status icon fixture: 18pt cat silhouette has a 36x36 bitmap representation and isTemplate=true")
-        print("Actions fixture: Ajman/Winnie submenus exactly match each pet's ctrl-click actions; Winnie Scream dispatches only to Winnie")
+        print("Actions playback: Ajman/Winnie Jumping and Loaf enter and hold their real animator/mode through live agent updates")
         print("Menu fixture: Playful Idle and Steady Size absent; Hear Claude Code is adjacent to notifications and reflects installed hooks")
         let uninstalled = try ClaudeHookInstaller.uninstall(settingsPath: settings)
         connectionMenu.refreshClaudeConnectionStateForTesting()

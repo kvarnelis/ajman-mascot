@@ -162,7 +162,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.pets.forEach { $0.setDebugState(state) }
         }
         menu.petActionHandler = { [weak self] id, action in
-            self?.statusMenu?.resumeLiveReactionsIfManual()
             self?.pets.first(where: { $0.petID == id })?.performDirectAction(action)
         }
         menu.resumeLiveHandler = { [weak self] in

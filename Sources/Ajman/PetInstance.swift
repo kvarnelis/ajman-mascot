@@ -345,12 +345,11 @@ final class PetInstance {
     }
 
     func handleAgentActivity() {
+        guard !isManualMode() else { return }
         cancelGlance(returnToRest: true)
-        if !isManualMode() {
-            scratchBehavior?.cancel(returnToIdle: true)
-            groomingBehavior?.cancel(returnToIdle: true)
-            screamingBehavior?.cancel(returnToIdle: true)
-        }
+        scratchBehavior?.cancel(returnToIdle: true)
+        groomingBehavior?.cancel(returnToIdle: true)
+        screamingBehavior?.cancel(returnToIdle: true)
         petMode.stir()
     }
 
