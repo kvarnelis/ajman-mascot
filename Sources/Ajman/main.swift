@@ -1630,7 +1630,7 @@ exit 0
             }
         )
         let menuTitles = connectionMenu.topLevelMenuTitlesForTesting
-        let listenItems = connectionMenu.listenMenuItemsForTesting
+        let agentsItems = connectionMenu.agentsMenuItemsForTesting
         let actionsTree = connectionMenu.actionsMenuTreeForTesting
         let actionTopLevel = connectionMenu.actionsTopLevelTitlesForTesting.filter { !$0.isEmpty }
         guard let lightAppearance = NSAppearance(named: .aqua),
@@ -1690,18 +1690,18 @@ exit 0
                 throw SelfTestError("Actions -> \(pet.petID) -> Loaf did not enter and hold the companion mode")
             }
         }
-        guard let notificationsIndex = menuTitles.firstIndex(of: "Show agent notifications"),
-              let listenIndex = menuTitles.firstIndex(of: "Listen to") else {
-            throw SelfTestError("agent integration menu cluster was missing")
+        guard menuTitles.contains("Agents") else {
+            throw SelfTestError("Agents menu was missing")
         }
         guard !menuTitles.contains("Hear Claude Code"),
               !menuTitles.contains("Hear Codex"),
+              !menuTitles.contains("Show agent notifications"),
+              !menuTitles.contains("Listen to"),
               !menuTitles.contains("Playful Idle"),
               !menuTitles.contains("Steady Size"),
               !menuTitles.contains("Connect to Claude Code"),
-              listenIndex == notificationsIndex + 1,
-              listenItems.map(\.title) == ["Hear Claude Code", "Hear Codex"],
-              listenItems.map(\.state) == [.on, .on],
+              agentsItems.map(\.title) == ["Hear Claude Code", "Hear Codex", "Show agent notifications"],
+              agentsItems.map(\.state) == [.on, .on, .off],
               connectionMenu.claudeConnectionStateForTesting == .on,
               connectionMenu.codexConnectionStateForTesting == .on,
               connectionMenu.agentNotificationsStateForTesting == .off,
@@ -1814,7 +1814,7 @@ exit 0
         print("Status icon fixture: aqua selects original 🐈‍⬛ title with no image; darkAqua selects 18pt/36px template silhouette")
         print("Actions playback: Ajman/Winnie Jumping and Loaf enter and hold their real animator/mode through live agent updates")
         print("Manual expiry fixture: dispatch pauses; redispatch resets 600s; expiry resumes; explicit Resume cancels; menu Sleep remains held")
-        print("Menu fixture: Show agent notifications is adjacent to Listen to; Listen to contains exactly Hear Claude Code=on, Hear Codex=on")
+        print("Menu fixture: Agents contains exactly Hear Claude Code=on, Hear Codex=on, Show agent notifications=off; no top-level Show agent notifications remains")
         print("Menu fixture: Pets > Ajman/Winnie > Reacts to is hidden with agent notifications off, present with notifications on, and hidden again when off")
         let codexPreferenceSuiteName = "AjmanSelfTest.HearCodex.\(UUID().uuidString)"
         guard let codexPreferenceDefaults = UserDefaults(suiteName: codexPreferenceSuiteName) else {

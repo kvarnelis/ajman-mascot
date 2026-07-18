@@ -50,7 +50,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let codexConnectionItem = NSMenuItem(
         title: "Hear Codex", action: #selector(toggleCodexConnection(_:)), keyEquivalent: ""
     )
-    private let listenMenu = NSMenu(title: "Listen to")
+    private let agentsMenu = NSMenu(title: "Agents")
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
     private let updateChecksItem = NSMenuItem(title: "Check for updates", action: #selector(toggleUpdateChecks(_:)), keyEquivalent: "")
     private let petMenu = NSMenu(title: "Pets")
@@ -148,16 +148,16 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
         agentNotificationsItem.target = self
         agentNotificationsItem.state = agentNotificationsEnabled ? .on : .off
-        menu.addItem(agentNotificationsItem)
         claudeConnectionItem.target = self
         updateClaudeConnectionCheck()
-        listenMenu.addItem(claudeConnectionItem)
+        agentsMenu.addItem(claudeConnectionItem)
         codexConnectionItem.target = self
         codexConnectionItem.state = hearCodexEnabled ? .on : .off
-        listenMenu.addItem(codexConnectionItem)
-        let listenItem = NSMenuItem(title: "Listen to", action: nil, keyEquivalent: "")
-        listenItem.submenu = listenMenu
-        menu.addItem(listenItem)
+        agentsMenu.addItem(codexConnectionItem)
+        agentsMenu.addItem(agentNotificationsItem)
+        let agentsItem = NSMenuItem(title: "Agents", action: nil, keyEquivalent: "")
+        agentsItem.submenu = agentsMenu
+        menu.addItem(agentsItem)
         menu.addItem(.separator())
 
         let sizeMenu = NSMenu(title: "Overall Size")
@@ -685,8 +685,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     var topLevelMenuTitlesForTesting: [String] { statusItem.menu?.items.map(\.title) ?? [] }
-    var listenMenuItemsForTesting: [(title: String, state: NSControl.StateValue)] {
-        listenMenu.items.map { ($0.title, $0.state) }
+    var agentsMenuItemsForTesting: [(title: String, state: NSControl.StateValue)] {
+        agentsMenu.items.map { ($0.title, $0.state) }
     }
     var visibleReactsToPetTitlesForTesting: [String] {
         petMenu.items.compactMap { petItem in
