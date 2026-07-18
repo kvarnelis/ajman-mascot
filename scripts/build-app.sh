@@ -58,7 +58,7 @@ for pet_id in ajman winnie; do
   fi
 done
 
-for pose_asset in "$REPO_ROOT"/assets/pets/*/{sleep,loaf,stretch,scratch}.webp; do
+for pose_asset in "$REPO_ROOT"/assets/pets/*/{sleep,loaf,stretch,scratch,groom,run-left,run-right}.webp; do
   [[ -f "$pose_asset" ]] || continue
   pet_id="$(basename "$(dirname "$pose_asset")")"
   mkdir -p "$CONTENTS/Resources/pets/$pet_id"

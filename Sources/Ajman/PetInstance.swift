@@ -20,6 +20,7 @@ final class PetInstance {
     private(set) var temperament: Temperament
     var hasLoafAnimation: Bool { loadedPet.loafAnimation != nil }
     var hasSleepAnimation: Bool { loadedPet.sleepAnimation != nil }
+    var hasStretchAnimation: Bool { loadedPet.wakeAnimation != nil }
     var hasScratchAnimation: Bool { loadedPet.scratchAnimation != nil }
     var hasGroomAnimation: Bool { loadedPet.groomAnimation != nil }
     var hasTravelGait: Bool { loadedPet.runLeftAnimation != nil && loadedPet.runRightAnimation != nil }
@@ -339,6 +340,7 @@ final class PetInstance {
             availableStates: animator.availableStates,
             hasLoaf: hasLoafAnimation,
             hasSleep: hasSleepAnimation,
+            hasStretch: hasStretchAnimation,
             hasScratch: hasScratchAnimation,
             hasGroom: hasGroomAnimation
         )
@@ -359,6 +361,8 @@ final class PetInstance {
             _ = petMode.forceLoaf()
         case .sleep:
             _ = petMode.forceSleep()
+        case .stretch:
+            _ = petMode.forceStretch()
         case .scratch:
             guard let side = farScratchSide() else { return }
             _ = scratchBehavior?.forceStart(side: side)

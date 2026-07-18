@@ -463,6 +463,7 @@ private func runSelfTest() -> Int32 {
             availableStates: cycleOrder,
             hasLoaf: true,
             hasSleep: true,
+            hasStretch: true,
             hasScratch: true,
             hasGroom: true
         )
@@ -470,11 +471,12 @@ private func runSelfTest() -> Int32 {
             .animation(.runningRight), .animation(.runningLeft), .animation(.waving),
             .animation(.jumping), .animation(.failed), .animation(.waiting),
             .animation(.running), .animation(.review), .animation(.lookDirectionsA),
-            .animation(.lookDirectionsB), .loaf, .sleep, .scratch, .groom, .animation(.idle),
+            .animation(.lookDirectionsB), .loaf, .sleep, .stretch, .scratch, .groom,
+            .animation(.idle),
         ]
         guard fullActionCycle == PetActionCycle.directOrder,
-              fullActionCycle.suffix(4) == [.loaf, .sleep, .scratch, .groom] else {
-            throw SelfTestError("per-pet action cycle did not include loaf, sleep, scratch, and groom")
+              fullActionCycle.suffix(5) == [.loaf, .sleep, .stretch, .scratch, .groom] else {
+            throw SelfTestError("per-pet action cycle did not include ordered loaf, sleep, stretch, scratch, and groom")
         }
 
         var ajmanCursor = PetActionCycle.Cursor()
@@ -511,19 +513,31 @@ private func runSelfTest() -> Int32 {
             availableStates: cycleOrder,
             hasLoaf: true,
             hasSleep: true,
+            hasStretch: true,
             hasScratch: false,
+            hasGroom: true
+        )
+        let noStretchCycle = PetActionCycle.availableActions(
+            availableStates: cycleOrder,
+            hasLoaf: true,
+            hasSleep: true,
+            hasStretch: false,
+            hasScratch: true,
             hasGroom: true
         )
         var resyncCursor = PetActionCycle.Cursor()
         for _ in 0..<fullActionCycle.count {
             _ = resyncCursor.next(availableActions: fullActionCycle)
         }
-        guard !noScratchCycle.contains(.scratch), noScratchCycle.suffix(3) == [.loaf, .sleep, .groom],
+        guard !noScratchCycle.contains(.scratch),
+              noScratchCycle.suffix(4) == [.loaf, .sleep, .stretch, .groom],
+              !noStretchCycle.contains(.stretch),
+              noStretchCycle.suffix(4) == [.loaf, .sleep, .scratch, .groom],
               resyncCursor.next(availableActions: noScratchCycle) == .animation(.idle),
               PetActionCycle.next(after: .lookDirectionsB, availableStates: cycleOrder) == .idle else {
             throw SelfTestError("per-pet action cycle did not skip unavailable behavior assets")
         }
-        print("Pet action clicks: per-pet cursor traverses 11 states plus loaf/sleep/scratch/groom despite idle resets; unavailable actions skip; order wraps")
+        print("Pet action clicks: per-pet cursor traverses 11 states plus loaf/sleep/stretch/scratch/groom despite idle resets; missing stretch/scratch assets skip; order wraps")
 
         let temperamentSuiteName = "AjmanSelfTest.Temperament.\(UUID().uuidString)"
         guard let temperamentDefaults = UserDefaults(suiteName: temperamentSuiteName) else {
@@ -858,10 +872,29 @@ private func runSelfTest() -> Int32 {
             availableStates: sleepingWinnie.sheet.animationTable.states,
             hasLoaf: sleepingWinnie.loafAnimation != nil,
             hasSleep: sleepingWinnie.sleepAnimation != nil,
+            hasStretch: sleepingWinnie.wakeAnimation != nil,
             hasScratch: sleepingWinnie.scratchAnimation != nil,
             hasGroom: sleepingWinnie.groomAnimation != nil
         )
-        guard winnieActions.contains(.scratch), winnieActions.contains(.groom),
+        let ajmanActions = PetActionCycle.availableActions(
+            availableStates: sleepingAjman.sheet.animationTable.states,
+            hasLoaf: sleepingAjman.loafAnimation != nil,
+            hasSleep: sleepingAjman.sleepAnimation != nil,
+            hasStretch: sleepingAjman.wakeAnimation != nil,
+            hasScratch: sleepingAjman.scratchAnimation != nil,
+            hasGroom: sleepingAjman.groomAnimation != nil
+        )
+        guard let winnieSleepIndex = winnieActions.firstIndex(of: .sleep),
+              let winnieStretchIndex = winnieActions.firstIndex(of: .stretch),
+              let winnieScratchIndex = winnieActions.firstIndex(of: .scratch),
+              let ajmanSleepIndex = ajmanActions.firstIndex(of: .sleep),
+              let ajmanStretchIndex = ajmanActions.firstIndex(of: .stretch),
+              let ajmanScratchIndex = ajmanActions.firstIndex(of: .scratch),
+              winnieSleepIndex < winnieStretchIndex,
+              winnieStretchIndex < winnieScratchIndex,
+              ajmanSleepIndex < ajmanStretchIndex,
+              ajmanStretchIndex < ajmanScratchIndex,
+              winnieActions.contains(.scratch), winnieActions.contains(.groom),
               HeldSequenceEligibility(
                 hasAsset: true, isShown: true, liveState: .idle,
                 displayedState: .idle, isManual: false,
@@ -885,7 +918,7 @@ private func runSelfTest() -> Int32 {
               ) else {
             throw SelfTestError("Winnie scratch/groom whim availability or default frequency was incorrect")
         }
-        print("Winnie companions: groom 6 frames/5.05s and run 8+8 frames are grounded; direct actions include Groom; travel direction maps left/right assets")
+        print("Winnie companions: groom 6 frames/5.05s and run 8+8 frames are grounded; Ajman and Winnie direct actions order Sleep/Stretch/Scratch; travel direction maps left/right assets")
         guard ScratchEdgeGeometry.leftPawX == 37,
               ScratchEdgeGeometry.rightPawX == 155,
               ScratchEdgeGeometry.targetOriginX(
@@ -1124,6 +1157,14 @@ private func runSelfTest() -> Int32 {
             !shortDoze.isWaking && sleepAnimator.currentState == .idle && !sleepAnimator.isPlayingCalmPose
         }) else {
             throw SelfTestError("click wake did not return to idle after the held stretch/yawn")
+        }
+        guard shortDoze.forceStretch(), shortDoze.isWaking, sleepAnimator.isPlayingWake,
+              sleepAnimator.currentWakePoseIndex != nil,
+              pump(until: {
+                  !shortDoze.isWaking && sleepAnimator.currentState == .idle
+                      && !sleepAnimator.isPlayingCalmPose
+              }) else {
+            throw SelfTestError("direct stretch did not play once and settle back to idle")
         }
         shortDoze.teardown()
         sleepAnimator.stop()

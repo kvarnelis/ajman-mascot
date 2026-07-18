@@ -160,6 +160,14 @@ final class PetMode {
         return true
     }
 
+    /// Directly plays the same held stretch/yawn used when leaving a rest pose.
+    @discardableResult
+    func forceStretch() -> Bool {
+        guard wakeAnimation != nil else { return false }
+        beginWakeTransition()
+        return isWaking
+    }
+
     func replaceCalmAnimations(
         loaf: SleepAnimation?,
         sleep: SleepAnimation?,
