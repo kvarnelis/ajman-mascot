@@ -65,6 +65,7 @@ final class PetInstance {
     private(set) var isGlancing = false
     private var isDirectCycling = false
     private var actionCycleCursor = PetActionCycle.Cursor()
+    private var pendingManualActionCompletion: (PetCycleAction, @MainActor () -> Void)?
     private var tornDown = false
 
     init(
@@ -167,6 +168,7 @@ final class PetInstance {
             didFinish: { [weak self] in
                 guard let self else { return }
                 self.scratchStartingOrigin = nil
+                self.finishManualActionIfNeeded(.scratch)
                 guard self.liveState.value == .idle, !self.isManualMode() else { return }
                 self.petMode.resumeAtRest()
                 self.groomingBehavior?.resumeScheduling()
@@ -215,7 +217,9 @@ final class PetInstance {
             },
             showIdle: { [weak self] in self?.animator.play(.idle) },
             didFinish: { [weak self] in
-                guard let self, self.liveState.value == .idle, !self.isManualMode() else { return }
+                guard let self else { return }
+                self.finishManualActionIfNeeded(.groom)
+                guard self.liveState.value == .idle, !self.isManualMode() else { return }
                 self.petMode.resumeAtRest()
                 self.scratchBehavior?.resumeScheduling()
                 self.groomingBehavior?.resumeScheduling()
@@ -265,7 +269,9 @@ final class PetInstance {
             },
             showIdle: { [weak self] in self?.animator.play(.idle) },
             didFinish: { [weak self] in
-                guard let self, self.liveState.value == .idle, !self.isManualMode() else { return }
+                guard let self else { return }
+                self.finishManualActionIfNeeded(.scream)
+                guard self.liveState.value == .idle, !self.isManualMode() else { return }
                 self.petMode.resumeAtRest()
                 self.scratchBehavior?.resumeScheduling()
                 self.groomingBehavior?.resumeScheduling()
@@ -327,11 +333,19 @@ final class PetInstance {
         screamingBehavior?.resumeScheduling()
     }
 
-    func resumeLiveReactions() {
+    func resumeLiveReactions(currentState: AnimationState? = nil) {
+        let wasResting = petMode.isLoafing || petMode.isSleeping
         cancelGlance(returnToRest: false)
         scratchBehavior?.cancel(returnToIdle: false)
         groomingBehavior?.cancel(returnToIdle: false)
         screamingBehavior?.cancel(returnToIdle: false)
+        if wasResting {
+            // Hand ownership back without replaying agent state that accumulated
+            // while manual mode was deliberately holding Loaf or Sleep.
+            liveState.value = .idle
+            return
+        }
+        if let currentState { liveState.value = currentState }
         petMode.stir()
         applyState(liveState.value)
     }
@@ -408,32 +422,54 @@ final class PetInstance {
         performDirectAction(next)
     }
 
-    func performDirectAction(_ action: PetCycleAction) {
+    func performDirectAction(
+        _ action: PetCycleAction,
+        actionDidSettle: (@MainActor () -> Void)? = nil
+    ) {
         guard availableDirectActions.contains(action) else { return }
         cancelGlance(returnToRest: false)
         scratchBehavior?.cancel(returnToIdle: false)
         groomingBehavior?.cancel(returnToIdle: false)
         screamingBehavior?.cancel(returnToIdle: false)
+        pendingManualActionCompletion = nil
         switch action {
         case let .animation(state):
             petMode.yieldToHigherPriorityDriver()
             isDirectCycling = true
             animator.play(state)
             isDirectCycling = false
+            actionDidSettle?()
         case .loaf:
             _ = petMode.forceLoaf()
+            actionDidSettle?()
         case .sleep:
             _ = petMode.forceSleep()
+            actionDidSettle?()
         case .stretch:
-            _ = petMode.forceStretch()
+            guard petMode.forceStretch(completion: actionDidSettle) else {
+                actionDidSettle?()
+                return
+            }
         case .scratch:
-            guard let side = farScratchSide() else { return }
-            _ = scratchBehavior?.forceStart(side: side)
+            pendingManualActionCompletion = actionDidSettle.map { (.scratch, $0) }
+            guard let side = farScratchSide() else {
+                finishManualActionIfNeeded(.scratch)
+                return
+            }
+            if scratchBehavior?.forceStart(side: side) != true { finishManualActionIfNeeded(.scratch) }
         case .groom:
-            _ = groomingBehavior?.forceStart()
+            pendingManualActionCompletion = actionDidSettle.map { (.groom, $0) }
+            if groomingBehavior?.forceStart() != true { finishManualActionIfNeeded(.groom) }
         case .scream:
-            _ = screamingBehavior?.forceStart()
+            pendingManualActionCompletion = actionDidSettle.map { (.scream, $0) }
+            if screamingBehavior?.forceStart() != true { finishManualActionIfNeeded(.scream) }
         }
+    }
+
+    private func finishManualActionIfNeeded(_ action: PetCycleAction) {
+        guard let pending = pendingManualActionCompletion, pending.0 == action else { return }
+        pendingManualActionCompletion = nil
+        pending.1()
     }
 
     func setDebugState(_ state: AnimationState) {

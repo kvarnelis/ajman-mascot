@@ -1606,6 +1606,9 @@ exit 0
         guard userSurvivedInstall, allEventsAdded, backupExists else {
             throw SelfTestError("installer fixture assertions failed (user=\(userSurvivedInstall), events=\(installed.eventsAdded.count), backup=\(backupExists))")
         }
+        var manualExpiryDelays: [TimeInterval] = []
+        var manualExpiryCallbacks: [@MainActor () -> Void] = []
+        var manualExpiryCancellations: [Bool] = []
         let connectionMenu = StatusMenu(
             registry: registry,
             pets: [sleepingAjman.descriptor, sleepingWinnie.descriptor],
@@ -1617,7 +1620,14 @@ exit 0
             directActionsByPetID: ["ajman": ajmanActions, "winnie": winnieActions],
             agentNotificationsEnabled: notificationPreferences.isEnabled,
             hearCodexEnabled: true,
-            claudeSettingsPath: settings
+            claudeSettingsPath: settings,
+            manualModeExpiryScheduler: { delay, action in
+                let index = manualExpiryCallbacks.count
+                manualExpiryDelays.append(delay)
+                manualExpiryCallbacks.append(action)
+                manualExpiryCancellations.append(false)
+                return { manualExpiryCancellations[index] = true }
+            }
         )
         let menuTitles = connectionMenu.topLevelMenuTitlesForTesting
         let listenItems = connectionMenu.listenMenuItemsForTesting
@@ -1652,9 +1662,12 @@ exit 0
         }
         let menuPets = [menuAjman, menuWinnie]
         var selectedPetActions: [(String, PetCycleAction)] = []
-        connectionMenu.petActionHandler = { id, action in
+        connectionMenu.petActionHandler = { id, action, actionDidSettle in
             selectedPetActions.append((id, action))
-            menuPets.first(where: { $0.petID == id })?.performDirectAction(action)
+            menuPets.first(where: { $0.petID == id })?.performDirectAction(
+                action,
+                actionDidSettle: actionDidSettle
+            )
         }
 
         for pet in menuPets {
@@ -1724,8 +1737,83 @@ exit 0
               connectionMenu.visibleReactsToPetTitlesForTesting.isEmpty else {
             throw SelfTestError("Reacts to menus did not hide when agent notifications were disabled")
         }
+
+        let heldFixtureStart = manualExpiryCallbacks.count
+        var heldActionDidSettle: (@MainActor () -> Void)?
+        connectionMenu.petActionHandler = { _, action, actionDidSettle in
+            guard action == .scream else { return }
+            heldActionDidSettle = actionDidSettle
+        }
+        connectionMenu.performPetActionForTesting(petID: "winnie", action: .scream)
+        guard connectionMenu.manualMode,
+              heldActionDidSettle != nil,
+              manualExpiryCallbacks.count == heldFixtureStart else {
+            throw SelfTestError("held action armed expiry before its sequence finished")
+        }
+        heldActionDidSettle?()
+        guard manualExpiryCallbacks.count == heldFixtureStart + 1 else {
+            throw SelfTestError("held action completion did not arm manual expiry")
+        }
+        connectionMenu.resumeLiveReactionsForTesting()
+        connectionMenu.petActionHandler = { id, action, actionDidSettle in
+            menuPets.first(where: { $0.petID == id })?.performDirectAction(
+                action,
+                actionDidSettle: actionDidSettle
+            )
+        }
+
+        var liveResumeCount = 0
+        connectionMenu.resumeLiveHandler = {
+            liveResumeCount += 1
+            menuPets.forEach { $0.resumeLiveReactions(currentState: .waiting) }
+        }
+        let expiryFixtureStart = manualExpiryCallbacks.count
+        connectionMenu.performPetActionForTesting(petID: "ajman", action: .animation(.jumping))
+        guard connectionMenu.manualMode,
+              manualExpiryCallbacks.count == expiryFixtureStart + 1 else {
+            throw SelfTestError("manual action did not pause live reactions and arm expiry")
+        }
+        let firstExpiry = expiryFixtureStart
+        connectionMenu.performPetActionForTesting(petID: "ajman", action: .sleep)
+        let sleepExpiry = firstExpiry + 1
+        guard connectionMenu.manualMode,
+              menuAjman.petMode.isSleeping,
+              menuAjman.animator.isPlayingSleep,
+              manualExpiryCallbacks.count == expiryFixtureStart + 2,
+              manualExpiryCancellations[firstExpiry],
+              !manualExpiryCancellations[sleepExpiry] else {
+            throw SelfTestError("new manual dispatch did not reset the quiet countdown")
+        }
+        manualExpiryCallbacks[firstExpiry]()
+        guard connectionMenu.manualMode, liveResumeCount == 0 else {
+            throw SelfTestError("cancelled manual-mode countdown resumed live reactions")
+        }
+        manualExpiryCallbacks[sleepExpiry]()
+        guard !connectionMenu.manualMode,
+              liveResumeCount == 1,
+              menuAjman.petMode.isSleeping,
+              menuAjman.animator.isPlayingSleep else {
+            throw SelfTestError("expiry did not resume ownership while preserving menu Sleep")
+        }
+
+        connectionMenu.performPetActionForTesting(petID: "ajman", action: .animation(.jumping))
+        let explicitResumeExpiry = manualExpiryCallbacks.count - 1
+        connectionMenu.resumeLiveReactionsForTesting()
+        guard !connectionMenu.manualMode,
+              liveResumeCount == 2,
+              manualExpiryCancellations[explicitResumeExpiry] else {
+            throw SelfTestError("explicit Resume did not cancel expiry and resume immediately")
+        }
+        manualExpiryCallbacks[explicitResumeExpiry]()
+        guard liveResumeCount == 2,
+              manualExpiryDelays[expiryFixtureStart...].allSatisfy({
+                  $0 == StatusMenu.manualModeQuietTimeout
+              }) else {
+            throw SelfTestError("manual expiry used the wrong timeout or survived explicit Resume")
+        }
         print("Status icon fixture: aqua selects original 🐈‍⬛ title with no image; darkAqua selects 18pt/36px template silhouette")
         print("Actions playback: Ajman/Winnie Jumping and Loaf enter and hold their real animator/mode through live agent updates")
+        print("Manual expiry fixture: dispatch pauses; redispatch resets 600s; expiry resumes; explicit Resume cancels; menu Sleep remains held")
         print("Menu fixture: Show agent notifications is adjacent to Listen to; Listen to contains exactly Hear Claude Code=on, Hear Codex=on")
         print("Menu fixture: Pets > Ajman/Winnie > Reacts to is hidden with agent notifications off, present with notifications on, and hidden again when off")
         let codexPreferenceSuiteName = "AjmanSelfTest.HearCodex.\(UUID().uuidString)"

@@ -21,6 +21,7 @@ final class PetMode {
     private var loafTimer: Timer?
     private var dozeTimer: Timer?
     private var wakeTimer: Timer?
+    private var forcedWakeCompletion: (@MainActor () -> Void)?
     private var wakeUntil: Date?
     private var lastFunState: AnimationState?
     private var temperament: Temperament
@@ -162,9 +163,9 @@ final class PetMode {
 
     /// Directly plays the same held stretch/yawn used when leaving a rest pose.
     @discardableResult
-    func forceStretch() -> Bool {
+    func forceStretch(completion: (@MainActor () -> Void)? = nil) -> Bool {
         guard wakeAnimation != nil else { return false }
-        beginWakeTransition()
+        beginWakeTransition(completion: completion)
         return isWaking
     }
 
@@ -237,8 +238,9 @@ final class PetMode {
         _ = forceSleep()
     }
 
-    private func beginWakeTransition() {
+    private func beginWakeTransition(completion: (@MainActor () -> Void)? = nil) {
         cancelTimers()
+        forcedWakeCompletion = completion
         wakeUntil = nil
         ownsRestingAnimation = true
         isLoafing = false
@@ -262,8 +264,11 @@ final class PetMode {
         wakeTimer?.invalidate()
         wakeTimer = nil
         isWaking = false
+        let completion = forcedWakeCompletion
+        forcedWakeCompletion = nil
         guard !isManualMode() else {
             ownsRestingAnimation = false
+            completion?()
             return
         }
 
@@ -276,6 +281,7 @@ final class PetMode {
             ownsRestingAnimation = false
             animator?.play(liveState)
         }
+        completion?()
     }
 
     private func scheduleOccasionalBeat() {
@@ -379,6 +385,7 @@ final class PetMode {
         loafTimer = nil
         dozeTimer = nil
         wakeTimer = nil
+        forcedWakeCompletion = nil
     }
 
     func teardown() {

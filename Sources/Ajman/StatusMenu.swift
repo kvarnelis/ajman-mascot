@@ -2,6 +2,13 @@ import AppKit
 
 @MainActor
 final class StatusMenu: NSObject, NSMenuDelegate {
+    nonisolated static let manualModeQuietTimeout: TimeInterval = 10 * 60
+
+    typealias ManualModeExpiryScheduler = (
+        TimeInterval,
+        @escaping @MainActor () -> Void
+    ) -> () -> Void
+
     private enum StatusIconVariant: String {
         case originalGlyph
         case templateSilhouette
@@ -60,6 +67,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private var cycleTimer: Timer?
     private var cycleState: AnimationState?
     private var manualAction: PetCycleAction?
+    private let manualModeExpiryScheduler: ManualModeExpiryScheduler
+    private var cancelManualModeExpiry: (() -> Void)?
+    private var manualDispatchGeneration = 0
     private let claudeSettingsPath: URL
 
     private(set) var manualMode = false
@@ -71,7 +81,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     var temperamentHandler: ((String, Temperament) -> Void)?
     var agentNotificationsHandler: ((Bool) -> Void)?
     var hearCodexHandler: ((Bool) -> Void)?
-    var petActionHandler: ((String, PetCycleAction) -> Void)?
+    var petActionHandler: ((String, PetCycleAction, @escaping @MainActor () -> Void) -> Void)?
     var debugStateHandler: ((AnimationState) -> Void)?
     var resumeLiveHandler: (() -> Void)?
     var resetPositionsHandler: (() -> Void)?
@@ -90,7 +100,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         agentNotificationsEnabled: Bool,
         hearCodexEnabled: Bool,
         claudeSettingsPath: URL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/settings.json")
+            .appendingPathComponent(".claude/settings.json"),
+        manualModeExpiryScheduler: ManualModeExpiryScheduler? = nil
     ) {
         self.registry = registry
         self.pets = pets
@@ -100,6 +111,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         self.debugStates = debugStates
         self.agentNotificationsEnabled = agentNotificationsEnabled
         self.claudeSettingsPath = claudeSettingsPath
+        self.manualModeExpiryScheduler = manualModeExpiryScheduler ?? { delay, action in
+            let timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in
+                Task { @MainActor in action() }
+            }
+            return { timer.invalidate() }
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -394,19 +411,37 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     @objc private func selectPetAction(_ sender: NSMenuItem) {
         guard let selection = sender.representedObject as? PetActionSelection else { return }
         stopCycling()
+        cancelPendingManualModeExpiry()
+        manualDispatchGeneration += 1
+        let generation = manualDispatchGeneration
         manualMode = true
         manualAction = selection.action
         cycleState = nil
-        petActionHandler?(selection.petID, selection.action)
+        let actionDidSettle: @MainActor () -> Void = { [weak self] in
+            self?.manualActionDidSettle(generation: generation)
+        }
+        if let petActionHandler {
+            petActionHandler(selection.petID, selection.action, actionDidSettle)
+        } else {
+            actionDidSettle()
+        }
         refreshActivityIndicator()
     }
 
     @objc private func toggleCycle(_ sender: NSMenuItem) {
-        cycleTimer == nil ? startCycling() : stopCycling()
+        if cycleTimer == nil {
+            startCycling()
+        } else {
+            stopCycling()
+            manualDispatchGeneration += 1
+            manualActionDidSettle(generation: manualDispatchGeneration)
+        }
     }
 
     private func startCycling() {
         guard !debugStates.isEmpty else { return }
+        cancelPendingManualModeExpiry()
+        manualDispatchGeneration += 1
         manualMode = true
         manualAction = nil
         cycleItem.state = .on
@@ -431,6 +466,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     @objc private func resumeLiveReactions() {
+        cancelPendingManualModeExpiry()
+        manualDispatchGeneration += 1
         stopCycling()
         manualMode = false
         manualAction = nil
@@ -438,6 +475,20 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         updateDebugChecks()
         resumeLiveHandler?()
         refreshActivityIndicator()
+    }
+
+    private func manualActionDidSettle(generation: Int) {
+        guard manualMode, generation == manualDispatchGeneration else { return }
+        cancelPendingManualModeExpiry()
+        cancelManualModeExpiry = manualModeExpiryScheduler(Self.manualModeQuietTimeout) { [weak self] in
+            guard let self, self.manualMode, generation == self.manualDispatchGeneration else { return }
+            self.resumeLiveReactions()
+        }
+    }
+
+    private func cancelPendingManualModeExpiry() {
+        cancelManualModeExpiry?()
+        cancelManualModeExpiry = nil
     }
 
     func resumeLiveReactionsIfManual() {
@@ -678,6 +729,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             }
         }
     }
+    func resumeLiveReactionsForTesting() { resumeLiveReactions() }
     var claudeConnectionStateForTesting: NSControl.StateValue { claudeConnectionItem.state }
     var codexConnectionStateForTesting: NSControl.StateValue { codexConnectionItem.state }
     var agentNotificationsStateForTesting: NSControl.StateValue { agentNotificationsItem.state }
@@ -685,5 +737,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     func toggleCodexConnectionForTesting() { toggleCodexConnection(codexConnectionItem) }
     func refreshClaudeConnectionStateForTesting() { updateClaudeConnectionCheck() }
 
-    deinit { cycleTimer?.invalidate() }
+    deinit {
+        cycleTimer?.invalidate()
+        cancelManualModeExpiry?()
+    }
 }

@@ -170,14 +170,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.debugStateHandler = { [weak self] state in
             self?.pets.forEach { $0.setDebugState(state) }
         }
-        menu.petActionHandler = { [weak self] id, action in
-            self?.pets.first(where: { $0.petID == id })?.performDirectAction(action)
+        menu.petActionHandler = { [weak self] id, action, actionDidSettle in
+            guard let pet = self?.pets.first(where: { $0.petID == id }) else {
+                actionDidSettle()
+                return
+            }
+            pet.performDirectAction(action, actionDidSettle: actionDidSettle)
         }
         menu.resumeLiveHandler = { [weak self] in
             guard let self, let registry = self.registry else { return }
             for pet in self.pets {
-                pet.applyState(registry.currentState(for: pet.binding))
-                pet.resumeLiveReactions()
+                pet.resumeLiveReactions(currentState: registry.currentState(for: pet.binding))
             }
         }
         menu.resetPositionsHandler = { [weak self] in
