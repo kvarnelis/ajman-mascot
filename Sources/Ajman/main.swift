@@ -1621,7 +1621,12 @@ exit 0
         let menuTitles = connectionMenu.topLevelMenuTitlesForTesting
         let actionsTree = connectionMenu.actionsMenuTreeForTesting
         let actionTopLevel = connectionMenu.actionsTopLevelTitlesForTesting.filter { !$0.isEmpty }
-        let iconProof = connectionMenu.statusIconProofForTesting
+        guard let lightAppearance = NSAppearance(named: .aqua),
+              let darkAppearance = NSAppearance(named: .darkAqua) else {
+            throw SelfTestError("could not construct light and dark status-icon appearances")
+        }
+        let lightIconProof = connectionMenu.statusIconProofForTesting(appearance: lightAppearance)
+        let darkIconProof = connectionMenu.statusIconProofForTesting(appearance: darkAppearance)
         let menuPetSuiteName = "AjmanSelfTest.MenuPetPlayback.\(UUID().uuidString)"
         guard let menuPetDefaults = UserDefaults(suiteName: menuPetSuiteName) else {
             throw SelfTestError("could not create menu playback defaults")
@@ -1687,12 +1692,19 @@ exit 0
               !actionTopLevel.contains("Sleep"),
               selectedPetActions.map(\.0) == ["ajman", "ajman", "winnie", "winnie"],
               selectedPetActions.map(\.1) == [.animation(.jumping), .loaf, .animation(.jumping), .loaf],
-              iconProof.isTemplate,
-              iconProof.pointSize == NSSize(width: 18, height: 18),
-              iconProof.pixelSize == NSSize(width: 36, height: 36) else {
+              lightIconProof.variant == "originalGlyph",
+              lightIconProof.title == "🐈‍⬛",
+              !lightIconProof.hasImage,
+              !lightIconProof.isTemplate,
+              darkIconProof.variant == "templateSilhouette",
+              darkIconProof.title.isEmpty,
+              darkIconProof.hasImage,
+              darkIconProof.isTemplate,
+              darkIconProof.pointSize == NSSize(width: 18, height: 18),
+              darkIconProof.pixelSize == NSSize(width: 36, height: 36) else {
             throw SelfTestError("cleaned menu items or initial checkbox states were incorrect")
         }
-        print("Status icon fixture: 18pt cat silhouette has a 36x36 bitmap representation and isTemplate=true")
+        print("Status icon fixture: aqua selects original 🐈‍⬛ title with no image; darkAqua selects 18pt/36px template silhouette")
         print("Actions playback: Ajman/Winnie Jumping and Loaf enter and hold their real animator/mode through live agent updates")
         print("Menu fixture: Playful Idle and Steady Size absent; Hear Claude Code is adjacent to notifications and reflects installed hooks")
         let uninstalled = try ClaudeHookInstaller.uninstall(settingsPath: settings)

@@ -2,6 +2,22 @@ import AppKit
 
 @MainActor
 final class StatusMenu: NSObject, NSMenuDelegate {
+    private enum StatusIconVariant: String {
+        case originalGlyph
+        case templateSilhouette
+    }
+
+    private final class StatusAppearanceObserverView: NSView {
+        var appearanceDidChange: ((NSAppearance) -> Void)?
+
+        override func viewDidChangeEffectiveAppearance() {
+            super.viewDidChangeEffectiveAppearance()
+            appearanceDidChange?(effectiveAppearance)
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
+
     private final class PetActionSelection: NSObject {
         let petID: String
         let action: PetCycleAction
@@ -14,6 +30,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     private let registry: SessionRegistry
     private let statusItem: NSStatusItem
+    private let statusAppearanceObserver = StatusAppearanceObserverView(frame: .zero)
     private let launchAtLogin = LaunchAtLogin()
     private let activityItem = NSMenuItem(title: "Agents: Idle — 0 sessions", action: nil, keyEquivalent: "")
     private let cycleItem = NSMenuItem(title: "Cycle All States", action: #selector(toggleCycle(_:)), keyEquivalent: "")
@@ -79,11 +96,15 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         super.init()
 
         if let button = statusItem.button {
-            button.title = ""
-            button.image = Self.makeStatusIcon()
-            button.imagePosition = .imageOnly
             button.imageScaling = .scaleProportionallyDown
             button.toolTip = "Ajman"
+            statusAppearanceObserver.frame = button.bounds
+            statusAppearanceObserver.autoresizingMask = [.width, .height]
+            statusAppearanceObserver.appearanceDidChange = { [weak self] appearance in
+                self?.updateStatusIcon(for: appearance)
+            }
+            button.addSubview(statusAppearanceObserver)
+            updateStatusIcon(for: button.effectiveAppearance)
         }
         let menu = NSMenu()
         menu.delegate = self
@@ -499,7 +520,29 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         claudeConnectionItem.state = ClaudeHookInstaller.isInstalled(settingsPath: claudeSettingsPath) ? .on : .off
     }
 
-    private static func makeStatusIcon() -> NSImage {
+    private static let originalStatusGlyph = "🐈‍⬛"
+
+    private static func statusIconVariant(for appearance: NSAppearance) -> StatusIconVariant {
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? .templateSilhouette
+            : .originalGlyph
+    }
+
+    private func updateStatusIcon(for appearance: NSAppearance) {
+        guard let button = statusItem.button else { return }
+        switch Self.statusIconVariant(for: appearance) {
+        case .originalGlyph:
+            button.image = nil
+            button.imagePosition = .noImage
+            button.title = Self.originalStatusGlyph
+        case .templateSilhouette:
+            button.title = ""
+            button.image = Self.makeTemplateStatusIcon()
+            button.imagePosition = .imageOnly
+        }
+    }
+
+    private static func makeTemplateStatusIcon() -> NSImage {
         let pointSize = NSSize(width: 18, height: 18)
         let scale = 2
         guard let bitmap = NSBitmapImageRep(
@@ -568,11 +611,22 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             item.submenu.map { (item.title, $0.items.map(\.title)) }
         })
     }
-    var statusIconProofForTesting: (isTemplate: Bool, pointSize: NSSize, pixelSize: NSSize?) {
+    func statusIconProofForTesting(appearance: NSAppearance) -> (
+        variant: String, title: String, hasImage: Bool,
+        isTemplate: Bool, pointSize: NSSize, pixelSize: NSSize?
+    ) {
+        updateStatusIcon(for: appearance)
         let image = statusItem.button?.image
         let bitmap = image?.representations.compactMap { $0 as? NSBitmapImageRep }.first
         let pixels = bitmap.map { NSSize(width: $0.pixelsWide, height: $0.pixelsHigh) }
-        return (image?.isTemplate == true, image?.size ?? .zero, pixels)
+        return (
+            Self.statusIconVariant(for: appearance).rawValue,
+            statusItem.button?.title ?? "",
+            image != nil,
+            image?.isTemplate == true,
+            image?.size ?? .zero,
+            pixels
+        )
     }
     func performPetActionForTesting(petID: String, action: PetCycleAction) {
         for petItem in debugMenu.items {
