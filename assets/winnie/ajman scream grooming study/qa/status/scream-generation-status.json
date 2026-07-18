@@ -1,0 +1,12 @@
+{
+  "state": "complete",
+  "checkpoint": "Generated a replacement after rejecting the first attempt for weak ear-tip and foreleg-stripe fidelity; visually QA-checked the selected coherent eight-pose strip.",
+  "output_path": "/Users/kazys/.codex/generated_images/019f76ce-589c-7431-bcb4-cfed5a291429/exec-0ddfe6e2-a243-44e8-8c5d-fded10a954a8.png",
+  "verification": {
+    "pose_count": 8,
+    "poses": "Separated complete seated poses progress closed mouth -> inhale -> opening -> full yowl -> sustained yowl -> closing -> recovered.",
+    "background": "Visually uniform flat magenta chroma field (the source needs the parent pipeline's exact-key normalization rather than a broad flood-fill, which damaged sprite pixels in an experimental copy).",
+    "identity": "Lean black tuxedo, black face/chin and neck sides, white front throat/chest, white toes, consistent long left-foreleg stripe, and modest flat left TNR ear tip are present.",
+    "layout": "Full-body sprites have consistent scale/baseline with no cropping or overlap."
+  }
+}

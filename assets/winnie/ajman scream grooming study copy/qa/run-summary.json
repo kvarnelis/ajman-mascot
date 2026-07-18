@@ -1,0 +1,29 @@
+{
+  "ok": true,
+  "actions": {
+    "screaming": {
+      "frameCount": 8,
+      "structuralReview": "qa/rows/screaming-review.json",
+      "preview": "previews/screaming.gif"
+    },
+    "grooming": {
+      "frameCount": 8,
+      "structuralReview": "qa/rows/grooming-review.json",
+      "preview": "previews/grooming.gif"
+    }
+  },
+  "atlas": {
+    "path": "final/ajman-scream-groom-atlas.webp",
+    "width": 1536,
+    "height": 416,
+    "cellWidth": 192,
+    "cellHeight": 208,
+    "alpha": true,
+    "sha256": "4c6de4076fdae8ca009846bd49a19046110f58ac5ec3d45fffaf0e29b9aae62f"
+  },
+  "visualQA": "qa/final-visual-qa.json",
+  "contactSheet": "qa/contact-sheet.png",
+  "installedPetModified": false,
+  "duplicatePath": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman scream grooming study copy",
+  "zipPath": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman scream grooming study copy.zip"
+}

@@ -1,0 +1,35 @@
+{
+  "ok": true,
+  "review_scope": [
+    "qa/contact-sheet.png",
+    "previews/screaming.gif",
+    "previews/grooming.gif",
+    "frames/screaming/00.png through 07.png",
+    "frames/grooming/00.png through 07.png",
+    "references/"
+  ],
+  "reviewed_at": "2026-07-18",
+  "structural_reviews": {
+    "screaming": "qa/rows/screaming-review.json: pass; 8 of 8 frames, no errors or warnings.",
+    "grooming": "qa/rows/grooming-review.json: pass; 8 of 8 frames, no errors or warnings."
+  },
+  "screaming": {
+    "result": "pass",
+    "frame_count": 8,
+    "motion": "A coherent seated closed-mouth to open-mouth yowl and recovery loop; the mouth remains attached to the face, with no detached effects.",
+    "identity": "Lean adult Ajman remains black-faced through muzzle and chin, with front-only under-chin/chest white, an intact long anatomical-left foreleg stripe, black opposite foreleg apart from its paw, and the same modest ear tip.",
+    "registration": "No visible clipping, overlap, baseline jump, or material size pop."
+  },
+  "grooming": {
+    "result": "pass",
+    "frame_count": 8,
+    "motion": "A coherent reset, raised left-paw lick, face rub, lower, and reset loop; the tongue and paw stay attached.",
+    "identity": "The raised grooming paw is Ajman's anatomical left foreleg and retains the long white stripe; the opposite foreleg stays black except for the paw. Face, front-only under-chin white, chest/belly white, and same modest ear tip are consistent.",
+    "registration": "No visible clipping, overlap, baseline jump, or material size pop."
+  },
+  "transparency": {
+    "result": "pass",
+    "evidence": "All 16 final PNGs are 192 by 208 and report alpha support; the visible sprite field outside each silhouette is transparent."
+  },
+  "repair_rows": []
+}

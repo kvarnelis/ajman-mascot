@@ -187,7 +187,7 @@ final class PetInstance {
         let groomAnimation = loadedPet.groomAnimation
         groomingBehavior = HeldSequenceBehavior(
             animation: groomAnimation,
-            frameDurations: GroomingSequence.frameDurations,
+            frameDurations: GroomingSequence.frameDurations(for: petID),
             scheduleRange: GroomingSequence.scheduleRange,
             triggerProbability: GroomingSequence.triggerProbability,
             minimumSpacing: GroomingSequence.minimumSpacing,
@@ -240,11 +240,11 @@ final class PetInstance {
         let screamAnimation = loadedPet.screamAnimation
         screamingBehavior = HeldSequenceBehavior(
             animation: screamAnimation,
-            frameDurations: ScreamSequence.frameDurations,
+            frameDurations: ScreamSequence.frameDurations(for: petID),
             scheduleRange: 0...0,
             triggerProbability: 0,
             minimumSpacing: 0,
-            frameSequences: ScreamSequence.variants,
+            frameSequences: ScreamSequence.frameSequences(for: petID),
             eligibility: { [weak self] in
                 guard let self else {
                     return HeldSequenceEligibility(

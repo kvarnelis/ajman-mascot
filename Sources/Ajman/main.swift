@@ -849,18 +849,31 @@ exit 0
               GroomingSequence.frameDurations.reduce(0, +) <= 8,
               GroomingSequence.scheduleRange == 18...30,
               GroomingSequence.triggerProbability == 0.28,
-              GroomingSequence.minimumSpacing == 75,
-              sleepingAjman.groomAnimation == nil else {
-            throw SelfTestError("Winnie's eight-frame grooming ritual, whim settings, or Ajman isolation was incorrect")
+              GroomingSequence.minimumSpacing == 75 else {
+            throw SelfTestError("Winnie's eight-frame grooming ritual or whim settings were incorrect")
+        }
+        guard let ajmanGroom = sleepingAjman.groomAnimation,
+              ajmanGroom.frameCount == 8,
+              GroomingSequence.ajmanFrameDurations.count == 8,
+              GroomingSequence.ajmanFrameDurations.reduce(0, +) >= 6,
+              GroomingSequence.ajmanFrameDurations.reduce(0, +) <= 8 else {
+            throw SelfTestError("Ajman's eight-frame unhurried grooming ritual was incorrect")
         }
         guard let winnieScream = sleepingWinnie.screamAnimation,
               winnieScream.frameCount == 8,
               ScreamSequence.frameDurations.count == 4,
               ScreamSequence.frameDurations.reduce(0, +) >= 3,
               ScreamSequence.frameDurations.reduce(0, +) <= 6,
-              ScreamSequence.variants == [[0, 1, 2, 3], [4, 5, 6, 7]],
-              sleepingAjman.screamAnimation == nil else {
-            throw SelfTestError("Winnie's eight-frame scream variants or Ajman isolation was incorrect")
+              ScreamSequence.variants == [[0, 1, 2, 3], [4, 5, 6, 7]] else {
+            throw SelfTestError("Winnie's eight-frame scream variants were incorrect")
+        }
+        guard let ajmanScream = sleepingAjman.screamAnimation,
+              ajmanScream.frameCount == 8,
+              ScreamSequence.ajmanFrameDurations.count == 8,
+              ScreamSequence.ajmanFrameDurations.reduce(0, +) >= 3,
+              ScreamSequence.ajmanFrameDurations.reduce(0, +) <= 6,
+              ScreamSequence.ajmanArc == [Array(0..<8)] else {
+            throw SelfTestError("Ajman's eight-frame scream arc was incorrect")
         }
         guard let winnieRunLeft = sleepingWinnie.travelAnimation(for: .left),
               let winnieRunRight = sleepingWinnie.travelAnimation(for: .right),
@@ -874,11 +887,15 @@ exit 0
         }
         let winnieGroomBounds = winnieGroom.frames.compactMap(SpriteSheet.contentBounds)
         let winnieScreamBounds = winnieScream.frames.compactMap(SpriteSheet.contentBounds)
+        let ajmanGroomBounds = ajmanGroom.frames.compactMap(SpriteSheet.contentBounds)
+        let ajmanScreamBounds = ajmanScream.frames.compactMap(SpriteSheet.contentBounds)
         let winnieLoafBounds = winnieLoaf.frames.compactMap(SpriteSheet.contentBounds)
         let winnieTravelFrames = winnieRunLeft.frames + winnieRunRight.frames
         let winnieTravelBounds = winnieTravelFrames.compactMap(SpriteSheet.contentBounds)
         guard winnieGroomBounds.count == 8,
               winnieScreamBounds.count == 8,
+              ajmanGroomBounds.count == 8,
+              ajmanScreamBounds.count == 8,
               winnieLoafBounds.count == 6,
               winnieTravelBounds.count == 16,
               winnieLoafBounds.allSatisfy({
@@ -904,6 +921,13 @@ exit 0
                       && $0.minY > 0
                       && $0.maxY < CGFloat(SpriteSheet.cellHeight)
               }),
+              (ajmanGroomBounds + ajmanScreamBounds).allSatisfy({
+                  $0.maxY == 204
+                      && $0.minX > 0
+                      && $0.maxX < CGFloat(SpriteSheet.cellWidth)
+                      && $0.minY > 0
+                      && $0.maxY < CGFloat(SpriteSheet.cellHeight)
+              }),
               winnieTravelBounds.allSatisfy({
                   $0.maxY == 203
                       && $0.minX > 0
@@ -911,7 +935,7 @@ exit 0
                       && $0.maxY < CGFloat(SpriteSheet.cellHeight)
               }) else {
             throw SelfTestError(
-                "Winnie loaf/groom/scream/run frames missed the ground line or touched a cell edge: loaf=\(winnieLoafBounds), groom=\(winnieGroomBounds), scream=\(winnieScreamBounds), run=\(winnieTravelBounds)"
+                "Companion frames missed the ground line or touched a cell edge: Winnie loaf=\(winnieLoafBounds), groom=\(winnieGroomBounds), scream=\(winnieScreamBounds), run=\(winnieTravelBounds); Ajman groom=\(ajmanGroomBounds), scream=\(ajmanScreamBounds)"
             )
         }
         let winnieCompanionFrames = winnieWake.frames + winnieScratch.frames
@@ -972,6 +996,8 @@ exit 0
               let ajmanSleepIndex = ajmanActions.firstIndex(of: .sleep),
               let ajmanStretchIndex = ajmanActions.firstIndex(of: .stretch),
               let ajmanScratchIndex = ajmanActions.firstIndex(of: .scratch),
+              let ajmanGroomIndex = ajmanActions.firstIndex(of: .groom),
+              let ajmanScreamIndex = ajmanActions.firstIndex(of: .scream),
               winnieLoafIndex == winnieLookBIndex + 1,
               winnieSleepIndex == winnieLoafIndex + 1,
               winnieSleepIndex < winnieStretchIndex,
@@ -981,9 +1007,12 @@ exit 0
               winnieZoomiesIndex == winnieScreamIndex + 1,
               ajmanSleepIndex < ajmanStretchIndex,
               ajmanStretchIndex < ajmanScratchIndex,
+              ajmanGroomIndex == ajmanScratchIndex + 1,
+              ajmanScreamIndex == ajmanGroomIndex + 1,
               winnieActions.contains(.scratch), winnieActions.contains(.groom),
               winnieActions.contains(.scream), winnieActions.contains(.zoomies),
-              !ajmanActions.contains(.scream), !ajmanActions.contains(.zoomies),
+              ajmanActions.contains(.scratch), ajmanActions.contains(.groom),
+              ajmanActions.contains(.scream), !ajmanActions.contains(.zoomies),
               HeldSequenceEligibility(
                 hasAsset: true, isShown: true, liveState: .idle,
                 displayedState: .idle, isManual: false,
@@ -997,6 +1026,15 @@ exit 0
               Temperament.defaultValue(for: "winnie").scaledFidget(
                 probability: GroomingSequence.triggerProbability
               ) == 0.56,
+              abs(Temperament.defaultValue(for: "ajman").scaledFidget(
+                probability: GroomingSequence.triggerProbability
+              ) - 0.042) < 1e-12,
+              Temperament.defaultValue(for: "ajman").scaledFidget(
+                interval: GroomingSequence.minimumSpacing
+              ) == 500,
+              Temperament.defaultValue(for: "winnie").scaledFidget(
+                interval: GroomingSequence.minimumSpacing
+              ) == 37.5,
               Temperament.catatonic.scaledFidget(
                 probability: GroomingSequence.triggerProbability
               ) < 0.003,
@@ -1005,9 +1043,15 @@ exit 0
               ) > Temperament.defaultValue(for: "ajman").scaledFidget(
                 probability: ScratchBehavior.triggerProbability
               ) else {
-            throw SelfTestError("Winnie scratch/groom/scream/zoomies availability or cycle order was incorrect")
+            throw SelfTestError("Ajman/Winnie scratch/groom/scream/zoomies availability, odds, or cycle order was incorrect")
         }
         let screamSettings = Temperament.allCases.map(ScreamSequence.whimSettings)
+        let ajmanDefaultScream = ScreamSequence.whimSettings(
+            for: Temperament.defaultValue(for: "ajman")
+        )
+        let winnieDefaultScream = ScreamSequence.whimSettings(
+            for: Temperament.defaultValue(for: "winnie")
+        )
         let screamRates = screamSettings.map { settings -> Double in
             guard settings.triggerProbability > 0 else { return 0 }
             return settings.triggerProbability
@@ -1018,6 +1062,8 @@ exit 0
               screamSettings[2].scheduleRange == 1_200...1_800,
               screamSettings[3].scheduleRange == 600...900,
               screamSettings[4].scheduleRange == 360...600,
+              ajmanDefaultScream == screamSettings[1],
+              winnieDefaultScream == screamSettings[3],
               zip(screamRates, screamRates.dropFirst()).allSatisfy({ pair in pair.0 < pair.1 }),
               (1 / screamRates[2]) > 10 * (24 / GroomingSequence.triggerProbability) else {
             throw SelfTestError("scream rarity windows were not strictly ordered or an order of magnitude below groom")
@@ -1054,6 +1100,22 @@ exit 0
               crouchFrames == [0, 1, 2, 3], gremlinFrames == [4, 5, 6, 7] else {
             throw SelfTestError("scream variant selection did not preserve the two four-frame escalations")
         }
+        var ajmanArcFrames: [Int] = []
+        let ajmanArcScream = HeldSequenceBehavior(
+            animation: ajmanScream,
+            frameDurations: ScreamSequence.ajmanFrameDurations,
+            scheduleRange: 0...0, triggerProbability: 0, minimumSpacing: 0,
+            frameSequences: ScreamSequence.ajmanArc,
+            eligibility: { HeldSequenceEligibility(
+                hasAsset: true, isShown: true, liveState: .idle, displayedState: .idle,
+                isManual: false, isCalmPose: false, isGlancing: false
+            ) },
+            willStart: {}, showFrame: { ajmanArcFrames.append($0); return true },
+            showIdle: {}, didFinish: {}, scheduler: { _, action in action() }
+        )
+        guard ajmanArcScream.forceStart(), ajmanArcFrames == Array(0..<8) else {
+            throw SelfTestError("Ajman's scream player did not preserve its single eight-frame arc")
+        }
         let heldSequenceSource = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -1069,7 +1131,7 @@ exit 0
             )
         }
         print("Whim reschedule: probability miss, cooldown, and ineligible start each schedule the next attempt")
-        print("Winnie companions: scream loads 8 grounded frames as random 0-3/4-7 escalations; Scream follows Groom in the direct cycle; Ajman has no scream")
+        print("Ajman/Winnie companions: both groom/scream strips load 8 grounded frames; Ajman plays one 0-7 scream arc while Winnie preserves random 0-3/4-7 escalations; Scream follows Groom after Scratch")
 
         let zoomiesSettings = Temperament.allCases.map(ZoomiesSchedule.whimSettings)
         let zoomiesRates = zoomiesSettings.map { settings -> Double in

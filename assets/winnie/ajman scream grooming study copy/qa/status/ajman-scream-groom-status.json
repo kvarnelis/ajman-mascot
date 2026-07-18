@@ -1,0 +1,14 @@
+{
+  "state": "complete",
+  "checkpoint": "Both eight-frame action loops passed structural and independent visual QA; the complete study was duplicated and zipped.",
+  "output_path": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman scream grooming study",
+  "verification": {
+    "result": "passed",
+    "screaming_frames": 8,
+    "grooming_frames": 8,
+    "atlas": "1536x416 RGBA",
+    "visual_qa": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman scream grooming study/qa/final-visual-qa.json",
+    "installed_pet_modified": false
+  },
+  "zip_path": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman scream grooming study copy.zip"
+}

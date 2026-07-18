@@ -2,9 +2,14 @@ import Foundation
 
 enum GroomingSequence {
     nonisolated static let frameDurations: [TimeInterval] = [0.8, 0.65, 0.75, 0.9, 0.9, 1.1, 0.65, 0.75]
+    nonisolated static let ajmanFrameDurations: [TimeInterval] = [0.9, 0.8, 0.85, 0.9, 1.05, 1.1, 0.8, 0.8]
     nonisolated static let scheduleRange: ClosedRange<TimeInterval> = 18...30
     nonisolated static let triggerProbability = 0.28
     nonisolated static let minimumSpacing: TimeInterval = 75
+
+    nonisolated static func frameDurations(for petID: String) -> [TimeInterval] {
+        petID == "ajman" ? ajmanFrameDurations : frameDurations
+    }
 }
 
 struct HeldSequenceWhimSettings: Equatable {
@@ -17,6 +22,16 @@ struct HeldSequenceWhimSettings: Equatable {
 enum ScreamSequence {
     nonisolated static let frameDurations: [TimeInterval] = [0.7, 0.8, 1.0, 1.5]
     nonisolated static let variants = [[0, 1, 2, 3], [4, 5, 6, 7]]
+    nonisolated static let ajmanFrameDurations: [TimeInterval] = [0.55, 0.55, 0.6, 0.7, 1.0, 0.9, 0.65, 0.55]
+    nonisolated static let ajmanArc = [Array(0..<8)]
+
+    nonisolated static func frameDurations(for petID: String) -> [TimeInterval] {
+        petID == "ajman" ? ajmanFrameDurations : frameDurations
+    }
+
+    nonisolated static func frameSequences(for petID: String) -> [[Int]] {
+        petID == "ajman" ? ajmanArc : variants
+    }
 
     nonisolated static func whimSettings(for temperament: Temperament) -> HeldSequenceWhimSettings {
         switch temperament {

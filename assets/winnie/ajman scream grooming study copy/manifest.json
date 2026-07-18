@@ -1,0 +1,35 @@
+{
+  "id": "ajman-scream-groom-extension",
+  "displayName": "Ajman Scream and Groom Extension",
+  "cellWidth": 192,
+  "cellHeight": 208,
+  "columns": 8,
+  "rows": 2,
+  "frameDurationMilliseconds": 120,
+  "background": "transparent",
+  "atlas": "final/ajman-scream-groom-atlas.webp",
+  "actions": [
+    {
+      "id": "screaming",
+      "row": 0,
+      "frameCount": 8,
+      "frames": "frames/screaming",
+      "preview": "previews/screaming.gif"
+    },
+    {
+      "id": "grooming",
+      "row": 1,
+      "frameCount": 8,
+      "frames": "frames/grooming",
+      "preview": "previews/grooming.gif"
+    }
+  ],
+  "identityRules": {
+    "face": "entire face, muzzle, and chin surface remain black",
+    "throat": "white spreads behind and beneath the black chin across the front underside only; it never wraps into a collar",
+    "body": "lean adult build with the real irregular white chest and belly",
+    "forelegs": "long white stripe only on Ajman's anatomical left foreleg; right foreleg is black except for white paw/toes",
+    "ear": "one modest clean flat TNR tip on Ajman's left ear"
+  },
+  "installedPetModified": false
+}

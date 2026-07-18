@@ -1,0 +1,11 @@
+{
+  "state": "complete",
+  "checkpoint": "Generated, visually inspected, and normalized the grooming row background.",
+  "output_path": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman scream grooming study/decoded/grooming.png",
+  "verification": {
+    "poses": "8 separated full-body seated grooming poses, coherent paw and tongue sequence",
+    "identity": "lean black tuxedo, front-only throat/chest white, left-foreleg stripe used as grooming paw, white toes, modest same-ear tip",
+    "background": "edge-sampled #FF00FF after deterministic normalization",
+    "clipping": "none observed"
+  }
+}

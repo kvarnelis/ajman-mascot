@@ -1,0 +1,7 @@
+{
+  "state": "complete",
+  "checkpoint": "Independent final visual QA completed for both action loops.",
+  "output_path": "/Users/kazys/Developer/ajman mascot/assets/winnie/ajman scream grooming study/qa/final-visual-qa.json",
+  "verification": "pass: eight screaming and eight grooming frames are visually coherent, identity-consistent, registered, unclipped, and transparent outside the sprites.",
+  "repair_rows": []
+}
