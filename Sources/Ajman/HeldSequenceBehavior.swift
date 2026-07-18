@@ -1,7 +1,7 @@
 import Foundation
 
 enum GroomingSequence {
-    nonisolated static let frameDurations: [TimeInterval] = [0.75, 0.7, 0.85, 0.85, 1.0, 0.9]
+    nonisolated static let frameDurations: [TimeInterval] = [0.8, 0.65, 0.75, 0.9, 0.9, 1.1, 0.65, 0.75]
     nonisolated static let scheduleRange: ClosedRange<TimeInterval> = 18...30
     nonisolated static let triggerProbability = 0.28
     nonisolated static let minimumSpacing: TimeInterval = 75

@@ -1,0 +1,335 @@
+{
+  "source": "assets/winnie/winnie-grooming-study-v1/source/winnie-grooming-strip-chroma.png",
+  "cleanColorSource": "assets/winnie/winnie-grooming-study-v1/final/winnie-grooming-strip.png",
+  "output": "assets/pets/winnie/groom.webp",
+  "method": "Euclidean RGB distance from #FF00FF at threshold 96; 4-connected components; eight largest pose seeds ordered by center x; owner-delivered transparent final supplies clean edge color; shared premultiplied Lanczos scale; centered; alpha content grounded at y=203.",
+  "chromaKey": "#FF00FF",
+  "threshold": 96.0,
+  "scale": 0.44,
+  "frameCount": 8,
+  "cellSize": [
+    192,
+    208
+  ],
+  "stripSize": [
+    1536,
+    208
+  ],
+  "scaleEvidence": {
+    "seatedIdleFrame": "assets/pets/winnie/spritesheet.webp row 0 frame 0",
+    "seatedIdleContentBox": {
+      "x": 52,
+      "y": 5,
+      "width": 88,
+      "height": 198
+    },
+    "seatedIdleMedianHeight": 198,
+    "previousGroom": "assets/winnie/winnie-live-sprite-backups/groom-BEFORE-8-frame-study-20260718T193510Z.webp",
+    "previousGroomFrame0ContentBox": {
+      "x": 51,
+      "y": 6,
+      "width": 89,
+      "height": 195
+    },
+    "previousGroomMedianWidth": 89.5,
+    "previousGroomMedianHeight": 185.0,
+    "newAlertSourceBox": {
+      "x": 48,
+      "y": 174,
+      "width": 203,
+      "height": 448
+    },
+    "newAlertAtScale": {
+      "x": 51,
+      "y": 7,
+      "width": 89,
+      "height": 197
+    },
+    "decision": "Use 0.44 for all eight poses: the first alert sit lands at 89x197, matching the 88x198 seated idle ruler and the previous groom's 89x195 opening pose; the full set remains centered, grounded, and clear of every cell edge."
+  },
+  "timingsMilliseconds": [
+    800,
+    650,
+    750,
+    900,
+    900,
+    1100,
+    650,
+    750
+  ],
+  "totalDurationSeconds": 6.5,
+  "frames": [
+    {
+      "index": 0,
+      "sourceBox": {
+        "x": 48,
+        "y": 174,
+        "width": 203,
+        "height": 448
+      },
+      "chromaSeedBox": {
+        "x": 48,
+        "y": 173,
+        "width": 204,
+        "height": 450,
+        "pixels": 63053
+      },
+      "scaledSizeBeforeAlphaRegistration": [
+        89,
+        197
+      ],
+      "contentBox": {
+        "x": 51,
+        "y": 7,
+        "width": 89,
+        "height": 197
+      },
+      "alphaBox": {
+        "x": 51,
+        "y": 7,
+        "width": 89,
+        "height": 197
+      },
+      "groundY": 203,
+      "edgeBleed": false
+    },
+    {
+      "index": 1,
+      "sourceBox": {
+        "x": 297,
+        "y": 187,
+        "width": 205,
+        "height": 437
+      },
+      "chromaSeedBox": {
+        "x": 295,
+        "y": 186,
+        "width": 208,
+        "height": 439,
+        "pixels": 64604
+      },
+      "scaledSizeBeforeAlphaRegistration": [
+        90,
+        192
+      ],
+      "contentBox": {
+        "x": 51,
+        "y": 12,
+        "width": 90,
+        "height": 192
+      },
+      "alphaBox": {
+        "x": 51,
+        "y": 12,
+        "width": 90,
+        "height": 192
+      },
+      "groundY": 203,
+      "edgeBleed": false
+    },
+    {
+      "index": 2,
+      "sourceBox": {
+        "x": 560,
+        "y": 217,
+        "width": 212,
+        "height": 407
+      },
+      "chromaSeedBox": {
+        "x": 559,
+        "y": 216,
+        "width": 214,
+        "height": 409,
+        "pixels": 62517
+      },
+      "scaledSizeBeforeAlphaRegistration": [
+        93,
+        179
+      ],
+      "contentBox": {
+        "x": 49,
+        "y": 25,
+        "width": 93,
+        "height": 179
+      },
+      "alphaBox": {
+        "x": 49,
+        "y": 25,
+        "width": 93,
+        "height": 179
+      },
+      "groundY": 203,
+      "edgeBleed": false
+    },
+    {
+      "index": 3,
+      "sourceBox": {
+        "x": 826,
+        "y": 214,
+        "width": 208,
+        "height": 410
+      },
+      "chromaSeedBox": {
+        "x": 825,
+        "y": 213,
+        "width": 210,
+        "height": 412,
+        "pixels": 62201
+      },
+      "scaledSizeBeforeAlphaRegistration": [
+        92,
+        180
+      ],
+      "contentBox": {
+        "x": 50,
+        "y": 24,
+        "width": 92,
+        "height": 180
+      },
+      "alphaBox": {
+        "x": 50,
+        "y": 24,
+        "width": 92,
+        "height": 180
+      },
+      "groundY": 203,
+      "edgeBleed": false
+    },
+    {
+      "index": 4,
+      "sourceBox": {
+        "x": 1081,
+        "y": 210,
+        "width": 208,
+        "height": 414
+      },
+      "chromaSeedBox": {
+        "x": 1080,
+        "y": 209,
+        "width": 211,
+        "height": 416,
+        "pixels": 63331
+      },
+      "scaledSizeBeforeAlphaRegistration": [
+        92,
+        182
+      ],
+      "contentBox": {
+        "x": 50,
+        "y": 22,
+        "width": 92,
+        "height": 182
+      },
+      "alphaBox": {
+        "x": 50,
+        "y": 22,
+        "width": 92,
+        "height": 182
+      },
+      "groundY": 203,
+      "edgeBleed": false
+    },
+    {
+      "index": 5,
+      "sourceBox": {
+        "x": 1321,
+        "y": 187,
+        "width": 225,
+        "height": 437
+      },
+      "chromaSeedBox": {
+        "x": 1320,
+        "y": 187,
+        "width": 227,
+        "height": 438,
+        "pixels": 64932
+      },
+      "scaledSizeBeforeAlphaRegistration": [
+        99,
+        192
+      ],
+      "contentBox": {
+        "x": 46,
+        "y": 12,
+        "width": 99,
+        "height": 192
+      },
+      "alphaBox": {
+        "x": 46,
+        "y": 12,
+        "width": 99,
+        "height": 192
+      },
+      "groundY": 203,
+      "edgeBleed": false
+    },
+    {
+      "index": 6,
+      "sourceBox": {
+        "x": 1588,
+        "y": 184,
+        "width": 208,
+        "height": 440
+      },
+      "chromaSeedBox": {
+        "x": 1587,
+        "y": 184,
+        "width": 211,
+        "height": 441,
+        "pixels": 64037
+      },
+      "scaledSizeBeforeAlphaRegistration": [
+        92,
+        194
+      ],
+      "contentBox": {
+        "x": 50,
+        "y": 10,
+        "width": 92,
+        "height": 194
+      },
+      "alphaBox": {
+        "x": 50,
+        "y": 10,
+        "width": 92,
+        "height": 194
+      },
+      "groundY": 203,
+      "edgeBleed": false
+    },
+    {
+      "index": 7,
+      "sourceBox": {
+        "x": 1848,
+        "y": 175,
+        "width": 200,
+        "height": 447
+      },
+      "chromaSeedBox": {
+        "x": 1847,
+        "y": 175,
+        "width": 202,
+        "height": 448,
+        "pixels": 61955
+      },
+      "scaledSizeBeforeAlphaRegistration": [
+        88,
+        197
+      ],
+      "contentBox": {
+        "x": 52,
+        "y": 7,
+        "width": 88,
+        "height": 197
+      },
+      "alphaBox": {
+        "x": 52,
+        "y": 7,
+        "width": 88,
+        "height": 197
+      },
+      "groundY": 203,
+      "edgeBleed": false
+    }
+  ]
+}

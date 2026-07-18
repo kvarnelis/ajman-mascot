@@ -843,12 +843,15 @@ exit 0
             throw SelfTestError("Winnie's bundled stretch/scratch strips did not load 5/2 poses")
         }
         guard let winnieGroom = sleepingWinnie.groomAnimation,
-              winnieGroom.frameCount == 6,
-              GroomingSequence.frameDurations.count == 6,
+              winnieGroom.frameCount == 8,
+              GroomingSequence.frameDurations.count == 8,
               GroomingSequence.frameDurations.reduce(0, +) >= 4,
               GroomingSequence.frameDurations.reduce(0, +) <= 8,
+              GroomingSequence.scheduleRange == 18...30,
+              GroomingSequence.triggerProbability == 0.28,
+              GroomingSequence.minimumSpacing == 75,
               sleepingAjman.groomAnimation == nil else {
-            throw SelfTestError("Winnie's six-frame grooming ritual or Ajman isolation was incorrect")
+            throw SelfTestError("Winnie's eight-frame grooming ritual, whim settings, or Ajman isolation was incorrect")
         }
         guard let winnieScream = sleepingWinnie.screamAnimation,
               winnieScream.frameCount == 8,
@@ -874,7 +877,7 @@ exit 0
         let winnieLoafBounds = winnieLoaf.frames.compactMap(SpriteSheet.contentBounds)
         let winnieTravelFrames = winnieRunLeft.frames + winnieRunRight.frames
         let winnieTravelBounds = winnieTravelFrames.compactMap(SpriteSheet.contentBounds)
-        guard winnieGroomBounds.count == 6,
+        guard winnieGroomBounds.count == 8,
               winnieScreamBounds.count == 8,
               winnieLoafBounds.count == 6,
               winnieTravelBounds.count == 16,
@@ -887,9 +890,11 @@ exit 0
                       && $0.maxY < CGFloat(SpriteSheet.cellHeight)
               }),
               winnieGroomBounds.allSatisfy({
-                  $0.maxY >= 201 && $0.maxY <= 204
+                  // CGRect.maxY is exclusive: 204 means the last occupied pixel is y=203.
+                  $0.maxY == 204
                       && $0.minX > 0
                       && $0.maxX < CGFloat(SpriteSheet.cellWidth)
+                      && $0.minY > 0
                       && $0.maxY < CGFloat(SpriteSheet.cellHeight)
               }),
               winnieScreamBounds.allSatisfy({
