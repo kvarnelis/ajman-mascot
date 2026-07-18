@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let registry = SessionRegistry()
             let server = UDSServer()
             let codexMonitor = CodexMonitor()
+            let codexMonitorPreferences = CodexMonitorPreferences()
             let descriptors = catalog.discover()
 
             self.catalog = catalog
@@ -53,7 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 temperaments: temperamentMap(),
                 debugStates: commonDebugStates(),
                 directActionsByPetID: directActionMap(),
-                agentNotificationsEnabled: AgentNotificationPreferences().isEnabled
+                agentNotificationsEnabled: AgentNotificationPreferences().isEnabled,
+                hearCodexEnabled: codexMonitorPreferences.isEnabled
             )
             statusMenu = menu
             wireMenu(menu)
@@ -82,7 +84,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             codexMonitor.eventHandler = { event in
                 Task { @MainActor in self.handleAgentEvent(event, registry: registry) }
             }
-            codexMonitor.start()
+            if codexMonitorPreferences.isEnabled {
+                codexMonitor.start()
+            }
         } catch {
             pets.forEach { $0.teardown() }
             pets.removeAll()
@@ -157,6 +161,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
+        }
+        menu.hearCodexHandler = { [weak self] enabled in
+            CodexMonitorPreferences().isEnabled = enabled
+            guard let monitor = self?.codexMonitor else { return }
+            enabled ? monitor.start() : monitor.stop()
         }
         menu.debugStateHandler = { [weak self] state in
             self?.pets.forEach { $0.setDebugState(state) }

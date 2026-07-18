@@ -1616,6 +1616,7 @@ exit 0
             debugStates: PetActionCycle.order,
             directActionsByPetID: ["ajman": ajmanActions, "winnie": winnieActions],
             agentNotificationsEnabled: notificationPreferences.isEnabled,
+            hearCodexEnabled: true,
             claudeSettingsPath: settings
         )
         let menuTitles = connectionMenu.topLevelMenuTitlesForTesting
@@ -1676,15 +1677,19 @@ exit 0
             }
         }
         guard let notificationsIndex = menuTitles.firstIndex(of: "Show agent notifications"),
-              let claudeIndex = menuTitles.firstIndex(of: "Hear Claude Code") else {
+              let claudeIndex = menuTitles.firstIndex(of: "Hear Claude Code"),
+              let codexIndex = menuTitles.firstIndex(of: "Hear Codex") else {
             throw SelfTestError("agent integration menu cluster was missing")
         }
         guard !menuTitles.contains("Playful Idle"),
               !menuTitles.contains("Steady Size"),
               menuTitles.filter({ $0 == "Hear Claude Code" }).count == 1,
+              menuTitles.filter({ $0 == "Hear Codex" }).count == 1,
               !menuTitles.contains("Connect to Claude Code"),
               claudeIndex == notificationsIndex + 1,
+              codexIndex == claudeIndex + 1,
               connectionMenu.claudeConnectionStateForTesting == .on,
+              connectionMenu.codexConnectionStateForTesting == .on,
               connectionMenu.agentNotificationsStateForTesting == .off,
               actionsTree["Ajman"] == ajmanActions.map(\.menuTitle),
               actionsTree["Winnie"] == winnieActions.map(\.menuTitle),
@@ -1706,7 +1711,39 @@ exit 0
         }
         print("Status icon fixture: aqua selects original 🐈‍⬛ title with no image; darkAqua selects 18pt/36px template silhouette")
         print("Actions playback: Ajman/Winnie Jumping and Loaf enter and hold their real animator/mode through live agent updates")
-        print("Menu fixture: Playful Idle and Steady Size absent; Hear Claude Code is adjacent to notifications and reflects installed hooks")
+        print("Menu fixture: Show agent notifications, Hear Claude Code, and Hear Codex are adjacent; both hearing toggles are present and on")
+        let codexPreferenceSuiteName = "AjmanSelfTest.HearCodex.\(UUID().uuidString)"
+        guard let codexPreferenceDefaults = UserDefaults(suiteName: codexPreferenceSuiteName) else {
+            throw SelfTestError("could not create Hear Codex defaults")
+        }
+        defer { codexPreferenceDefaults.removePersistentDomain(forName: codexPreferenceSuiteName) }
+        let codexPreferences = CodexMonitorPreferences(defaults: codexPreferenceDefaults)
+        let gatedMonitor = CodexMonitor(environment: ["CODEX_HOME": "/tmp/ajman-selftest-hear-codex"])
+        defer { gatedMonitor.stop() }
+        guard codexPreferences.isEnabled else {
+            throw SelfTestError("Hear Codex did not default on")
+        }
+        connectionMenu.hearCodexHandler = { enabled in
+            codexPreferences.isEnabled = enabled
+            enabled ? gatedMonitor.start() : gatedMonitor.stop()
+        }
+        gatedMonitor.start()
+        guard gatedMonitor.isRunningForTesting else {
+            throw SelfTestError("Hear Codex default-on preference did not start the monitor")
+        }
+        connectionMenu.toggleCodexConnectionForTesting()
+        guard !codexPreferences.isEnabled,
+              !gatedMonitor.isRunningForTesting,
+              connectionMenu.codexConnectionStateForTesting == .off else {
+            throw SelfTestError("Hear Codex off did not persist and stop the monitor")
+        }
+        connectionMenu.toggleCodexConnectionForTesting()
+        guard codexPreferences.isEnabled,
+              gatedMonitor.isRunningForTesting,
+              connectionMenu.codexConnectionStateForTesting == .on else {
+            throw SelfTestError("Hear Codex on did not persist and restart the monitor")
+        }
+        print("Hear Codex fixture: AjmanHearCodex defaults on; menu off/on persists and stops/restarts CodexMonitor")
         let uninstalled = try ClaudeHookInstaller.uninstall(settingsPath: settings)
         connectionMenu.refreshClaudeConnectionStateForTesting()
         let afterUninstall = try JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as! [String: Any]

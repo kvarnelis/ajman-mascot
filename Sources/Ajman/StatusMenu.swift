@@ -40,6 +40,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let claudeConnectionItem = NSMenuItem(
         title: "Hear Claude Code", action: #selector(toggleClaudeConnection(_:)), keyEquivalent: ""
     )
+    private let codexConnectionItem = NSMenuItem(
+        title: "Hear Codex", action: #selector(toggleCodexConnection(_:)), keyEquivalent: ""
+    )
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
     private let updateChecksItem = NSMenuItem(title: "Check for updates", action: #selector(toggleUpdateChecks(_:)), keyEquivalent: "")
     private let petMenu = NSMenu(title: "Pets")
@@ -65,6 +68,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     var relativeScaleHandler: ((String, Double) -> Void)?
     var temperamentHandler: ((String, Temperament) -> Void)?
     var agentNotificationsHandler: ((Bool) -> Void)?
+    var hearCodexHandler: ((Bool) -> Void)?
     var petActionHandler: ((String, PetCycleAction) -> Void)?
     var debugStateHandler: ((AnimationState) -> Void)?
     var resumeLiveHandler: (() -> Void)?
@@ -82,6 +86,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         debugStates: [AnimationState],
         directActionsByPetID: [String: [PetCycleAction]],
         agentNotificationsEnabled: Bool,
+        hearCodexEnabled: Bool,
         claudeSettingsPath: URL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/settings.json")
     ) {
@@ -127,6 +132,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         claudeConnectionItem.target = self
         updateClaudeConnectionCheck()
         menu.addItem(claudeConnectionItem)
+        codexConnectionItem.target = self
+        codexConnectionItem.state = hearCodexEnabled ? .on : .off
+        menu.addItem(codexConnectionItem)
         menu.addItem(.separator())
 
         let sizeMenu = NSMenu(title: "Overall Size")
@@ -488,6 +496,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         updateClaudeConnectionCheck()
     }
 
+    @objc private func toggleCodexConnection(_ sender: NSMenuItem) {
+        let enabled = sender.state != .on
+        sender.state = enabled ? .on : .off
+        hearCodexHandler?(enabled)
+    }
+
     private func connectToClaude() {
         do {
             let binary = try ClaudeHookInstaller.installHookBinary()
@@ -640,7 +654,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
     }
     var claudeConnectionStateForTesting: NSControl.StateValue { claudeConnectionItem.state }
+    var codexConnectionStateForTesting: NSControl.StateValue { codexConnectionItem.state }
     var agentNotificationsStateForTesting: NSControl.StateValue { agentNotificationsItem.state }
+    func toggleCodexConnectionForTesting() { toggleCodexConnection(codexConnectionItem) }
     func refreshClaudeConnectionStateForTesting() { updateClaudeConnectionCheck() }
 
     deinit { cycleTimer?.invalidate() }

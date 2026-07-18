@@ -56,6 +56,8 @@ final class CodexMonitor {
         }
     }
 
+    var isRunningForTesting: Bool { queue.sync { timer != nil } }
+
     deinit { timer?.cancel() }
 
     private func poll() {
