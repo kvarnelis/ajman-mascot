@@ -1620,6 +1620,7 @@ exit 0
             claudeSettingsPath: settings
         )
         let menuTitles = connectionMenu.topLevelMenuTitlesForTesting
+        let listenItems = connectionMenu.listenMenuItemsForTesting
         let actionsTree = connectionMenu.actionsMenuTreeForTesting
         let actionTopLevel = connectionMenu.actionsTopLevelTitlesForTesting.filter { !$0.isEmpty }
         guard let lightAppearance = NSAppearance(named: .aqua),
@@ -1677,20 +1678,21 @@ exit 0
             }
         }
         guard let notificationsIndex = menuTitles.firstIndex(of: "Show agent notifications"),
-              let claudeIndex = menuTitles.firstIndex(of: "Hear Claude Code"),
-              let codexIndex = menuTitles.firstIndex(of: "Hear Codex") else {
+              let listenIndex = menuTitles.firstIndex(of: "Listen to") else {
             throw SelfTestError("agent integration menu cluster was missing")
         }
-        guard !menuTitles.contains("Playful Idle"),
+        guard !menuTitles.contains("Hear Claude Code"),
+              !menuTitles.contains("Hear Codex"),
+              !menuTitles.contains("Playful Idle"),
               !menuTitles.contains("Steady Size"),
-              menuTitles.filter({ $0 == "Hear Claude Code" }).count == 1,
-              menuTitles.filter({ $0 == "Hear Codex" }).count == 1,
               !menuTitles.contains("Connect to Claude Code"),
-              claudeIndex == notificationsIndex + 1,
-              codexIndex == claudeIndex + 1,
+              listenIndex == notificationsIndex + 1,
+              listenItems.map(\.title) == ["Hear Claude Code", "Hear Codex"],
+              listenItems.map(\.state) == [.on, .on],
               connectionMenu.claudeConnectionStateForTesting == .on,
               connectionMenu.codexConnectionStateForTesting == .on,
               connectionMenu.agentNotificationsStateForTesting == .off,
+              connectionMenu.visibleReactsToPetTitlesForTesting.isEmpty,
               actionsTree["Ajman"] == ajmanActions.map(\.menuTitle),
               actionsTree["Winnie"] == winnieActions.map(\.menuTitle),
               !actionTopLevel.contains(AnimationState.idle.title),
@@ -1709,9 +1711,23 @@ exit 0
               darkIconProof.pixelSize == NSSize(width: 36, height: 36) else {
             throw SelfTestError("cleaned menu items or initial checkbox states were incorrect")
         }
+        connectionMenu.agentNotificationsHandler = { notificationPreferences.isEnabled = $0 }
+        connectionMenu.toggleAgentNotificationsForTesting()
+        guard connectionMenu.agentNotificationsStateForTesting == .on,
+              notificationPreferences.isEnabled,
+              connectionMenu.visibleReactsToPetTitlesForTesting == ["Ajman", "Winnie"] else {
+            throw SelfTestError("Reacts to menus did not appear when agent notifications were enabled")
+        }
+        connectionMenu.toggleAgentNotificationsForTesting()
+        guard connectionMenu.agentNotificationsStateForTesting == .off,
+              !notificationPreferences.isEnabled,
+              connectionMenu.visibleReactsToPetTitlesForTesting.isEmpty else {
+            throw SelfTestError("Reacts to menus did not hide when agent notifications were disabled")
+        }
         print("Status icon fixture: aqua selects original 🐈‍⬛ title with no image; darkAqua selects 18pt/36px template silhouette")
         print("Actions playback: Ajman/Winnie Jumping and Loaf enter and hold their real animator/mode through live agent updates")
-        print("Menu fixture: Show agent notifications, Hear Claude Code, and Hear Codex are adjacent; both hearing toggles are present and on")
+        print("Menu fixture: Show agent notifications is adjacent to Listen to; Listen to contains exactly Hear Claude Code=on, Hear Codex=on")
+        print("Menu fixture: Pets > Ajman/Winnie > Reacts to is hidden with agent notifications off, present with notifications on, and hidden again when off")
         let codexPreferenceSuiteName = "AjmanSelfTest.HearCodex.\(UUID().uuidString)"
         guard let codexPreferenceDefaults = UserDefaults(suiteName: codexPreferenceSuiteName) else {
             throw SelfTestError("could not create Hear Codex defaults")

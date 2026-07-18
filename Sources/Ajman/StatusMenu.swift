@@ -43,6 +43,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let codexConnectionItem = NSMenuItem(
         title: "Hear Codex", action: #selector(toggleCodexConnection(_:)), keyEquivalent: ""
     )
+    private let listenMenu = NSMenu(title: "Listen to")
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
     private let updateChecksItem = NSMenuItem(title: "Check for updates", action: #selector(toggleUpdateChecks(_:)), keyEquivalent: "")
     private let petMenu = NSMenu(title: "Pets")
@@ -55,6 +56,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private var directActionsByPetID: [String: [PetCycleAction]]
     private var temperaments: [String: Temperament]
     private var debugStates: [AnimationState]
+    private var agentNotificationsEnabled: Bool
     private var cycleTimer: Timer?
     private var cycleState: AnimationState?
     private var manualAction: PetCycleAction?
@@ -96,6 +98,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         self.directActionsByPetID = directActionsByPetID
         self.temperaments = temperaments
         self.debugStates = debugStates
+        self.agentNotificationsEnabled = agentNotificationsEnabled
         self.claudeSettingsPath = claudeSettingsPath
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -131,10 +134,13 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         menu.addItem(agentNotificationsItem)
         claudeConnectionItem.target = self
         updateClaudeConnectionCheck()
-        menu.addItem(claudeConnectionItem)
+        listenMenu.addItem(claudeConnectionItem)
         codexConnectionItem.target = self
         codexConnectionItem.state = hearCodexEnabled ? .on : .off
-        menu.addItem(codexConnectionItem)
+        listenMenu.addItem(codexConnectionItem)
+        let listenItem = NSMenuItem(title: "Listen to", action: nil, keyEquivalent: "")
+        listenItem.submenu = listenMenu
+        menu.addItem(listenItem)
         menu.addItem(.separator())
 
         let sizeMenu = NSMenu(title: "Overall Size")
@@ -239,6 +245,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             }
             let reacts = NSMenuItem(title: "Reacts to", action: nil, keyEquivalent: "")
             reacts.submenu = reactsMenu
+            reacts.isHidden = !agentNotificationsEnabled
             submenu.addItem(reacts)
 
             let currentRelativeScale = relativeScales[pet.id] ?? PetCatalog.builtInRelativeScale(for: pet.id)
@@ -373,7 +380,15 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     @objc private func toggleAgentNotifications(_ sender: NSMenuItem) {
         let enabled = sender.state != .on
         sender.state = enabled ? .on : .off
+        agentNotificationsEnabled = enabled
+        updateReactsToVisibility()
         agentNotificationsHandler?(enabled)
+    }
+
+    private func updateReactsToVisibility() {
+        for petItem in petMenu.items {
+            petItem.submenu?.items.first(where: { $0.title == "Reacts to" })?.isHidden = !agentNotificationsEnabled
+        }
     }
 
     @objc private func selectPetAction(_ sender: NSMenuItem) {
@@ -619,6 +634,16 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     var topLevelMenuTitlesForTesting: [String] { statusItem.menu?.items.map(\.title) ?? [] }
+    var listenMenuItemsForTesting: [(title: String, state: NSControl.StateValue)] {
+        listenMenu.items.map { ($0.title, $0.state) }
+    }
+    var visibleReactsToPetTitlesForTesting: [String] {
+        petMenu.items.compactMap { petItem in
+            petItem.submenu?.items.contains(where: { $0.title == "Reacts to" && !$0.isHidden }) == true
+                ? petItem.title
+                : nil
+        }
+    }
     var actionsTopLevelTitlesForTesting: [String] { debugMenu.items.map(\.title) }
     var actionsMenuTreeForTesting: [String: [String]] {
         Dictionary(uniqueKeysWithValues: debugMenu.items.compactMap { item in
@@ -656,6 +681,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     var claudeConnectionStateForTesting: NSControl.StateValue { claudeConnectionItem.state }
     var codexConnectionStateForTesting: NSControl.StateValue { codexConnectionItem.state }
     var agentNotificationsStateForTesting: NSControl.StateValue { agentNotificationsItem.state }
+    func toggleAgentNotificationsForTesting() { toggleAgentNotifications(agentNotificationsItem) }
     func toggleCodexConnectionForTesting() { toggleCodexConnection(codexConnectionItem) }
     func refreshClaudeConnectionStateForTesting() { updateClaudeConnectionCheck() }
 
