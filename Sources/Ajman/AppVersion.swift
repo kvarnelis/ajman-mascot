@@ -2,7 +2,7 @@ import Foundation
 
 /// The version of the running Ajman build. Release tags may optionally begin with "v".
 enum AjmanApp {
-    static let version = AppVersion("0.2.4")!
+    static let version = AppVersion("0.3.0")!
     static let repository = "kvarnelis/ajman-mascot"
 }
 
