@@ -885,6 +885,12 @@ exit 0
               sleepingAjman.travelAnimation(for: .right) == nil else {
             throw SelfTestError("Winnie's 8+8 directional travel gait or Ajman isolation was incorrect")
         }
+        guard let winnieZoomies = sleepingWinnie.zoomiesAnimation,
+              winnieZoomies.frameCount == 8,
+              winnieZoomies.sourceURL.lastPathComponent == "zoomies.webp",
+              sleepingAjman.zoomiesAnimation == nil else {
+            throw SelfTestError("Winnie's dedicated eight-frame zoomies strip or Ajman isolation was incorrect")
+        }
         let winnieGroomBounds = winnieGroom.frames.compactMap(SpriteSheet.contentBounds)
         let winnieScreamBounds = winnieScream.frames.compactMap(SpriteSheet.contentBounds)
         let ajmanGroomBounds = ajmanGroom.frames.compactMap(SpriteSheet.contentBounds)
@@ -892,12 +898,14 @@ exit 0
         let winnieLoafBounds = winnieLoaf.frames.compactMap(SpriteSheet.contentBounds)
         let winnieTravelFrames = winnieRunLeft.frames + winnieRunRight.frames
         let winnieTravelBounds = winnieTravelFrames.compactMap(SpriteSheet.contentBounds)
+        let winnieZoomiesBounds = winnieZoomies.frames.compactMap(SpriteSheet.contentBounds)
         guard winnieGroomBounds.count == 8,
               winnieScreamBounds.count == 8,
               ajmanGroomBounds.count == 8,
               ajmanScreamBounds.count == 8,
               winnieLoafBounds.count == 6,
               winnieTravelBounds.count == 16,
+              winnieZoomiesBounds.count == 8,
               winnieLoafBounds.allSatisfy({
                   // CGRect.maxY is exclusive: 204 means the last occupied pixel is y=203.
                   $0.maxY == 204
@@ -933,9 +941,16 @@ exit 0
                       && $0.minX > 0
                       && $0.maxX < CGFloat(SpriteSheet.cellWidth)
                       && $0.maxY < CGFloat(SpriteSheet.cellHeight)
+              }),
+              winnieZoomiesBounds.allSatisfy({
+                  $0.maxY == 204
+                      && $0.minX > 0
+                      && $0.maxX < CGFloat(SpriteSheet.cellWidth)
+                      && $0.minY > 0
+                      && $0.maxY < CGFloat(SpriteSheet.cellHeight)
               }) else {
             throw SelfTestError(
-                "Companion frames missed the ground line or touched a cell edge: Winnie loaf=\(winnieLoafBounds), groom=\(winnieGroomBounds), scream=\(winnieScreamBounds), run=\(winnieTravelBounds); Ajman groom=\(ajmanGroomBounds), scream=\(ajmanScreamBounds)"
+                "Companion frames missed the ground line or touched a cell edge: Winnie loaf=\(winnieLoafBounds), groom=\(winnieGroomBounds), scream=\(winnieScreamBounds), run=\(winnieTravelBounds), zoomies=\(winnieZoomiesBounds); Ajman groom=\(ajmanGroomBounds), scream=\(ajmanScreamBounds)"
             )
         }
         let winnieCompanionFrames = winnieWake.frames + winnieScratch.frames
@@ -973,7 +988,8 @@ exit 0
             hasScratch: sleepingWinnie.scratchAnimation != nil,
             hasGroom: sleepingWinnie.groomAnimation != nil,
             hasScream: sleepingWinnie.screamAnimation != nil,
-            hasZoomies: sleepingWinnie.runLeftAnimation != nil && sleepingWinnie.runRightAnimation != nil
+            hasZoomies: sleepingWinnie.zoomiesAnimation != nil
+                && sleepingWinnie.runLeftAnimation != nil && sleepingWinnie.runRightAnimation != nil
         )
         let ajmanActions = PetActionCycle.availableActions(
             availableStates: sleepingAjman.sheet.animationTable.states,
@@ -983,7 +999,8 @@ exit 0
             hasScratch: sleepingAjman.scratchAnimation != nil,
             hasGroom: sleepingAjman.groomAnimation != nil,
             hasScream: sleepingAjman.screamAnimation != nil,
-            hasZoomies: sleepingAjman.runLeftAnimation != nil && sleepingAjman.runRightAnimation != nil
+            hasZoomies: sleepingAjman.zoomiesAnimation != nil
+                && sleepingAjman.runLeftAnimation != nil && sleepingAjman.runRightAnimation != nil
         )
         guard let winnieLookBIndex = winnieActions.firstIndex(of: .animation(.lookDirectionsB)),
               let winnieLoafIndex = winnieActions.firstIndex(of: .loaf),
@@ -1181,11 +1198,45 @@ exit 0
         ]
         var zoomiesDashes: [(NSPoint, NSPoint)] = []
         var zoomiesEvents: [String] = []
+        guard ZoomiesChoreography.frameFacings == [
+                  .right, .right, .right, .frontRight, .front, .left, .right, .right,
+              ],
+              ZoomiesChoreography.startFrames == [0, 1],
+              ZoomiesChoreography.travelFrames(for: .right) == [2, 3],
+              ZoomiesChoreography.travelFrames(for: .left) == [5],
+              ZoomiesChoreography.turnFrames(toward: .right) == [6, 7],
+              ZoomiesChoreography.turnFrames(toward: .left).isEmpty,
+              ZoomiesChoreography.finishFrames == [3, 4],
+              ZoomiesChoreography.travelFrames(for: .right).allSatisfy({
+                  [.right, .frontRight].contains(ZoomiesChoreography.frameFacings[$0])
+              }),
+              ZoomiesChoreography.travelFrames(for: .left).allSatisfy({
+                  ZoomiesChoreography.frameFacings[$0] == .left
+              }),
+              ZoomiesChoreography.turnFrames(toward: .right).allSatisfy({
+                  ZoomiesChoreography.frameFacings[$0] == .right
+              }) else {
+            throw SelfTestError("zoomies per-frame facing map, choreography, or left-turn fallback changed")
+        }
         let zoomiesBehavior = ZoomiesBehavior(
             hasRunCompanions: true,
             eligibility: { zoomiesEligibility },
             willStart: { zoomiesEvents.append("start") },
             nextTarget: { zoomiesTargets.isEmpty ? nil : zoomiesTargets.removeFirst() },
+            directionToTarget: { target in target.x < zoomiesOrigin.x ? .left : .right },
+            showFrame: { index in
+                zoomiesEvents.append("frame-\(index)")
+                return true
+            },
+            showTravel: { side in
+                let frames = ZoomiesChoreography.travelFrames(for: side)
+                    .map(String.init).joined(separator: ",")
+                zoomiesEvents.append("travel-\(side == .left ? "left" : "right")-\(frames)")
+                return !frames.isEmpty
+            },
+            showRunFallback: { side in
+                zoomiesEvents.append("run-fallback-\(side == .left ? "left" : "right")")
+            },
             moveDash: { target, completion in
                 let start = zoomiesOrigin
                 zoomiesDashes.append((start, target))
@@ -1196,7 +1247,8 @@ exit 0
             cancelMovement: { zoomiesEvents.append("cancel-move") },
             showIdle: { zoomiesEvents.append("idle") },
             didFinish: { zoomiesEvents.append("finish") },
-            dashCountRandomUnit: { 0.999 }
+            dashCountRandomUnit: { 0.999 },
+            scheduler: { _, action in action() }
         )
         guard !zoomiesBehavior.startIfEligible() else {
             throw SelfTestError("zoomies started during an agent-reaction state")
@@ -1208,7 +1260,12 @@ exit 0
         guard zoomiesBehavior.startIfEligible(), !zoomiesBehavior.isPerforming,
               zoomiesDashes.count == 3,
               zoomiesDashes.allSatisfy({ hypot($0.1.x - $0.0.x, $0.1.y - $0.0.y) >= ZoomiesSchedule.minimumDashLength }),
-              zoomiesEvents == ["start", "left", "right", "left", "idle", "finish"] else {
+              zoomiesEvents == [
+                  "start", "frame-0", "frame-1", "travel-left-5", "left",
+                  "frame-6", "frame-7", "travel-right-2,3", "right",
+                  "run-fallback-left", "travel-left-5", "left",
+                  "frame-3", "frame-4", "idle", "finish",
+              ] else {
             throw SelfTestError("zoomies episode did not run 1-3 meaningful dashes and settle seated: \(zoomiesEvents)")
         }
         let noRunZoomies = ZoomiesBehavior(
@@ -1230,7 +1287,8 @@ exit 0
             cancelMovement: { interruptionEvents.append("stop") },
             showIdle: { interruptionEvents.append("idle") },
             didFinish: { interruptionEvents.append("finish") },
-            dashCountRandomUnit: { 0 }
+            dashCountRandomUnit: { 0 },
+            scheduler: { _, action in action() }
         )
         guard interruptedZoomies.forceStart(), interruptedZoomies.isPerforming else {
             throw SelfTestError("zoomies interruption fixture did not begin its dash")
@@ -1253,14 +1311,31 @@ exit 0
         let zoomiesRescheduleBranches = zoomiesSource.components(
             separatedBy: "if settings.reschedulesAfterMiss { resumeScheduling() }"
         ).count - 1
-        guard zoomiesRescheduleBranches == 3 else {
+        let petInstanceSource = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .appendingPathComponent("PetInstance.swift"),
+            encoding: .utf8
+        )
+        guard let scratchTravelStart = petInstanceSource.range(of: "private func moveToScratchEdge"),
+              let scratchTravelEnd = petInstanceSource.range(of: "private func scratchScreen"),
+              scratchTravelStart.lowerBound < scratchTravelEnd.lowerBound else {
+            throw SelfTestError("scratch travel fixture could not isolate its implementation")
+        }
+        let scratchTravelSource = petInstanceSource[scratchTravelStart.lowerBound..<scratchTravelEnd.lowerBound]
+        guard zoomiesRescheduleBranches == 3,
+              petInstanceSource.contains("private func playZoomiesTravel"),
+              petInstanceSource.contains("ZoomiesChoreography.travelFrames(for: side)"),
+              scratchTravelSource.contains("playTravelGait(side: side)"),
+              scratchTravelSource.contains("playTravelGait(side: travelState == .runningLeft ? .left : .right)") else {
             throw SelfTestError(
-                "zoomies misses did not reschedule after probability/cooldown/ineligible checks (branches=\(zoomiesRescheduleBranches))"
+                "zoomies art routing, scratch run-cycle routing, or miss rescheduling changed (branches=\(zoomiesRescheduleBranches))"
             )
         }
         print("Zoomies table: Catatonic off; Calm 2700...3600s @20% floor 7200s; Normal 1200...1800s @40% floor 2700s; Frisky 600...900s @45% floor 1200s; Insane 180...300s @65% floor 300s")
-        print("Zoomies episode: 1-3 dashes; minimum 120pt; 352pt/s = 3.2x scratch; alternating directions; interruption stops cleanly; final frame seated idle")
-        print("Zoomies gating: Winnie paired run companions enable cycle/menu; Ajman has neither companion and no Zoomies action; all three whim misses reschedule")
+        print("Zoomies art: 8 owner frames grounded at pixel 203; facing right/right/right/front-right/front/left/right/right; start 0,1; right travel 2,3; left travel 5; right skid 6,7; left turn run-left fallback; finish 3,4")
+        print("Zoomies episode: dedicated frames drive moving dashes; 1-3 dashes; minimum 120pt; 352pt/s = 3.2x scratch; interruption stops cleanly; final frame seated idle")
+        print("Zoomies gating: Winnie needs dedicated zoomies plus paired run fallbacks; Ajman has neither and no Zoomies action; scratch travel remains paired run-left/run-right; all three whim misses reschedule")
         guard ScratchEdgeGeometry.leftPawX == 37,
               ScratchEdgeGeometry.rightPawX == 155,
               ScratchEdgeGeometry.targetOriginX(

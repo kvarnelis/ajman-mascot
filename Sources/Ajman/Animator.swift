@@ -161,7 +161,22 @@ final class Animator {
     }
 
     func playLoop(_ animation: SleepAnimation, as state: AnimationState, frameDuration: TimeInterval) {
-        guard !animation.frames.isEmpty, frameDuration > 0 else { return }
+        playLoop(
+            animation,
+            frameIndices: Array(animation.frames.indices),
+            as: state,
+            frameDuration: frameDuration
+        )
+    }
+
+    func playLoop(
+        _ animation: SleepAnimation,
+        frameIndices: [Int],
+        as state: AnimationState,
+        frameDuration: TimeInterval
+    ) {
+        let selectedFrames = frameIndices.compactMap { animation.frames.indices.contains($0) ? animation.frames[$0] : nil }
+        guard selectedFrames.count == frameIndices.count, !selectedFrames.isEmpty, frameDuration > 0 else { return }
         timer?.cancel()
         timer = nil
         calmPoseMode = nil
@@ -169,7 +184,7 @@ final class Animator {
         view?.setBreathingEnabled(false)
         view?.setScratchRaking(false)
         currentState = state
-        frames = animation.frames
+        frames = selectedFrames
         frameDurations = Array(repeating: frameDuration, count: frames.count)
         frameIndex = 0
         stateDidChange?(state)

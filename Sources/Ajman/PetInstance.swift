@@ -25,7 +25,10 @@ final class PetInstance {
     var hasGroomAnimation: Bool { loadedPet.groomAnimation != nil }
     var hasScreamAnimation: Bool { loadedPet.screamAnimation != nil }
     var hasTravelGait: Bool { loadedPet.runLeftAnimation != nil && loadedPet.runRightAnimation != nil }
-    var hasZoomies: Bool { hasTravelGait }
+    var hasZoomies: Bool {
+        loadedPet.zoomiesAnimation?.frameCount == ZoomiesChoreography.frameFacings.count
+            && hasTravelGait
+    }
     var availableDirectActions: [PetCycleAction] {
         PetActionCycle.availableActions(
             availableStates: animator.availableStates,
@@ -294,7 +297,7 @@ final class PetInstance {
         )
 
         zoomiesBehavior = ZoomiesBehavior(
-            hasRunCompanions: hasTravelGait,
+            hasRunCompanions: hasZoomies,
             eligibility: { [weak self] in
                 guard let self else {
                     return ZoomiesEligibility(
@@ -304,7 +307,7 @@ final class PetInstance {
                     )
                 }
                 return ZoomiesEligibility(
-                    hasRunCompanions: self.hasTravelGait,
+                    hasRunCompanions: self.hasZoomies,
                     isShown: self.panel.isVisible,
                     liveState: self.liveState.value,
                     displayedState: self.animator.currentState,
@@ -325,6 +328,19 @@ final class PetInstance {
                 self?.petMode.yieldToHigherPriorityDriver()
             },
             nextTarget: { [weak self] in self?.nextZoomiesTarget() },
+            directionToTarget: { [weak self] target in
+                self?.zoomiesDirection(to: target) ?? .right
+            },
+            showFrame: { [weak self] index in
+                guard let self, let zoomies = self.loadedPet.zoomiesAnimation else { return false }
+                return self.animator.playHeldPose(zoomies, frameIndex: index)
+            },
+            showTravel: { [weak self] side in
+                self?.playZoomiesTravel(side: side) ?? false
+            },
+            showRunFallback: { [weak self] side in
+                self?.playTravelGait(side: side, frameDuration: ZoomiesChoreography.travelFrameDuration)
+            },
             moveDash: { [weak self] target, completion in
                 self?.moveZoomiesDash(to: target, completion: completion)
             },
@@ -660,8 +676,6 @@ final class PetInstance {
         completion: @escaping @MainActor () -> Void
     ) {
         let current = panel.frame.origin
-        let side: ScratchSide = target.x < current.x ? .left : .right
-        playTravelGait(side: side, frameDuration: 0.055)
         let distance = hypot(target.x - current.x, target.y - current.y)
         let duration = max(TimeInterval(distance / ZoomiesSchedule.velocity), 0.12)
         scratchMover.move(
@@ -670,6 +684,24 @@ final class PetInstance {
             shouldContinue: { [weak self] in self?.zoomiesBehavior?.isPerforming == true },
             completion: completion
         )
+    }
+
+    private func zoomiesDirection(to target: NSPoint) -> ScratchSide {
+        target.x < panel.frame.origin.x ? .left : .right
+    }
+
+    @discardableResult
+    private func playZoomiesTravel(side: ScratchSide) -> Bool {
+        guard let zoomies = loadedPet.zoomiesAnimation else { return false }
+        let frames = ZoomiesChoreography.travelFrames(for: side)
+        guard !frames.isEmpty, frames.allSatisfy(zoomies.frames.indices.contains) else { return false }
+        animator.playLoop(
+            zoomies,
+            frameIndices: frames,
+            as: side.approachState,
+            frameDuration: ZoomiesChoreography.travelFrameDuration
+        )
+        return true
     }
 
     private func moveToScratchEdge(

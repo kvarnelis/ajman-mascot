@@ -51,6 +51,42 @@ enum ZoomiesSchedule {
     }
 }
 
+enum ZoomiesFrameFacing: String, Equatable {
+    case left
+    case right
+    case front
+    case frontRight = "front-right"
+}
+
+enum ZoomiesChoreography {
+    // Read from the owner-delivered pixels. Winnie is asymmetric, so these
+    // authored directions must never be inferred by index or mirrored.
+    nonisolated static let frameFacings: [ZoomiesFrameFacing] = [
+        .right, .right, .right, .frontRight, .front, .left, .right, .right,
+    ]
+    nonisolated static let startFrames = [0, 1]
+    nonisolated static let finishFrames = [3, 4]
+    nonisolated static let startDurations: [TimeInterval] = [0.32, 0.12]
+    nonisolated static let turnFrameDuration: TimeInterval = 0.09
+    nonisolated static let turnFallbackDuration: TimeInterval = 0.12
+    nonisolated static let finishDurations: [TimeInterval] = [0.14, 0.28]
+    nonisolated static let travelFrameDuration: TimeInterval = 0.055
+
+    nonisolated static func travelFrames(for side: ScratchSide) -> [Int] {
+        switch side {
+        case .left: [5]
+        case .right: [2, 3]
+        }
+    }
+
+    nonisolated static func turnFrames(toward side: ScratchSide) -> [Int] {
+        switch side {
+        case .left: [] // No owner-authored left-facing skid; use run-left briefly.
+        case .right: [6, 7]
+        }
+    }
+}
+
 enum ZoomiesGeometry {
     /// Select an on-screen panel origin at least `minimumDistance` away. When
     /// both directions are available, either can be chosen for every dash.
@@ -106,6 +142,10 @@ final class ZoomiesBehavior {
     private let eligibility: () -> ZoomiesEligibility
     private let willStart: () -> Void
     private let nextTarget: () -> NSPoint?
+    private let directionToTarget: (NSPoint) -> ScratchSide
+    private let showFrame: (Int) -> Bool
+    private let showTravel: (ScratchSide) -> Bool
+    private let showRunFallback: (ScratchSide) -> Void
     private let moveDash: (NSPoint, @escaping @MainActor () -> Void) -> Void
     private let cancelMovement: () -> Void
     private let showIdle: () -> Void
@@ -114,6 +154,7 @@ final class ZoomiesBehavior {
     private let dashCountRandomUnit: () -> Double
     private let now: () -> Date
     private let temperament: () -> Temperament
+    private let scheduler: (TimeInterval, @escaping @MainActor () -> Void) -> Void
 
     private var whimTimer: Timer?
     private var sequenceID = 0
@@ -126,6 +167,10 @@ final class ZoomiesBehavior {
         eligibility: @escaping () -> ZoomiesEligibility,
         willStart: @escaping () -> Void,
         nextTarget: @escaping () -> NSPoint?,
+        directionToTarget: @escaping (NSPoint) -> ScratchSide = { _ in .right },
+        showFrame: @escaping (Int) -> Bool = { _ in true },
+        showTravel: @escaping (ScratchSide) -> Bool = { _ in true },
+        showRunFallback: @escaping (ScratchSide) -> Void = { _ in },
         moveDash: @escaping (NSPoint, @escaping @MainActor () -> Void) -> Void,
         cancelMovement: @escaping () -> Void,
         showIdle: @escaping () -> Void,
@@ -133,12 +178,17 @@ final class ZoomiesBehavior {
         randomUnit: @escaping () -> Double = { Double.random(in: 0..<1) },
         dashCountRandomUnit: @escaping () -> Double = { Double.random(in: 0..<1) },
         now: @escaping () -> Date = Date.init,
-        temperament: @escaping () -> Temperament = { .normal }
+        temperament: @escaping () -> Temperament = { .normal },
+        scheduler: ((TimeInterval, @escaping @MainActor () -> Void) -> Void)? = nil
     ) {
         self.hasRunCompanions = hasRunCompanions
         self.eligibility = eligibility
         self.willStart = willStart
         self.nextTarget = nextTarget
+        self.directionToTarget = directionToTarget
+        self.showFrame = showFrame
+        self.showTravel = showTravel
+        self.showRunFallback = showRunFallback
         self.moveDash = moveDash
         self.cancelMovement = cancelMovement
         self.showIdle = showIdle
@@ -147,6 +197,11 @@ final class ZoomiesBehavior {
         self.dashCountRandomUnit = dashCountRandomUnit
         self.now = now
         self.temperament = temperament
+        self.scheduler = scheduler ?? { delay, action in
+            Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in
+                Task { @MainActor in action() }
+            }
+        }
     }
 
     func resumeScheduling() {
@@ -217,30 +272,94 @@ final class ZoomiesBehavior {
         isPerforming = true
         self.recordsSpacing = recordsSpacing
         sequenceID += 1
-        runDash(
-            remaining: ZoomiesSchedule.dashCount(randomUnit: dashCountRandomUnit()),
-            id: sequenceID
-        )
+        let id = sequenceID
+        let dashCount = ZoomiesSchedule.dashCount(randomUnit: dashCountRandomUnit())
+        playFrames(
+            ZoomiesChoreography.startFrames,
+            durations: ZoomiesChoreography.startDurations,
+            id: id
+        ) { [weak self] in
+            self?.runDash(
+                remaining: dashCount,
+                previousDirection: nil,
+                id: id
+            )
+        }
     }
 
-    private func runDash(remaining: Int, id: Int) {
+    private func runDash(remaining: Int, previousDirection: ScratchSide?, id: Int) {
         guard isCurrent(id) else { return }
         guard remaining > 0, let target = nextTarget() else {
             finish(id: id)
             return
         }
-        moveDash(target) { [weak self] in
+        let direction = directionToTarget(target)
+        let beginMovement = { [weak self] in
             guard let self, self.isCurrent(id) else { return }
-            self.runDash(remaining: remaining - 1, id: id)
+            if !self.showTravel(direction) { self.showRunFallback(direction) }
+            self.moveDash(target) { [weak self] in
+                guard let self, self.isCurrent(id) else { return }
+                self.runDash(
+                    remaining: remaining - 1,
+                    previousDirection: direction,
+                    id: id
+                )
+            }
         }
+        guard let previousDirection, previousDirection != direction else {
+            beginMovement()
+            return
+        }
+        let turnFrames = ZoomiesChoreography.turnFrames(toward: direction)
+        guard !turnFrames.isEmpty else {
+            showRunFallback(direction)
+            scheduler(ZoomiesChoreography.turnFallbackDuration, beginMovement)
+            return
+        }
+        playFrames(
+            turnFrames,
+            durations: Array(repeating: ZoomiesChoreography.turnFrameDuration, count: turnFrames.count),
+            id: id,
+            completion: beginMovement
+        )
     }
 
     private func finish(id: Int) {
         guard isCurrent(id) else { return }
-        showIdle()
-        isPerforming = false
-        if recordsSpacing { lastPerformedAt = now() }
-        didFinish()
+        playFrames(
+            ZoomiesChoreography.finishFrames,
+            durations: ZoomiesChoreography.finishDurations,
+            id: id
+        ) { [weak self] in
+            guard let self, self.isCurrent(id) else { return }
+            self.showIdle()
+            self.isPerforming = false
+            if self.recordsSpacing { self.lastPerformedAt = self.now() }
+            self.didFinish()
+        }
+    }
+
+    private func playFrames(
+        _ indices: [Int],
+        durations: [TimeInterval],
+        id: Int,
+        completion: @escaping @MainActor () -> Void
+    ) {
+        guard indices.count == durations.count, !indices.isEmpty else {
+            completion()
+            return
+        }
+        func play(at offset: Int) {
+            guard isCurrent(id), indices.indices.contains(offset) else { return }
+            _ = showFrame(indices[offset])
+            scheduler(durations[offset]) { [weak self] in
+                guard let self, self.isCurrent(id) else { return }
+                let next = offset + 1
+                if indices.indices.contains(next) { play(at: next) }
+                else { completion() }
+            }
+        }
+        play(at: 0)
     }
 
     private func isCurrent(_ id: Int) -> Bool {
